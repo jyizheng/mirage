@@ -2928,10 +2928,16 @@ class PersistentKernel:
             else:
                 stem = f"mirage_{self.mpi_rank}"
 
-            export_to_perfetto_trace(
-                self.profiler_tensor, stem + ".perfetto-trace"
-            )
+            # CSV first: it degrades gracefully on ring-buffer wrap, while the
+            # perfetto export can still fail on truncated traces (KeyError on
+            # blocks past the header count).
             export_to_csv(self.profiler_tensor, stem + ".csv")
+            try:
+                export_to_perfetto_trace(
+                    self.profiler_tensor, stem + ".perfetto-trace"
+                )
+            except Exception as e:
+                print(f"perfetto export failed (csv already written): {e}")
 
     def __del__(self):
         if not self.__finalized__:

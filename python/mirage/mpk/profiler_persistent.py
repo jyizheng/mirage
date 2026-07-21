@@ -160,15 +160,23 @@ def export_to_perfetto_trace(
 
     tid_map = {}
     track_map = {}
-    for block_idx in range(num_blocks):
-        pid = tgen.create_group(f"block_{block_idx}")
-        for group_idx in range(num_groups):
-            tid = pid.create_group(f"group_{group_idx}")
-            tid_map[(block_idx, group_idx)] = tid
+    pid_map = {}
+
+    # Events can reference blocks beyond the header's num_blocks (e.g. worker
+    # vs scheduler block ranges), so create groups lazily instead of
+    # preallocating from the header counts.
+    def get_tid(block_idx, group_idx):
+        if (block_idx, group_idx) not in tid_map:
+            if block_idx not in pid_map:
+                pid_map[block_idx] = tgen.create_group(f"block_{block_idx}")
+            tid_map[(block_idx, group_idx)] = pid_map[block_idx].create_group(
+                f"group_{group_idx}"
+            )
+        return tid_map[(block_idx, group_idx)]
 
     for block_idx, group_idx, event_idx, event_no, event_type, timestamp in events:
         event = event_name_list[event_idx] + f"_{event_no}"
-        tid = tid_map[(block_idx, group_idx)]
+        tid = get_tid(block_idx, group_idx)
 
         if (block_idx, group_idx, event_idx) in track_map:
             track = track_map[(block_idx, group_idx, event_idx)]
@@ -206,26 +214,22 @@ def export_to_csv(
 
     pending = {}  # (block, group, event_idx) -> (event_no, begin_ts)
     rows = []
+    skipped = 0
 
     for block_idx, group_idx, event_idx, event_no, event_type, timestamp in events:
         key = (block_idx, group_idx, event_idx)
         name = event_name_list.get(event_idx, f"UNKNOWN_{event_idx}")
 
         if event_type == EventType.kBegin.value:
-            if key in pending:
-                prev_no, prev_ts = pending[key]
-                raise RuntimeError(
-                    f"dangling BEGIN: block={block_idx} group={group_idx} "
-                    f"event={name} event_no={prev_no} ts={prev_ts} has no END "
-                    f"before next BEGIN at event_no={event_no}"
-                )
+            # A BEGIN already pending means its END was overwritten by a ring
+            # wrap; drop the stale one and keep the newer BEGIN.
+            skipped += key in pending
             pending[key] = (event_no, timestamp)
         elif event_type == EventType.kEnd.value:
             if key not in pending:
-                raise RuntimeError(
-                    f"END without matching BEGIN: block={block_idx} "
-                    f"group={group_idx} event={name} event_no={event_no}"
-                )
+                # END whose BEGIN was overwritten by a ring wrap; skip it.
+                skipped += 1
+                continue
             begin_no, begin_ts = pending.pop(key)
             duration = (timestamp - begin_ts) & 0xFFFFFFFF
             rows.append(
@@ -238,13 +242,11 @@ def export_to_csv(
                  timestamp, timestamp, 0)
             )
 
-    if pending:
-        (b, g, e), (no, ts) = next(iter(pending.items()))
-        name = event_name_list.get(e, f"UNKNOWN_{e}")
-        raise RuntimeError(
-            f"{len(pending)} dangling BEGIN event(s) with no matching END "
-            f"(profiler buffer likely overflowed). Example: block={b} "
-            f"group={g} event={name} event_no={no} ts={ts}"
+    if pending or skipped:
+        print(
+            f"[profiler] warning: skipped {skipped} unpaired event(s) and "
+            f"{len(pending)} dangling BEGIN(s) — profiler ring buffer "
+            f"wrapped; the CSV covers only the tail of the run"
         )
 
     with open(file_name, "w", newline="") as f:

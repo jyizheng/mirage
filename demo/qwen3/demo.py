@@ -116,6 +116,13 @@ if __name__ == "__main__":
         help="Not use the cutlass version kernel.",
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
+    parser.add_argument(
+        "--deterministic",
+        action="store_true",
+        help="Bitwise-deterministic and batch-invariant decoding: avoids the "
+        "split-K linear tasks, whose partials are combined with "
+        "tma_reduce_add in task-completion order (~12%% slower on B200).",
+    )
 
     # -------- Args for CI tests ----------
     parser.add_argument("--max-new-tokens", type=int, default=None, help="Decode cap for CI determinism")
@@ -485,8 +492,12 @@ if __name__ == "__main__":
         )
         x = y
         target_cc = torch.cuda.get_device_properties(0).major * 10 + torch.cuda.get_device_properties(0).minor
-        # A current workaround to use splitk for only B200 GPUs
-        use_splitk = (target_cc == 100)
+        # A current workaround to use splitk for only B200 GPUs.
+        # Split-K linear combines K-partials via tma_reduce_add (atomic, in
+        # task-completion order), so results are NOT deterministic across
+        # runs and NOT batch-invariant; --deterministic switches to the
+        # plain linear path whose per-element reduction order is fixed.
+        use_splitk = (target_cc == 100) and not args.deterministic
         for i, layer in enumerate(model.model.layers):
             # if i > 0:
             #     break
