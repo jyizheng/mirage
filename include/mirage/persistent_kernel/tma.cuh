@@ -965,6 +965,9 @@ __host__ inline void fill_tma_desc_by_task(CUtensorMap *tma_desc,
       }
       break;
     }
+    // the deterministic partial variant stores to a partials slice whose
+    // per-task dims/strides arrive through the same tensor descs
+    case TASK_SPLITK_PARTIAL_LINEAR_SM100:
     case TASK_SPLITK_LINEAR_SM100: {
       int const cp_async_size = 64;
       size_t const smem_repeat_row = 1;
@@ -1471,6 +1474,7 @@ __host__ inline void create_tma_desc_by_task(FullTaskDesc &task_desc) {
     case TASK_SPLITK_LINEAR_SWAPAB_HOPPER:
     case TASK_LINEAR_SM100:
     case TASK_LINEAR_WITH_RESIDUAL_SM100:
+    case TASK_SPLITK_PARTIAL_LINEAR_SM100:
     case TASK_SPLITK_LINEAR_SM100: {
       // all tensors have 1 tma_desc
       for (size_t param_id = 0;
