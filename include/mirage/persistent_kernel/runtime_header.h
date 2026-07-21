@@ -132,6 +132,11 @@ enum TaskType {
   TASK_EAGLE3_COMMIT = 236,
   TASK_MOE_W13_FP8_SM100 = 248,
   TASK_MOE_W2_FP8_SM100 = 249,
+  // Deterministic split-K: partial GEMMs store K-chunk results to a
+  // dedicated partials buffer (plain TMA store, no atomics); a separate
+  // TASK_SPLITK_REDUCE_SM100 combines them in fixed split order. Must stay
+  // inside the (TASK_SM100_TMA_START_TASK, TASK_SM100_TMA_END_TASK) range.
+  TASK_SPLITK_PARTIAL_LINEAR_SM100 = 250,
   TASK_SPLITK_LINEAR_SM100 = 251,
   TASK_LINEAR_WITH_RESIDUAL_SM100 = 252,
   TASK_LINEAR_SM100 = 253,
@@ -160,6 +165,9 @@ enum TaskType {
   TASK_LINEAR_FP8_SM100 = 276,
   TASK_LINEAR_FP8_WITH_RESIDUAL_SM100 = 277,
   TASK_MLA_KV_GATHER_SM100 = 278,
+  // Fixed-order combine of TASK_SPLITK_PARTIAL_LINEAR_SM100 outputs
+  // (+ residual); deterministic replacement for tma_reduce_add.
+  TASK_SPLITK_REDUCE_SM100 = 279,
   TASK_MOE_TOPK_SIGMOID_SM100 = 280,
   TASK_ELEMENTWISE_ADD_SM100 = 281,
   TASK_SOFTMAX_GATHER_SM100 = 282,

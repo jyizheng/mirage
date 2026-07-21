@@ -1889,6 +1889,60 @@ class PersistentKernel:
         else:
             assert False, f"Unsupported compute capability: {self.target_cc}"
 
+    def splitk_linear_det_layer(
+        self,
+        input: DTensor,
+        weight: DTensor,
+        residual: DTensor,
+        partials: DTensor,
+        output: DTensor,
+        grid_dim: tuple,
+        block_dim: tuple,
+        reduce_grid_dim: tuple,
+        reduce_block_dim: tuple = (128, 1, 1),
+    ):
+        """Deterministic split-K linear with residual:
+        output = residual + input @ weight^T.
+
+        Same task shape as splitk_linear_layer (grid x partitions the output
+        columns, grid y partitions the K dimension), but each K-split stores
+        its partial result to a disjoint slice of `partials` with a plain TMA
+        store instead of tma_reduce_add, and a follow-up reduce task combines
+        the splits (+ residual) in fixed order. This makes the result
+        bit-reproducible and batch-invariant, unlike splitk_linear_layer,
+        whose atomic accumulation order follows task completion.
+
+        `partials` must be a (num_splits * batch_size, output_size) tensor
+        where num_splits == grid_dim[1].
+        """
+        assert input.num_dims == 2  # (batch_size, hidden_size / world_size)
+        assert weight.num_dims == 2  # (hidden_size, hidden_size / world_size)
+        assert residual.num_dims == 2  # (batch_size, hidden_size)
+        assert partials.num_dims == 2
+        assert output.num_dims == 2  # (batch_size, hidden_size)
+        num_splits = grid_dim[1]
+        assert partials.dim(0) == num_splits * output.dim(0)
+        assert partials.dim(1) == output.dim(1)
+
+        # Phase A: split-K partial GEMMs, one disjoint partials slice each
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(input, (-1, 1, -1), 1, True)
+        tb_graph.new_input(weight, (0, 1, -1), 1, True)
+        tb_graph.new_input(partials, (1, 0, -1), -1, True)
+        self.kn_graph.customized([input, weight, partials], tb_graph)
+        assert (
+            self.target_cc == 100
+        ), "splitk_linear_det_layer is only implemented for SM100"
+        self.kn_graph.register_task(tb_graph, "splitk_partial_linear_sm100")
+
+        # Phase B: fixed-order combine of the splits, plus residual
+        tb_graph = TBGraph(CyTBGraph(reduce_grid_dim, reduce_block_dim, 1, 64))
+        tb_graph.new_input(partials, (1, -1, -1), -1, True)
+        tb_graph.new_input(residual, (1, -1, -1), -1, True)
+        tb_graph.new_input(output, (1, -1, -1), -1, True)
+        self.kn_graph.customized([partials, residual, output], tb_graph)
+        self.kn_graph.register_task(tb_graph, "splitk_reduce_sm100")
+
     def linear_with_residual_layer(
         self,
         input: DTensor,

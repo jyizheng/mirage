@@ -119,9 +119,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--deterministic",
         action="store_true",
-        help="Bitwise-deterministic and batch-invariant decoding: avoids the "
-        "split-K linear tasks, whose partials are combined with "
-        "tma_reduce_add in task-completion order (~12%% slower on B200).",
+        help="Bitwise-deterministic and batch-invariant decoding: split-K "
+        "linears store partials to a dedicated buffer and combine them in "
+        "fixed order, instead of tma_reduce_add accumulation in "
+        "task-completion order.",
     )
 
     # -------- Args for CI tests ----------
@@ -495,9 +496,10 @@ if __name__ == "__main__":
         # A current workaround to use splitk for only B200 GPUs.
         # Split-K linear combines K-partials via tma_reduce_add (atomic, in
         # task-completion order), so results are NOT deterministic across
-        # runs and NOT batch-invariant; --deterministic switches to the
-        # plain linear path whose per-element reduction order is fixed.
-        use_splitk = (target_cc == 100) and not args.deterministic
+        # runs and NOT batch-invariant; --deterministic keeps split-K but
+        # routes it through splitk_linear_det_layer, which stores partials
+        # to a dedicated buffer and combines them in fixed order.
+        use_splitk = (target_cc == 100)
         for i, layer in enumerate(model.model.layers):
             # if i > 0:
             #     break
@@ -613,7 +615,25 @@ if __name__ == "__main__":
             w = mpk.attach_input(
                 torch_tensor=layer.self_attn.o_proj.weight, name=f"layer_{i}_o_proj"
             )
-            if use_splitk:
+            if use_splitk and args.deterministic:
+                num_splits = 128 * 128 // hidden_size
+                o_proj_partials = mpk.new_tensor(
+                    dims=(num_splits * args.max_num_batched_tokens, hidden_size),
+                    dtype=mi.bfloat16,
+                    name=f"layer_{i}_o_proj_partials",
+                    io_category="cuda_tensor",
+                )
+                mpk.splitk_linear_det_layer(
+                    input=attn_out,
+                    weight=w,
+                    residual=x,
+                    partials=o_proj_partials,
+                    output=attn_proj_out,
+                    grid_dim=(hidden_size // 128, num_splits, 1),
+                    block_dim=(256, 1, 1),
+                    reduce_grid_dim=(hidden_size // 128, 1, 1),
+                )
+            elif use_splitk:
                 attn_proj_out = x
                 mpk.splitk_linear_layer(
                     input=attn_out,
@@ -693,7 +713,25 @@ if __name__ == "__main__":
             w = mpk.attach_input(
                 torch_tensor=layer.mlp.down_proj.weight, name=f"layer_{i}_down_proj"
             )
-            if use_splitk:
+            if use_splitk and args.deterministic:
+                num_splits = 128 * 128 // hidden_size
+                down_proj_partials = mpk.new_tensor(
+                    dims=(num_splits * args.max_num_batched_tokens, hidden_size),
+                    dtype=mi.bfloat16,
+                    name=f"layer_{i}_down_proj_partials",
+                    io_category="cuda_tensor",
+                )
+                mpk.splitk_linear_det_layer(
+                    input=silu_mul_out,
+                    weight=w,
+                    residual=x,
+                    partials=down_proj_partials,
+                    output=mlp_out,
+                    grid_dim=(hidden_size // 128, num_splits, 1),
+                    block_dim=(256, 1, 1),
+                    reduce_grid_dim=(hidden_size // 128, 1, 1),
+                )
+            elif use_splitk:
                 mlp_out = x
                 mpk.splitk_linear_layer(
                     input=silu_mul_out,

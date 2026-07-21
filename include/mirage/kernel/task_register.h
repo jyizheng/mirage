@@ -91,7 +91,10 @@ public:
   // SM100 tasks
   int register_splitk_linear_sm100_task(threadblock::Graph const &bgraph,
                                         std::vector<int> const &params,
-                                        bool with_residual);
+                                        bool with_residual,
+                                        bool partial_out = false);
+  int register_splitk_reduce_sm100_task(threadblock::Graph const &bgraph,
+                                        std::vector<int> const &params);
   int register_linear_sm100_task(threadblock::Graph const &bgraph,
                                  std::vector<int> const &params,
                                  bool with_residual);

@@ -1878,8 +1878,16 @@ int TaskRegister::register_linear_sm100_task(threadblock::Graph const &bgraph,
 int TaskRegister::register_splitk_linear_sm100_task(
     threadblock::Graph const &bgraph,
     std::vector<int> const &params,
-    bool with_residual) {
+    bool with_residual,
+    bool partial_out) {
   assert(params.size() == 0);
+  // partial_out: deterministic split-K variant. Each task stores its
+  // K-chunk result to a disjoint slice of a partials buffer with a plain
+  // TMA store; a TASK_SPLITK_REDUCE_SM100 task combines the slices in
+  // fixed order. The default (partial_out=false) accumulates directly into
+  // the output with tma_reduce_add, whose combine order follows task
+  // completion and is therefore non-deterministic.
+  assert(!partial_out || !with_residual);
   int batch_size = 0, output_size = 0, reduction_size = 0, output_stride = 0,
       reduction_stride = 0;
   std::vector<tb::TBInputOp *> input_ops;
@@ -2011,7 +2019,7 @@ int TaskRegister::register_splitk_linear_sm100_task(
          output_size,
          reduction_size,
          with_residual ? "false" : "true",
-         /*SplitK=*/"true",
+         /*SplitK=*/partial_out ? "false" : "true",
          num_ab_stages,
          num_acc_stages,
          num_c_stages);
@@ -2020,7 +2028,53 @@ int TaskRegister::register_splitk_linear_sm100_task(
   code.e("    mBias,");
   code.e("    tma_out); ");
 
-  return register_task_variant(TASK_SPLITK_LINEAR_SM100, code.to_string());
+  return register_task_variant(partial_out ? TASK_SPLITK_PARTIAL_LINEAR_SM100
+                                           : TASK_SPLITK_LINEAR_SM100,
+                               code.to_string());
+}
+
+int TaskRegister::register_splitk_reduce_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  assert(params.size() == 0);
+  std::vector<tb::TBInputOp *> input_ops;
+  std::vector<tb::TBInputOp *> output_ops;
+  int num_inputs = 2;
+  int num_outputs = 1;
+  assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
+  for (auto const &op : bgraph.operators) {
+    assert(op->op_type == mirage::type::TB_INPUT_OP);
+    if (input_ops.size() < (size_t)num_inputs) {
+      input_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    } else {
+      output_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    }
+  }
+  // inputs[0]: partials (NUM_SPLITS * batch_size, output tile)
+  // inputs[1]: residual (batch_size, output tile)
+  // outputs[0]: output  (batch_size, output tile)
+  assert(output_ops[0]->output_tensors[0].num_dims == 2);
+  int batch_size = output_ops[0]->output_tensors[0].dim[0];
+  int output_size = output_ops[0]->output_tensors[0].dim[1];
+  int output_stride = output_ops[0]->dtensor.dim[1];
+  assert(input_ops[0]->output_tensors[0].num_dims == 2);
+  int partial_rows = input_ops[0]->output_tensors[0].dim[0];
+  int partial_stride = input_ops[0]->dtensor.dim[1];
+  assert(partial_rows % batch_size == 0);
+  int num_splits = partial_rows / batch_size;
+  assert(input_ops[1]->output_tensors[0].dim[0] == batch_size);
+
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::splitk_reduce_task_impl<cute::bfloat16_t, $, $, $, $, $>(",
+         num_splits,
+         batch_size,
+         output_size,
+         partial_stride,
+         output_stride);
+  code.e("    task_desc->input_ptrs[0],");
+  code.e("    task_desc->input_ptrs[1],");
+  code.e("    task_desc->output_ptrs[0]);");
+  return register_task_variant(TASK_SPLITK_REDUCE_SM100, code.to_string());
 }
 
 int TaskRegister::register_paged_attention_sm100_task(

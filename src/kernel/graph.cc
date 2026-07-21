@@ -612,6 +612,19 @@ void Graph::register_task(char const *task_type, std::vector<int> params) {
         customized->bgraph, params, false /*with_residual*/);
     task_config[op] =
         std::make_tuple(2, 1, TASK_SPLITK_LINEAR_SM100, variant_id);
+  } else if (name == "splitk_partial_linear_sm100") {
+    int variant_id = task_register->register_splitk_linear_sm100_task(
+        customized->bgraph,
+        params,
+        false /*with_residual*/,
+        true /*partial_out*/);
+    task_config[op] =
+        std::make_tuple(2, 1, TASK_SPLITK_PARTIAL_LINEAR_SM100, variant_id);
+  } else if (name == "splitk_reduce_sm100") {
+    int variant_id = task_register->register_splitk_reduce_sm100_task(
+        customized->bgraph, params);
+    task_config[op] =
+        std::make_tuple(2, 1, TASK_SPLITK_REDUCE_SM100, variant_id);
   } else if (name == "linear_with_residual_sm100") {
     int variant_id = task_register->register_linear_sm100_task(
         customized->bgraph, params, true /*with_residual*/);
