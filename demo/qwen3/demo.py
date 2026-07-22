@@ -117,6 +117,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
     parser.add_argument(
+        "--capture-probs",
+        action="store_true",
+        help="Capture P(chosen token) at every step into a per-position "
+        "buffer (softmax_gather + prob_scatter) and include it in "
+        "--dump-tokens-file output.",
+    )
+    parser.add_argument(
         "--prompt-ids-file",
         type=str,
         default=None,
@@ -279,6 +286,11 @@ if __name__ == "__main__":
     # get all model weight tensors
     input_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
     output_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
+    prob_buffer_torch = torch.zeros(
+        (args.max_num_batched_tokens, args.max_seq_length),
+        dtype=torch.float32,
+        device="cuda",
+    )
     prev_pos = 0
 
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(
@@ -832,6 +844,38 @@ if __name__ == "__main__":
             grid_dim=argmax_reduce_grid_dim,
             block_dim=(128, 1, 1),
         )
+        if args.capture_probs:
+            # Per-step probability capture for the rescore-consistency
+            # harness: P(chosen token) = softmax(logits)[argmax_out],
+            # scattered into prob_buffer[0, step]. Only row 0 (request 0,
+            # single-token decode) is meaningful; prefill-chunk iterations
+            # write don't-care values at prefill positions.
+            prob_current = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, 1),
+                dtype=mi.float32,
+                name="prob_current",
+                io_category="cuda_tensor",
+            )
+            prob_buffer = mpk.attach_input(
+                torch_tensor=prob_buffer_torch, name="prob_buffer"
+            )
+            mpk.softmax_gather_layer(
+                logits=argmax_in,
+                token_ids=argmax_out,
+                output_probs=prob_current,
+                grid_dim=(1, 1, 1),
+                block_dim=(256, 1, 1),
+            )
+            mpk.prob_scatter_layer(
+                prob=prob_current,
+                step_counter=mpk.attach_input(
+                    torch_tensor=step, name="step_for_prob_scatter"
+                ),
+                buffer=prob_buffer,
+                grid_dim=(1, 1, 1),
+                block_dim=(1, 1, 1),
+                max_positions=args.max_seq_length,
+            )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(
                 spec_decode_config = spec_decode_config,
@@ -937,14 +981,17 @@ if __name__ == "__main__":
         )
 
         if args.dump_tokens_file and rank == 0:
+            out = {
+                "prompt_length": prompt_lengths[0].item(),
+                "token_ids": tokens[0, : step[0].item() + 1].tolist(),
+            }
+            if args.capture_probs:
+                # raw float32 bit patterns so the harness can compare bitwise
+                probs = prob_buffer_torch[0, : step[0].item() + 1]
+                out["prob_bits"] = probs.view(torch.int32).tolist()
+                out["probs"] = probs.tolist()
             with open(args.dump_tokens_file, "w") as f:
-                json.dump(
-                    {
-                        "prompt_length": prompt_lengths[0].item(),
-                        "token_ids": tokens[0, : step[0].item() + 1].tolist(),
-                    },
-                    f,
-                )
+                json.dump(out, f)
             print(f"Dumped token ids to {args.dump_tokens_file}")
 
         # -------- CI dumps outputs to json files ----------

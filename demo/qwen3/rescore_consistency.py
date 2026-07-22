@@ -33,7 +33,7 @@ det = ["--deterministic"] if args.deterministic else []
 
 def run_demo(extra, log_name):
     cmd = (
-        [sys.executable, "demo.py", "--use-mirage"]
+        [sys.executable, "demo.py", "--use-mirage", "--capture-probs"]
         + det
         + ["--max-new-tokens", str(args.max_new_tokens)]
         + extra
@@ -74,14 +74,38 @@ for k in args.ks:
     ref_cont = ref_ids[p0 + k : p0 + k + n]
     got_cont = got[p0 + k : p0 + k + n]
     if ref_cont == got_cont:
-        print(f"K={k}: MATCH over {n} continuation tokens")
+        print(f"K={k}: token MATCH over {n} continuation tokens")
     else:
         first = next(i for i in range(n) if ref_cont[i] != got_cont[i])
         failures += 1
         print(
-            f"K={k}: MISMATCH at continuation offset {first} "
+            f"K={k}: token MISMATCH at continuation offset {first} "
             f"(ref={ref_cont[first]} got={got_cont[first]})"
         )
+        continue
+    # bitwise probability comparison over the decode region of run-K.
+    # buffer indices track the runtime step counter, which advances the same
+    # way in both runs for the same absolute position, so slots align.
+    if "prob_bits" in ref and "prob_bits" in out:
+        rb, gb = ref["prob_bits"], out["prob_bits"]
+        m = min(len(rb), len(gb))
+        # run-K's decode-region capture starts after its own prompt
+        start = p0 + k
+        diffs = [
+            i for i in range(start, m) if rb[i] != gb[i] and gb[i] != 0
+        ]
+        checked = sum(1 for i in range(start, m) if gb[i] != 0)
+        if not diffs:
+            print(f"K={k}: prob BITWISE MATCH over {checked} positions")
+        else:
+            failures += 1
+            i = diffs[0]
+            print(
+                f"K={k}: prob BITWISE MISMATCH at pos {i} "
+                f"(ref_bits={rb[i] & 0xFFFFFFFF:#010x} "
+                f"got_bits={gb[i] & 0xFFFFFFFF:#010x}, "
+                f"{len(diffs)}/{checked} positions differ)"
+            )
 
 print("RESULT:", "ALL MATCH" if failures == 0 else f"{failures} mismatching K values")
 sys.exit(1 if failures else 0)
