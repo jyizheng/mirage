@@ -20,6 +20,7 @@ import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--ks", type=int, nargs="+", default=[8, 16, 24, 32, 48])
+parser.add_argument("--full-rescore", action="store_true")
 parser.add_argument("--deterministic", action="store_true")
 parser.add_argument("--max-new-tokens", type=int, default=96)
 parser.add_argument("--workdir", default="/tmp/rescore")
@@ -107,5 +108,50 @@ for k in args.ks:
                 f"{len(diffs)}/{checked} positions differ)"
             )
 
-print("RESULT:", "ALL MATCH" if failures == 0 else f"{failures} mismatching K values")
+# Full rescore: feed the ENTIRE trajectory as prompt; the
+# prefill_prob_capture task then computes the teacher-forcing probability
+# of every trajectory token during chunked prefill. Compare bitwise against
+# the reference run's decode-time capture — this is exactly the
+# rollout-vs-rescore logprob comparison an RL trainer performs
+# (miles' recompute_logprobs_via_prefill / input_token_logprobs).
+if args.full_rescore:
+    pf = os.path.join(args.workdir, "prompt_full.json")
+    json.dump(ref_ids, open(pf, "w"))
+    of = os.path.join(args.workdir, "out_full.json")
+    run_demo(["--prompt-ids-file", pf, "--dump-tokens-file", of], "full.log")
+    out = json.load(open(of))
+    rb, gb = ref["prob_bits"], out["prob_bits"]
+    # decode capture in the reference run covers the generated region; find
+    # the slot alignment (should be shift 0) and compare bitwise
+    lo = p0 + 1
+    hi = min(len(rb), len(gb)) - 2
+    best = None
+    for shift in range(-2, 3):
+        m = sum(
+            1
+            for i in range(lo, hi)
+            if rb[i] != 0 and 0 <= i + shift < len(gb) and rb[i] == gb[i + shift]
+        )
+        if best is None or m > best[1]:
+            best = (shift, m)
+    shift, matched = best
+    total = sum(1 for i in range(lo, hi) if rb[i] != 0)
+    mism = [
+        i
+        for i in range(lo, hi)
+        if rb[i] != 0 and rb[i] != gb[i + shift]
+    ]
+    if not mism and total > 0:
+        print(
+            f"FULL RESCORE: BITWISE MATCH over {matched}/{total} positions "
+            f"(slot shift {shift})"
+        )
+    else:
+        failures += 1
+        print(
+            f"FULL RESCORE: {len(mism)}/{total} positions differ "
+            f"(best shift {shift}); first diff at {mism[0] if mism else '-'}"
+        )
+
+print("RESULT:", "ALL MATCH" if failures == 0 else f"{failures} mismatching checks")
 sys.exit(1 if failures else 0)

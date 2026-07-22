@@ -625,6 +625,11 @@ void Graph::register_task(char const *task_type, std::vector<int> params) {
         customized->bgraph, params);
     task_config[op] =
         std::make_tuple(2, 1, TASK_SPLITK_REDUCE_SM100, variant_id);
+  } else if (name == "prefill_prob_capture_sm100") {
+    int variant_id = task_register->register_prefill_prob_capture_sm100_task(
+        customized->bgraph, params);
+    task_config[op] =
+        std::make_tuple(2, 1, TASK_PREFILL_PROB_CAPTURE_SM100, variant_id);
   } else if (name == "linear_with_residual_sm100") {
     int variant_id = task_register->register_linear_sm100_task(
         customized->bgraph, params, true /*with_residual*/);

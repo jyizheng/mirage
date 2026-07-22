@@ -2365,6 +2365,30 @@ class PersistentKernel:
         self.kn_graph.customized([output_tokens, mtp_input_tokens], tb_graph)
         self.kn_graph.register_task(tb_graph, "mtp_build_embed_input", params)
 
+    def prefill_prob_capture_layer(
+        self,
+        logits: DTensor,          # [max_tokens, vocab_size] BF16
+        prompt_lengths: DTensor,  # [num_requests] int32
+        buffer: DTensor,          # [num_requests, max_seq] float32
+        page_size: int,
+        grid_dim: tuple = (1, 1, 1),
+        block_dim: tuple = (256, 1, 1),
+    ):
+        """Teacher-forcing per-position probability capture: for every
+        prefill row, buffer[r, step_r + i] = softmax(logits[row])[next
+        prompt token]. Same softmax code as softmax_gather, so the values
+        are bitwise-comparable with the decode-side capture."""
+        assert logits.num_dims == 2
+        assert buffer.num_dims == 2
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(logits, (-1, -1, -1), -1, True)
+        tb_graph.new_input(prompt_lengths, (-1, -1, -1), -1, True)
+        tb_graph.new_input(buffer, (-1, -1, -1), -1, True)
+        self.kn_graph.customized([logits, prompt_lengths, buffer], tb_graph)
+        self.kn_graph.register_task(
+            tb_graph, "prefill_prob_capture_sm100", [page_size]
+        )
+
     def softmax_gather_layer(
         self,
         logits: DTensor,          # [batch, vocab_size] BF16

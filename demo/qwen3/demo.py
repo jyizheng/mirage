@@ -876,6 +876,16 @@ if __name__ == "__main__":
                 block_dim=(1, 1, 1),
                 max_positions=args.max_seq_length,
             )
+            # teacher-forcing capture over prefill rows (rescore pass):
+            # fills the same buffer slots a decode pass would have
+            mpk.prefill_prob_capture_layer(
+                logits=argmax_in,
+                prompt_lengths=mpk.attach_input(
+                    torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
+                ),
+                buffer=prob_buffer,
+                page_size=args.page_size,
+            )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(
                 spec_decode_config = spec_decode_config,

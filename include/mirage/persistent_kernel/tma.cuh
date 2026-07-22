@@ -1467,6 +1467,10 @@ __host__ inline void create_tma_desc_for_tensor(FullTaskDesc &task_desc,
 
 __host__ inline void create_tma_desc_by_task(FullTaskDesc &task_desc) {
   switch (task_desc.task_type) {
+    case TASK_PREFILL_PROB_CAPTURE_SM100:
+      // plain-pointer task; its id sits inside the SM100 TMA range but it
+      // has no TMA descriptors
+      break;
     case TASK_LINEAR_HOPPER:
     case TASK_LINEAR_WITH_RESIDUAL_HOPPER:
     case TASK_LINEAR_SWAPAB_HOPPER:

@@ -2083,6 +2083,50 @@ int TaskRegister::register_splitk_reduce_sm100_task(
   return register_task_variant(TASK_SPLITK_REDUCE_SM100, code.to_string());
 }
 
+int TaskRegister::register_prefill_prob_capture_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params[0]: page_size
+  assert(params.size() == 1);
+  int page_size = params[0];
+  std::vector<tb::TBInputOp *> input_ops;
+  std::vector<tb::TBInputOp *> output_ops;
+  int num_inputs = 2;
+  int num_outputs = 1;
+  assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
+  for (auto const &op : bgraph.operators) {
+    assert(op->op_type == mirage::type::TB_INPUT_OP);
+    if (input_ops.size() < (size_t)num_inputs) {
+      input_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    } else {
+      output_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    }
+  }
+  // inputs[0]: logits [max_tokens, vocab]; inputs[1]: prompt_lengths [R]
+  // outputs[0]: prob buffer [R, max_seq]
+  int vocab_size = input_ops[0]->output_tensors[0].dim[1];
+  int num_requests = output_ops[0]->output_tensors[0].dim[0];
+  int max_seq = output_ops[0]->output_tensors[0].dim[1];
+
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::prefill_prob_capture_task_impl<cute::bfloat16_t, $, $, $, "
+         "$>(",
+         num_requests,
+         vocab_size,
+         max_seq,
+         page_size);
+  code.e("    task_desc->input_ptrs[0],");
+  code.e("    static_cast<int const *>(task_desc->input_ptrs[1]),");
+  code.e("    task_desc->output_ptrs[0],");
+  code.e("    runtime_config.qo_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_last_page_len_buffer,");
+  code.e("    runtime_config.tokens,");
+  code.e("    runtime_config.step);");
+  return register_task_variant(TASK_PREFILL_PROB_CAPTURE_SM100,
+                               code.to_string());
+}
+
 int TaskRegister::register_paged_attention_sm100_task(
     threadblock::Graph const &bgraph, std::vector<int> const &params) {
   // params[0]: num_q_heads
