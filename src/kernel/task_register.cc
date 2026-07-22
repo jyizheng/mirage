@@ -2035,7 +2035,11 @@ int TaskRegister::register_splitk_linear_sm100_task(
 
 int TaskRegister::register_splitk_reduce_sm100_task(
     threadblock::Graph const &bgraph, std::vector<int> const &params) {
-  assert(params.size() == 0);
+  // params[0] (optional): enable_residual. Under tensor parallelism only
+  // rank 0 adds the residual (outputs are allreduced afterwards), mirroring
+  // register_linear_sm100_task's convention.
+  assert(params.size() <= 1);
+  bool enable_residual = params.empty() || params[0] != 0;
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
   int num_inputs = 2;
@@ -2065,12 +2069,14 @@ int TaskRegister::register_splitk_reduce_sm100_task(
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
-  code.e("kernel::splitk_reduce_task_impl<cute::bfloat16_t, $, $, $, $, $>(",
+  code.e("kernel::splitk_reduce_task_impl<cute::bfloat16_t, $, $, $, $, $, "
+         "$>(",
          num_splits,
          batch_size,
          output_size,
          partial_stride,
-         output_stride);
+         output_stride,
+         enable_residual ? "true" : "false");
   code.e("    task_desc->input_ptrs[0],");
   code.e("    task_desc->input_ptrs[1],");
   code.e("    task_desc->output_ptrs[0]);");

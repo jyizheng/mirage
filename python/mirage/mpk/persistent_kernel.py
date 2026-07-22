@@ -1935,13 +1935,21 @@ class PersistentKernel:
         ), "splitk_linear_det_layer is only implemented for SM100"
         self.kn_graph.register_task(tb_graph, "splitk_partial_linear_sm100")
 
-        # Phase B: fixed-order combine of the splits, plus residual
+        # Phase B: fixed-order combine of the splits, plus residual. Under
+        # tensor parallelism only rank 0 adds the residual, since the outputs
+        # are allreduced across ranks afterwards (same convention as
+        # linear_with_residual_layer).
         tb_graph = TBGraph(CyTBGraph(reduce_grid_dim, reduce_block_dim, 1, 64))
         tb_graph.new_input(partials, (1, -1, -1), -1, True)
         tb_graph.new_input(residual, (1, -1, -1), -1, True)
         tb_graph.new_input(output, (1, -1, -1), -1, True)
         self.kn_graph.customized([partials, residual, output], tb_graph)
-        self.kn_graph.register_task(tb_graph, "splitk_reduce_sm100")
+        enable_residual = 1
+        if self.world_size > 1 and self.mpi_rank != 0:
+            enable_residual = 0
+        self.kn_graph.register_task(
+            tb_graph, "splitk_reduce_sm100", [enable_residual]
+        )
 
     def linear_with_residual_layer(
         self,

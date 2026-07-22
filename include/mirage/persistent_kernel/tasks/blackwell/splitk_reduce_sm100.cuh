@@ -27,12 +27,16 @@ namespace kernel {
 // not depend on task scheduling or on how many requests share the batch —
 // unlike the tma_reduce_add path of TASK_SPLITK_LINEAR_SM100, whose partials
 // combine in task-completion order.
+// WITH_RESIDUAL mirrors the enable_residual convention of
+// linear_with_residual: under tensor parallelism only rank 0 adds the
+// residual, since the outputs are subsequently allreduced across ranks.
 template <typename T,
           int NUM_SPLITS,
           int BATCH_SIZE,
           int OUTPUT_SIZE,
           int PARTIAL_STRIDE,
-          int STRIDE>
+          int STRIDE,
+          bool WITH_RESIDUAL = true>
 __device__ __forceinline__ void splitk_reduce_task_impl(
     void const *partials_ptr, void const *residual_ptr, void *output_ptr) {
   T const *__restrict__ partials = static_cast<T const *>(partials_ptr);
@@ -43,7 +47,7 @@ __device__ __forceinline__ void splitk_reduce_task_impl(
   for (int i = threadIdx.x; i < BATCH_SIZE * OUTPUT_SIZE; i += blockDim.x) {
     int row = i / OUTPUT_SIZE;
     int col = i % OUTPUT_SIZE;
-    float acc = float(residual[row * STRIDE + col]);
+    float acc = WITH_RESIDUAL ? float(residual[row * STRIDE + col]) : 0.0f;
 #pragma unroll
     for (int s = 0; s < NUM_SPLITS; s++) {
       acc += float(partials[(s * BATCH_SIZE + row) * PARTIAL_STRIDE + col]);
