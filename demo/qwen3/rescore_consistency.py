@@ -1,0 +1,87 @@
+# Decode-vs-rescore consistency harness (RL zero-logprob-diff, necessary
+# condition at token level).
+#
+# Run 1 decodes a trajectory token-by-token. Runs 2..n replay a prefix of
+# that trajectory (prompt + first K generated tokens, fed as raw token ids)
+# through chunked prefill, then continue decoding. If the KV cache built by
+# prefill is bitwise-identical to the one built by decode — the property an
+# RL trainer relies on when rescoring rollout tokens — every continuation
+# must reproduce the reference suffix exactly. Each K probes one
+# prefill/decode boundary position; disagreement at any position would
+# surface as a diverging continuation (greedy decoding amplifies any logits
+# mismatch at near-ties).
+#
+# Usage (on a B200 machine, from demo/qwen3):
+#   python rescore_consistency.py --ks 8 16 24 32 48 [--deterministic]
+import argparse
+import json
+import subprocess
+import sys
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--ks", type=int, nargs="+", default=[8, 16, 24, 32, 48])
+parser.add_argument("--deterministic", action="store_true")
+parser.add_argument("--max-new-tokens", type=int, default=96)
+parser.add_argument("--workdir", default="/tmp/rescore")
+args = parser.parse_args()
+
+import os
+
+os.makedirs(args.workdir, exist_ok=True)
+det = ["--deterministic"] if args.deterministic else []
+
+
+def run_demo(extra, log_name):
+    cmd = (
+        [sys.executable, "demo.py", "--use-mirage"]
+        + det
+        + ["--max-new-tokens", str(args.max_new_tokens)]
+        + extra
+    )
+    log = os.path.join(args.workdir, log_name)
+    with open(log, "w") as f:
+        r = subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT)
+    if r.returncode != 0:
+        print(f"FAILED ({log_name}): see {log}")
+        sys.exit(1)
+
+
+# Run 1: reference trajectory
+ref_file = os.path.join(args.workdir, "ref.json")
+run_demo(["--dump-tokens-file", ref_file], "ref.log")
+ref = json.load(open(ref_file))
+ref_ids, p0 = ref["token_ids"], ref["prompt_length"]
+gen_len = len(ref_ids) - p0
+print(f"reference: prompt={p0} generated={gen_len}")
+
+# Runs 2..n: replay prompt + K generated tokens as prompt, continue
+failures = 0
+for k in args.ks:
+    if k >= gen_len:
+        print(f"K={k}: skipped (>= generated length {gen_len})")
+        continue
+    prefix = ref_ids[: p0 + k]
+    pf = os.path.join(args.workdir, f"prompt_k{k}.json")
+    json.dump(prefix, open(pf, "w"))
+    of = os.path.join(args.workdir, f"out_k{k}.json")
+    run_demo(
+        ["--prompt-ids-file", pf, "--dump-tokens-file", of], f"k{k}.log"
+    )
+    out = json.load(open(of))
+    got = out["token_ids"]
+    # compare the continuation region (positions p0+k .. end of shorter run)
+    n = min(len(ref_ids), len(got)) - (p0 + k)
+    ref_cont = ref_ids[p0 + k : p0 + k + n]
+    got_cont = got[p0 + k : p0 + k + n]
+    if ref_cont == got_cont:
+        print(f"K={k}: MATCH over {n} continuation tokens")
+    else:
+        first = next(i for i in range(n) if ref_cont[i] != got_cont[i])
+        failures += 1
+        print(
+            f"K={k}: MISMATCH at continuation offset {first} "
+            f"(ref={ref_cont[first]} got={got_cont[first]})"
+        )
+
+print("RESULT:", "ALL MATCH" if failures == 0 else f"{failures} mismatching K values")
+sys.exit(1 if failures else 0)

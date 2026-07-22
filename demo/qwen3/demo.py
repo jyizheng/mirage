@@ -117,6 +117,20 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
     parser.add_argument(
+        "--prompt-ids-file",
+        type=str,
+        default=None,
+        help="JSON file with a list of prompt token ids; bypasses the chat "
+        "template and tokenizer (for rescore-consistency experiments).",
+    )
+    parser.add_argument(
+        "--dump-tokens-file",
+        type=str,
+        default=None,
+        help="Write all token ids of request 0 (prompt + generated) to this "
+        "JSON file after generation.",
+    )
+    parser.add_argument(
         "--deterministic",
         action="store_true",
         help="Bitwise-deterministic and batch-invariant decoding: split-K "
@@ -246,6 +260,15 @@ if __name__ == "__main__":
         messages, tokenize=False, add_generation_prompt=True
     )
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    if args.prompt_ids_file:
+        # Feed the prompt as raw token ids (no chat template, no
+        # re-tokenization) — required by the decode-vs-rescore consistency
+        # harness, where a previous run's tokens become the next run's prompt.
+        with open(args.prompt_ids_file) as f:
+            prompt_ids = json.load(f)
+        model_inputs.input_ids = torch.tensor(
+            [prompt_ids], dtype=torch.long, device=model.device
+        )
     for r in range(total_num_requests):
         for i in range(model_inputs.input_ids.shape[-1]):
             tokens[r, i] = model_inputs.input_ids[0, i]
@@ -912,6 +935,17 @@ if __name__ == "__main__":
               prompt_lengths[0], tokens_generated, per_tok_ms
             )
         )
+
+        if args.dump_tokens_file and rank == 0:
+            with open(args.dump_tokens_file, "w") as f:
+                json.dump(
+                    {
+                        "prompt_length": prompt_lengths[0].item(),
+                        "token_ids": tokens[0, : step[0].item() + 1].tolist(),
+                    },
+                    f,
+                )
+            print(f"Dumped token ids to {args.dump_tokens_file}")
 
         # -------- CI dumps outputs to json files ----------
         if save_path and rank == 0:
