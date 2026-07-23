@@ -1,3 +1,5 @@
+import os
+
 from safetensors.torch import load_model
 import torch
 
@@ -253,8 +255,13 @@ class Qwen3Builder(GraphBuilder):
                      state_dict: dict):
         # add rmsnorm + linear
         target_cc = torch.cuda.get_device_properties(0).major * 10 + torch.cuda.get_device_properties(0).minor
-        # A current workaround to use splitk for only B200 GPUs
+        # A current workaround to use splitk for only B200 GPUs.
+        # MPK_DETERMINISTIC=1 keeps split-K but routes it through the
+        # deterministic partials + fixed-order-reduce path (bitwise
+        # reproducible and batch-invariant; the default tma_reduce_add
+        # combine is neither).
         use_splitk = (target_cc == 100)
+        deterministic = bool(int(os.environ.get("MPK_DETERMINISTIC", "0")))
         for i in range(self.num_layers):
             prefix = f"model.layers.{i}."
             w_norm = self.mpk.attach_input(
@@ -376,7 +383,25 @@ class Qwen3Builder(GraphBuilder):
             self.w = self.mpk.attach_input(
                 torch_tensor=state_dict[f"{prefix}self_attn.o_proj.weight"], name=f"layer_{i}_o_proj"
             )
-            if use_splitk:
+            if use_splitk and deterministic:
+                num_splits = 128 * 128 // self.hidden_size
+                o_proj_partials = self.mpk.new_tensor(
+                    dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
+                    dtype=bfloat16,
+                    name=f"layer_{i}_o_proj_partials",
+                    io_category="cuda_tensor",
+                )
+                self.mpk.splitk_linear_det_layer(
+                    input=self.attn_out,
+                    weight=self.w,
+                    residual=self.x,
+                    partials=o_proj_partials,
+                    output=self.attn_proj_out,
+                    grid_dim=(self.hidden_size // 128, num_splits, 1),
+                    block_dim=(256, 1, 1),
+                    reduce_grid_dim=(self.hidden_size // 128, 1, 1),
+                )
+            elif use_splitk:
                 self.attn_proj_out = self.x
                 self.mpk.splitk_linear_layer(
                     input=self.attn_out,
@@ -491,7 +516,25 @@ class Qwen3Builder(GraphBuilder):
             self.w = self.mpk.attach_input(
                 torch_tensor=state_dict[f"{prefix}mlp.down_proj.weight"], name=f"layer_{i}_down_proj"
             )
-            if use_splitk:
+            if use_splitk and deterministic:
+                num_splits = 128 * 128 // self.hidden_size
+                down_proj_partials = self.mpk.new_tensor(
+                    dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
+                    dtype=bfloat16,
+                    name=f"layer_{i}_down_proj_partials",
+                    io_category="cuda_tensor",
+                )
+                self.mpk.splitk_linear_det_layer(
+                    input=self.silu_mul_out,
+                    weight=self.w,
+                    residual=self.x,
+                    partials=down_proj_partials,
+                    output=self.mlp_out,
+                    grid_dim=(self.hidden_size // 128, num_splits, 1),
+                    block_dim=(256, 1, 1),
+                    reduce_grid_dim=(self.hidden_size // 128, 1, 1),
+                )
+            elif use_splitk:
                 self.mlp_out = self.x
                 self.mpk.splitk_linear_layer(
                     input=self.silu_mul_out,
