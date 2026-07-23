@@ -2306,9 +2306,13 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
-  code.e("kernel::sampling_from_logits_kernel<256, 4, bfloat16, int>(");
+  // IdType must be long long: the output token tensor is int64. With int,
+  // rows 1..N-1 write 4-byte values into the middle of row 0's int64 slot,
+  // corrupting it into a huge token id that the next step's embedding
+  // dereferences out of bounds.
+  code.e("kernel::sampling_from_logits_kernel<256, 4, bfloat16, long long>(");
   code.e("    static_cast<bfloat16*>(task_desc->input_ptrs[0]),");
-  code.e("    static_cast<int*>(task_desc->output_ptrs[0]),");
+  code.e("    static_cast<long long*>(task_desc->output_ptrs[0]),");
   code.e("    $,", vocab_size);
   code.e("    $,", seed);
   // philox_offset advances with the decode step so each step draws fresh
