@@ -25,6 +25,7 @@ parser.add_argument("--deterministic", action="store_true")
 parser.add_argument("--max-new-tokens", type=int, default=96)
 parser.add_argument("--sampling-seed", type=int, default=None)
 parser.add_argument("--prompt", type=str, default=None)
+parser.add_argument("--model", type=str, default=None)
 parser.add_argument("--workdir", default="/tmp/rescore")
 args = parser.parse_args()
 
@@ -44,6 +45,7 @@ def run_demo(extra, log_name):
             if args.sampling_seed is not None
             else []
         )
+        + (["--model", args.model] if args.model is not None else [])
         + extra
     )
     log = os.path.join(args.workdir, log_name)
