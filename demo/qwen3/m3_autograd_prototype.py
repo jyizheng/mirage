@@ -35,9 +35,12 @@ args = parser.parse_args()
 ref = json.load(open(args.ref))
 ids = ref["token_ids"]
 p0 = ref["prompt_length"]
-# MPK rollout logprobs for generated tokens: slot t-1 holds P(token_t)
+# MPK rollout logprobs for generated tokens: slot t-1 holds P(token_t).
+# Skip unwritten slots (e.g. the final EOS step) — same convention as the
+# rescore harness.
+valid_pos = [t for t in range(p0, len(ids)) if ref["probs"][t - 1] > 0.0]
 mpk_lp = torch.tensor(
-    [math.log(ref["probs"][t - 1]) for t in range(p0, len(ids))],
+    [math.log(ref["probs"][t - 1]) for t in valid_pos],
     dtype=torch.float32,
     device="cuda",
 )
@@ -49,13 +52,14 @@ model.gradient_checkpointing_enable()
 model.train()
 
 input_ids = torch.tensor([ids], dtype=torch.long, device="cuda")
-targets = input_ids[0, p0:]
+rows = torch.tensor([t - 1 for t in valid_pos], dtype=torch.long, device="cuda")
+targets = torch.tensor([ids[t] for t in valid_pos], dtype=torch.long, device="cuda")
 
 
 def hf_logprobs():
     """Differentiable trainer-stack logprobs of the generated tokens."""
     logits = model(input_ids=input_ids).logits[0]
-    lp = torch.log_softmax(logits[p0 - 1 : len(ids) - 1].float(), dim=-1)
+    lp = torch.log_softmax(logits[rows].float(), dim=-1)
     return lp.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
 
 
