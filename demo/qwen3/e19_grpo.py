@@ -176,6 +176,7 @@ def run(
 
         opt.zero_grad(set_to_none=True)
         losses, ratio_devs, clip_hits, n_tok = [], [], 0, 0
+        worst = {}
         for i, s in enumerate(samples):
             if not s["lp_old"] or adv[i].abs() < 1e-8:
                 continue
@@ -186,6 +187,19 @@ def run(
                 lp_theta = trainer_logprobs(s)
             ratio = torch.exp(lp_theta - lp_old)
             ratio_devs.append((ratio - 1).abs().max().item())
+            with torch.no_grad():
+                dev = (lp_theta.detach() - lp_old).abs()
+                j = int(dev.argmax())
+                if float(dev[j]) > worst.get("dlp", 0):
+                    worst.update({
+                        "dlp": float(dev[j]),
+                        "pos": s["pos"][j],
+                        "tok": s["ids"][s["pos"][j]],
+                        "lp_old": float(lp_old[j]),
+                        "lp_theta": float(lp_theta[j]),
+                        "gen_off": j,
+                        "gen_len": len(s["pos"]),
+                    })
             clip_hits += int(((ratio < 1 - clip_eps) |
                               (ratio > 1 + clip_eps)).sum().item())
             n_tok += ratio.numel()
@@ -204,6 +218,7 @@ def run(
             "reward_mean": float(rw.mean()),
             "ratio_dev_max": max(ratio_devs) if ratio_devs else 0.0,
             "clip_frac": (clip_hits / n_tok) if n_tok else 0.0,
+            "worst": worst or None,
             "loss": float(loss.item()) if losses else None,
             "grad_norm": float(gn) if losses else None,
             "gen_lens": [len(s["pos"]) for s in samples],
