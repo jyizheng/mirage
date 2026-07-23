@@ -116,6 +116,11 @@ if __name__ == "__main__":
         help="Not use the cutlass version kernel.",
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
+    parser.add_argument("--grpo-steps", type=int, default=0,
+                        help="Run the E19 GRPO loop for this many steps.")
+    parser.add_argument("--grpo-arm", choices=["mpk", "hf"], default="mpk")
+    parser.add_argument("--grpo-lr", type=float, default=2e-6)
+    parser.add_argument("--grpo-log", type=str, default=None)
     parser.add_argument(
         "--sampling-seed",
         type=int,
@@ -986,6 +991,25 @@ if __name__ == "__main__":
                 json.dump(out, f, indent=2)
             print(f"Saved tokens to {save_path}")
 
+    elif args.grpo_steps > 0:
+        # E19: scaled-down GRPO stability experiment (see e19_grpo.py)
+        import e19_grpo
+
+        e19_grpo.run(
+            args,
+            mpk,
+            model,
+            tokenizer,
+            tokens,
+            step,
+            prompt_lengths,
+            num_new_tokens,
+            prob_buffer_torch,
+            model.config.eos_token_id,
+        )
+        import sys
+
+        sys.exit(0)
     else:
         starter.record()
         mpk()
