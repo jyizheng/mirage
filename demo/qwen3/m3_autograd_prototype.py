@@ -76,8 +76,11 @@ class MPKLogProbs(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_out):
-        lp_hf = hf_logprobs()
-        lp_hf.backward(grad_out)
+        # autograd runs backward under no-grad; the differentiable recompute
+        # needs grad mode explicitly
+        with torch.enable_grad():
+            lp_hf = hf_logprobs()
+            lp_hf.backward(grad_out)
         return None
 
 
