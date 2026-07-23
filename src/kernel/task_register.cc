@@ -2311,7 +2311,11 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   code.e("    static_cast<int*>(task_desc->output_ptrs[0]),");
   code.e("    $,", vocab_size);
   code.e("    $,", seed);
-  code.e("    0,  // philox_offset");
+  // philox_offset advances with the decode step so each step draws fresh
+  // Gumbel noise; the previous constant 0 reused the SAME noise vector at
+  // every step (statistically biased sampling, adjacent steps strongly
+  // correlated). Runtime step keeps it deterministic and reproducible.
+  code.e("    static_cast<uint64_t>(runtime_config.step[0]) + 1,");
   code.e("    $);", batch_size);
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }

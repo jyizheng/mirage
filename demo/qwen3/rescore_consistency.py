@@ -23,6 +23,7 @@ parser.add_argument("--ks", type=int, nargs="+", default=[8, 16, 24, 32, 48])
 parser.add_argument("--full-rescore", action="store_true")
 parser.add_argument("--deterministic", action="store_true")
 parser.add_argument("--max-new-tokens", type=int, default=96)
+parser.add_argument("--sampling-seed", type=int, default=None)
 parser.add_argument("--workdir", default="/tmp/rescore")
 args = parser.parse_args()
 
@@ -37,6 +38,11 @@ def run_demo(extra, log_name):
         [sys.executable, "demo.py", "--use-mirage", "--capture-probs"]
         + det
         + ["--max-new-tokens", str(args.max_new_tokens)]
+        + (
+            ["--sampling-seed", str(args.sampling_seed)]
+            if args.sampling_seed is not None
+            else []
+        )
         + extra
     )
     log = os.path.join(args.workdir, log_name)

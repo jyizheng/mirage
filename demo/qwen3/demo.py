@@ -117,6 +117,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
     parser.add_argument(
+        "--sampling-seed",
+        type=int,
+        default=None,
+        help="Sample tokens with Gumbel-Max using this seed instead of "
+        "greedy argmax (deterministic given the seed).",
+    )
+    parser.add_argument(
         "--capture-probs",
         action="store_true",
         help="Capture P(chosen token) at every step into a per-position "
@@ -832,18 +839,31 @@ if __name__ == "__main__":
         else:
             argmax_partial_grid_dim = (mpk.num_workers, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
-        mpk.argmax_partial_layer(
-            input=argmax_in,
-            output=(argmax_part_value, argmax_part_index),
-            grid_dim=argmax_partial_grid_dim,
-            block_dim=(128, 1, 1),
-        )
-        mpk.argmax_reduce_layer(
-            input=(argmax_part_value, argmax_part_index),
-            output=argmax_out,
-            grid_dim=argmax_reduce_grid_dim,
-            block_dim=(128, 1, 1),
-        )
+        if args.sampling_seed is not None:
+            # Gumbel-Max sampling (deterministic given the seed; the philox
+            # offset advances with the runtime step so every step draws
+            # fresh noise). Replaces the argmax pair; the capture path below
+            # is unchanged since it gathers whatever token was chosen.
+            mpk.sampling_sm100_layer(
+                logits=argmax_in,
+                output=argmax_out,
+                grid_dim=(1, 1, 1),
+                block_dim=(256, 1, 1),
+                seed=args.sampling_seed,
+            )
+        else:
+            mpk.argmax_partial_layer(
+                input=argmax_in,
+                output=(argmax_part_value, argmax_part_index),
+                grid_dim=argmax_partial_grid_dim,
+                block_dim=(128, 1, 1),
+            )
+            mpk.argmax_reduce_layer(
+                input=(argmax_part_value, argmax_part_index),
+                output=argmax_out,
+                grid_dim=argmax_reduce_grid_dim,
+                block_dim=(128, 1, 1),
+            )
         if args.capture_probs:
             # Per-step probability capture for the rescore-consistency
             # harness: P(chosen token) = softmax(logits)[argmax_out],
