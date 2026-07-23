@@ -2306,21 +2306,25 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
-  // IdType must be long long: the output token tensor is int64. With int,
-  // rows 1..N-1 write 4-byte values into the middle of row 0's int64 slot,
-  // corrupting it into a huge token id that the next step's embedding
-  // dereferences out of bounds.
-  code.e("kernel::sampling_from_logits_kernel<256, 4, bfloat16, long long>(");
+  // Position-keyed sampling: Gumbel noise depends only on (seed, request,
+  // absolute position), so samples are reproducible run-to-run, invariant
+  // to prefill chunking (replayed prefixes resample identically), and
+  // invariant to batch composition. IdType must be long long: the output
+  // token tensor is int64 (a 4-byte IdType corrupts row 0's slot and the
+  // next step's embedding reads out of bounds).
+  code.e("kernel::sampling_from_logits_poskeyed_kernel<256, 4, bfloat16, "
+         "long long>(");
   code.e("    static_cast<bfloat16*>(task_desc->input_ptrs[0]),");
   code.e("    static_cast<long long*>(task_desc->output_ptrs[0]),");
   code.e("    $,", vocab_size);
   code.e("    $,", seed);
-  // philox_offset advances with the decode step so each step draws fresh
-  // Gumbel noise; the previous constant 0 reused the SAME noise vector at
-  // every step (statistically biased sampling, adjacent steps strongly
-  // correlated). Runtime step keeps it deterministic and reproducible.
-  code.e("    static_cast<uint64_t>(runtime_config.step[0]) + 1,");
-  code.e("    $);", batch_size);
+  code.e("    runtime_config.qo_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_last_page_len_buffer,");
+  code.e("    MPK_MAX_NUM_BATCHED_REQUESTS,");
+  code.e("    MPK_PAGE_SIZE,");
+  code.e("    MPK_MAX_SEQ_LENGTH);");
+  (void)batch_size;
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }
 

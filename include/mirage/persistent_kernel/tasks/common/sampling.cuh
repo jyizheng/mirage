@@ -225,4 +225,97 @@ __device__ __forceinline__ void
   }
 }
 
+// Position-keyed variant: Gumbel noise is a pure function of
+// (philox_seed, request, absolute sequence position) instead of
+// (seed, step, window row). This makes sampling invariant to how the
+// window is chunked (prefill tail row vs decode row 0) and to batch
+// composition, and reproducible when a trajectory prefix is replayed.
+// Row -> (request, position) mapping mirrors
+// multitoken_paged_attention_sm100_task_impl / prefill_prob_capture.
+template <uint32_t BLOCK_THREADS,
+          uint32_t VEC_SIZE,
+          typename DType,
+          typename IdType>
+__device__ __forceinline__ void
+    sampling_from_logits_poskeyed_kernel(DType *logits,
+                                         IdType *output,
+                                         uint32_t d,
+                                         uint64_t philox_seed,
+                                         int const *qo_indptr_buffer_ptr,
+                                         int const *paged_kv_indptr_buffer_ptr,
+                                         int const *paged_kv_last_page_len_ptr,
+                                         int num_requests,
+                                         int page_size,
+                                         int max_seq) {
+  uint32_t const tx = threadIdx.x;
+
+  using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
+                                         BLOCK_THREADS,
+                                         SAMPLING_REDUCE_ALGO>::TempStorage;
+  extern __shared__ __align__(alignof(SharedMem)) uint8_t smem_sampling_logit[];
+  auto &temp_storage = reinterpret_cast<SharedMem &>(smem_sampling_logit);
+
+  for (int rid = 0; rid < num_requests; ++rid) {
+    int const first_token_pos = qo_indptr_buffer_ptr[rid];
+    int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
+    int const num_tokens = last_token_pos - first_token_pos;
+    if (num_tokens <= 0) {
+      continue;
+    }
+    int const num_pages =
+        paged_kv_indptr_buffer_ptr[rid + 1] - paged_kv_indptr_buffer_ptr[rid];
+    int const seq_len =
+        (num_pages - 1) * page_size + paged_kv_last_page_len_ptr[rid];
+
+    for (int i = 0; i < num_tokens; ++i) {
+      int const row = first_token_pos + i;
+      int const pos = seq_len - num_tokens + i;
+      // unique per (request, position); +1 keeps offset 0 unused
+      uint64_t const philox_offset =
+          static_cast<uint64_t>(rid) * static_cast<uint64_t>(max_seq) + pos + 1;
+
+      sampling_vec_t<DType, VEC_SIZE> logits_vec;
+      SamplingDataAndIndex<DType, IdType> max_data = {
+          -cuda::std::numeric_limits<DType>::infinity(), 0};
+
+      for (uint32_t c = 0; c < sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
+           ++c) {
+        logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
+        if ((c * BLOCK_THREADS + tx) * VEC_SIZE < d) {
+          logits_vec.cast_load(logits + static_cast<uint64_t>(row) * d +
+                               c * BLOCK_THREADS * VEC_SIZE + tx * VEC_SIZE);
+        }
+
+        // noise subsequence is the vocab element index only; the
+        // (request, position) identity lives in philox_offset
+        sampling_vec_t<DType, VEC_SIZE> gumbel_noise =
+            GenerateSamplingGumbelNoise<DType, VEC_SIZE>(
+                philox_seed,
+                philox_offset,
+                static_cast<uint64_t>((c * BLOCK_THREADS + tx) * VEC_SIZE));
+
+        SamplingDataAndIndex<DType, IdType> cur_data[VEC_SIZE];
+#pragma unroll
+        for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+          cur_data[j].data =
+              (c * BLOCK_THREADS + tx) * VEC_SIZE + j < d
+                  ? logits_vec[j] + gumbel_noise[j]
+                  : -cuda::std::numeric_limits<DType>::infinity();
+          cur_data[j].index = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
+        }
+
+        max_data += BlockReduce<SamplingDataAndIndex<DType, IdType>,
+                                BLOCK_THREADS,
+                                SAMPLING_REDUCE_ALGO>(temp_storage)
+                        .template Sum<VEC_SIZE>(cur_data);
+      }
+
+      if (tx == 0) {
+        output[row] = max_data.index;
+      }
+      __syncthreads();
+    }
+  }
+}
+
 } // namespace kernel
