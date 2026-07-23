@@ -103,11 +103,15 @@ def run(
             step.zero_()
             num_new_tokens.fill_(1)
             prob_buffer.zero_()
-        meta_ptrs = [t.data_ptr() for t in mpk.meta_tensors]
+        meta_ptrs = [t.data_ptr() for t in mpk.meta_tensors.values()]
         prof_ptr = (mpk.profiler_tensor.data_ptr()
                     if mpk.profiler_tensor is not None else 0)
-        mpk.init_func(meta_ptrs, prof_ptr, mpk.mpi_rank, mpk.num_workers,
-                      mpk.num_local_schedulers, mpk.num_remote_schedulers)
+        mpk.init_func(
+            meta_ptrs, prof_ptr, mpk.mpi_rank, mpk.num_workers,
+            mpk.num_local_schedulers, mpk.num_remote_schedulers,
+            mpk.max_seq_length, mpk.total_num_requests, mpk.eos_token_id,
+            mpk.allocate_nvshmem_teams, mpk.test_mode,
+        )
         mpk()
         torch.cuda.synchronize()
         outs = []
