@@ -2104,7 +2104,10 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
   // inputs[0]: logits [max_tokens, vocab]; inputs[1]: prompt_lengths [R]
   // outputs[0]: prob buffer [R, max_seq]
   int vocab_size = input_ops[0]->output_tensors[0].dim[1];
-  int num_requests = output_ops[0]->output_tensors[0].dim[0];
+  // number of requests comes from prompt_lengths [R]; the prob buffer's
+  // leading dim is max_num_batched_tokens (the decode-capture convention),
+  // NOT the request count
+  int num_requests = input_ops[1]->output_tensors[0].dim[0];
   int max_seq = output_ops[0]->output_tensors[0].dim[1];
 
   mirage::transpiler::CodeKeeper code;
