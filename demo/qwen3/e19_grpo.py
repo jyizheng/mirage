@@ -188,11 +188,11 @@ def run(
             ratio = torch.exp(lp_theta - lp_old)
             ratio_devs.append((ratio - 1).abs().max().item())
             with torch.no_grad():
-                dev = (lp_theta.detach() - lp_old).abs()
-                j = int(dev.argmax())
-                if float(dev[j]) > worst.get("dlp", 0):
+                devi = (lp_theta.detach() - lp_old).abs()
+                j = int(devi.argmax())
+                if float(devi[j]) > worst.get("dlp", 0):
                     worst.update({
-                        "dlp": float(dev[j]),
+                        "dlp": float(devi[j]),
                         "pos": s["pos"][j],
                         "tok": s["ids"][s["pos"][j]],
                         "lp_old": float(lp_old[j]),
