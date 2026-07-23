@@ -24,6 +24,7 @@ parser.add_argument("--full-rescore", action="store_true")
 parser.add_argument("--deterministic", action="store_true")
 parser.add_argument("--max-new-tokens", type=int, default=96)
 parser.add_argument("--sampling-seed", type=int, default=None)
+parser.add_argument("--prompt", type=str, default=None)
 parser.add_argument("--workdir", default="/tmp/rescore")
 args = parser.parse_args()
 
@@ -55,7 +56,10 @@ def run_demo(extra, log_name):
 
 # Run 1: reference trajectory
 ref_file = os.path.join(args.workdir, "ref.json")
-run_demo(["--dump-tokens-file", ref_file], "ref.log")
+ref_extra = ["--dump-tokens-file", ref_file]
+if args.prompt is not None:
+    ref_extra += ["--prompt", args.prompt]
+run_demo(ref_extra, "ref.log")
 ref = json.load(open(ref_file))
 ref_ids, p0 = ref["token_ids"], ref["prompt_length"]
 gen_len = len(ref_ids) - p0
