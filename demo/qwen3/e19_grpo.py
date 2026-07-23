@@ -87,8 +87,22 @@ def run(
     demo_sd = dict(model_demo.named_parameters())
     hf_sd = dict(trainer.named_parameters())
     sync_keys = [k for k in hf_sd if k in demo_sd]
-    print(f"[e19] weight-sync keys: {len(sync_keys)}/{len(hf_sd)}")
+    # tied embeddings: HF exposes no lm_head.weight param; the demo model
+    # holds a separate lm_head tensor that MPK reads -- sync it from the
+    # (tied) embedding or the rollout policy's head goes stale
+    tied_head = ("lm_head.weight" not in hf_sd and "lm_head.weight" in demo_sd)
+    print(f"[e19] weight-sync keys: {len(sync_keys)}/{len(hf_sd)} "
+          f"tied_head={tied_head}")
 
+    def sync_weights():
+        with torch.no_grad():
+            for k in sync_keys:
+                demo_sd[k].copy_(hf_sd[k])
+            if tied_head:
+                demo_sd["lm_head.weight"].copy_(
+                    hf_sd["model.embed_tokens.weight"])
+
+    sync_weights()  # start from identical weights on both sides
     data = load_gsm8k(tokenizer, args.grpo_steps * 1)
     print(f"[e19] arm={arm} steps={args.grpo_steps} group={R} "
           f"lr={args.grpo_lr} data={len(data)}")
@@ -161,7 +175,7 @@ def run(
         adv = (rw - rw.mean()) / (rw.std() + 1e-6)
 
         opt.zero_grad(set_to_none=True)
-        losses, ratio_devs = [], []
+        losses, ratio_devs, clip_hits, n_tok = [], [], 0, 0
         for i, s in enumerate(samples):
             if not s["lp_old"] or adv[i].abs() < 1e-8:
                 continue
@@ -172,6 +186,9 @@ def run(
                 lp_theta = trainer_logprobs(s)
             ratio = torch.exp(lp_theta - lp_old)
             ratio_devs.append((ratio - 1).abs().max().item())
+            clip_hits += int(((ratio < 1 - clip_eps) |
+                              (ratio > 1 + clip_eps)).sum().item())
+            n_tok += ratio.numel()
             un = ratio * adv[i]
             cl = torch.clamp(ratio, 1 - clip_eps, 1 + clip_eps) * adv[i]
             losses.append(-torch.minimum(un, cl).mean())
@@ -181,13 +198,12 @@ def run(
             gn = torch.nn.utils.clip_grad_norm_(trainer.parameters(), 1.0)
             opt.step()
             # sync trainer -> rollout weights (MPK reads them next rollout)
-            with torch.no_grad():
-                for k in sync_keys:
-                    demo_sd[k].copy_(hf_sd[k])
+            sync_weights()
         rec = {
             "step": it,
             "reward_mean": float(rw.mean()),
             "ratio_dev_max": max(ratio_devs) if ratio_devs else 0.0,
+            "clip_frac": (clip_hits / n_tok) if n_tok else 0.0,
             "loss": float(loss.item()) if losses else None,
             "grad_norm": float(gn) if losses else None,
             "gen_lens": [len(s["pos"]) for s in samples],
