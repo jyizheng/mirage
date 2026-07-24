@@ -190,6 +190,12 @@ def run(
             with torch.no_grad():
                 devi = (lp_theta.detach() - lp_old).abs()
                 j = int(devi.argmax())
+                if float(devi[j]) > 5.0:
+                    json.dump(
+                        {"ids": s["ids"], "plen": s["plen"],
+                         "pos": s["pos"][j], "lp_old": float(lp_old[j]),
+                         "lp_theta": float(lp_theta[j].detach())},
+                        open(f"/tmp/e19_offender_{it}_{i}.json", "w"))
                 if float(devi[j]) > worst.get("dlp", 0):
                     worst.update({
                         "dlp": float(devi[j]),
