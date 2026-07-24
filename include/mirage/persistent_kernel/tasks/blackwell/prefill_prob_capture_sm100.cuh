@@ -18,7 +18,8 @@
 
 namespace kernel {
 
-// Teacher-forcing probability capture over prefill rows.
+// Per-token probability capture over ALL rows (teacher-forcing prefill
+// rows AND the generating row of each request's window).
 //
 // For every valid logits row i of every request r, computes
 //   P(tokens[r, pos+1] | prefix through pos),  pos = seq_len_r - n_r + i
@@ -43,6 +44,7 @@ template <typename T,
 __device__ __forceinline__ void prefill_prob_capture_task_impl(
     void const *__restrict__ logits_ptr,
     int const *__restrict__ prompt_lengths_ptr,
+    long long const *__restrict__ chosen_tokens_ptr,
     void *__restrict__ buffer_ptr,
     int const *__restrict__ qo_indptr_buffer_ptr,
     int const *__restrict__ paged_kv_indptr_buffer_ptr,
@@ -73,15 +75,27 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
 
     for (int i = 0; i < num_tokens; ++i) {
       int const pos = seq_len - num_tokens + i;
-      // capture only teacher-forcing rows: the next token must already be
-      // a given (prompt) token, not one being generated this iteration
-      if (pos + 1 >= prompt_len || pos + 1 >= MAX_SEQ) {
+      if (pos + 1 >= MAX_SEQ) {
         continue;
       }
-      long long const target =
-          all_tokens_ptr[(long long)rid * MAX_SEQ + pos + 1];
-      int const target_id = static_cast<int>(target);
       int const row_idx = first_token_pos + i;
+      long long target;
+      if (pos + 1 < prompt_len) {
+        // teacher-forcing row: the next token is a given prompt token
+        target = all_tokens_ptr[(long long)rid * MAX_SEQ + pos + 1];
+      } else if (i == num_tokens - 1) {
+        // generating row: capture P(token chosen this iteration). Reading
+        // chosen_tokens through a graph input (not runtime_config) makes
+        // the dependency on the sampling/argmax task explicit. Row->request
+        // mapping goes through qo_indptr, so this stays correct when
+        // requests finish at different times and the window re-packs --
+        // unlike the row-indexed softmax_gather+prob_scatter pair this
+        // replaces.
+        target = chosen_tokens_ptr[row_idx];
+      } else {
+        continue;
+      }
+      int const target_id = static_cast<int>(target);
       T const *row = logits + (long long)row_idx * VOCAB_SIZE;
 
       // ---- softmax + gather, verbatim from softmax_gather_sm100.cuh ----

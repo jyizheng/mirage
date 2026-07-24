@@ -2369,6 +2369,7 @@ class PersistentKernel:
         self,
         logits: DTensor,          # [max_tokens, vocab_size] BF16
         prompt_lengths: DTensor,  # [num_requests] int32
+        chosen_tokens: DTensor,   # [max_tokens, 1] int64 (sampled/argmax out)
         buffer: DTensor,          # [num_requests, max_seq] float32
         page_size: int,
         grid_dim: tuple = (1, 1, 1),
@@ -2383,8 +2384,11 @@ class PersistentKernel:
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         tb_graph.new_input(logits, (-1, -1, -1), -1, True)
         tb_graph.new_input(prompt_lengths, (-1, -1, -1), -1, True)
+        tb_graph.new_input(chosen_tokens, (-1, -1, -1), -1, True)
         tb_graph.new_input(buffer, (-1, -1, -1), -1, True)
-        self.kn_graph.customized([logits, prompt_lengths, buffer], tb_graph)
+        self.kn_graph.customized(
+            [logits, prompt_lengths, chosen_tokens, buffer], tb_graph
+        )
         self.kn_graph.register_task(
             tb_graph, "prefill_prob_capture_sm100", [page_size]
         )

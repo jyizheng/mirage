@@ -2090,7 +2090,7 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
   int page_size = params[0];
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
-  int num_inputs = 2;
+  int num_inputs = 3;
   int num_outputs = 1;
   assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
   for (auto const &op : bgraph.operators) {
@@ -2120,6 +2120,7 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
          page_size);
   code.e("    task_desc->input_ptrs[0],");
   code.e("    static_cast<int const *>(task_desc->input_ptrs[1]),");
+  code.e("    static_cast<long long const *>(task_desc->input_ptrs[2]),");
   code.e("    task_desc->output_ptrs[0],");
   code.e("    runtime_config.qo_indptr_buffer,");
   code.e("    runtime_config.paged_kv_indptr_buffer,");

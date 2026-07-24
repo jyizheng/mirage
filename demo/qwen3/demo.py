@@ -875,39 +875,21 @@ if __name__ == "__main__":
             # scattered into prob_buffer[0, step]. Only row 0 (request 0,
             # single-token decode) is meaningful; prefill-chunk iterations
             # write don't-care values at prefill positions.
-            prob_current = mpk.new_tensor(
-                dims=(args.max_num_batched_tokens, 1),
-                dtype=mi.float32,
-                name="prob_current",
-                io_category="cuda_tensor",
-            )
             prob_buffer = mpk.attach_input(
                 torch_tensor=prob_buffer_torch, name="prob_buffer"
             )
-            mpk.softmax_gather_layer(
-                logits=argmax_in,
-                token_ids=argmax_out,
-                output_probs=prob_current,
-                grid_dim=(1, 1, 1),
-                block_dim=(256, 1, 1),
-            )
-            mpk.prob_scatter_layer(
-                prob=prob_current,
-                step_counter=mpk.attach_input(
-                    torch_tensor=step, name="step_for_prob_scatter"
-                ),
-                buffer=prob_buffer,
-                grid_dim=(1, 1, 1),
-                block_dim=(1, 1, 1),
-                max_positions=args.max_seq_length,
-            )
-            # teacher-forcing capture over prefill rows (rescore pass):
-            # fills the same buffer slots a decode pass would have
+            # unified per-token probability capture: teacher-forcing rows
+            # (prefill/rescore) and the generating row (decode) in ONE task
+            # with qo-derived row->request mapping. Replaces the earlier
+            # softmax_gather+prob_scatter pair, whose row-indexed scatter
+            # miscaptured once requests in a batch finished at different
+            # times and the decode window re-packed.
             mpk.prefill_prob_capture_layer(
                 logits=argmax_in,
                 prompt_lengths=mpk.attach_input(
                     torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
                 ),
+                chosen_tokens=argmax_out,
                 buffer=prob_buffer,
                 page_size=args.page_size,
             )
