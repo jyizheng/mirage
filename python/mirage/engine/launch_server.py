@@ -137,6 +137,7 @@ async def chat_completions(request: Request):
                 "message": {"role": "assistant", "content": result["text"]},
                 "finish_reason": "stop",
             }],
+            "usage": {"completion_tokens": len(result["token_ids"])},
         }
 
 
@@ -166,6 +167,7 @@ async def completions(request: Request):
                 "text": result["text"],
                 "finish_reason": "stop",
             }],
+            "usage": {"completion_tokens": len(result["token_ids"])},
         }
 
 
