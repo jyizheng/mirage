@@ -141,24 +141,23 @@ class OnlinePinnedRuntime:
         Called from :meth:`drain_completions` so waiting requests are
         gradually fed into the ring as slots free up.
         """
-        # Reserve ring slot first (serialised with submit), then pop from
-        # the waiting deque.  This ordering prevents a lost request if the
-        # ring is full: we never remove a request from waiting unless we
-        # have a guaranteed ring slot.
+        # Pop and reserve atomically under both locks (ring -> waiting, same
+        # order as submit()).  Reserving first and "giving back" the slot on
+        # an empty deque is unsound: two concurrent flushers can reserve
+        # slots N and N+1, the second wins the only pop, and the first one's
+        # decrement returns slot N+1 while slot N is never published.  The
+        # GPU consumes the ring strictly in order, so that hole permanently
+        # stalls every request behind it (observed as wait_for_request
+        # timeouts for every rid after the race under C=8 load).
         with self._ring_lock:
             slot = self._cpu_req_tail & self._mask
             if self._req_ready[slot].item() != 0:
                 return 0  # ring still full
-            self._cpu_req_tail += 1  # reserve slot
-
-        with self._waiting_lock:
-            if not self._waiting:
-                # Rare: submit() drained the deque between our check and now.
-                # Put the reserved slot back.
-                with self._ring_lock:
-                    self._cpu_req_tail -= 1
-                return 0
-            rid, token_ids, initial_step = self._waiting.popleft()
+            with self._waiting_lock:
+                if not self._waiting:
+                    return 0
+                rid, token_ids, initial_step = self._waiting.popleft()
+            self._cpu_req_tail += 1  # slot is ours; hole-free by construction
 
         prompt_len = token_ids.shape[0]
         with torch.cuda.stream(self._write_stream):
