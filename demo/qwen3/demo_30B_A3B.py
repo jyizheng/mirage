@@ -4,6 +4,7 @@ from safetensors.torch import load_model
 import torch
 import torch.distributed as dist
 import argparse
+import json
 import os
 
 # ! Caveat
@@ -94,6 +95,24 @@ if __name__ == "__main__":
     )
     parser.add_argument("--ignore-eos", action="store_true", help="Ignore eos token during generation")
     parser.add_argument("--splitk-gate", action="store_true", help="Use split-k gating linear")
+    parser.add_argument(
+        "--sampling-seed", type=int, default=None,
+        help="Sample tokens with Gumbel-Max using this seed instead of "
+        "greedy argmax (deterministic given the seed).")
+    parser.add_argument(
+        "--capture-probs", action="store_true",
+        help="Capture P(chosen token) at every step into a per-position "
+        "buffer and include it in --dump-tokens-file output.")
+    parser.add_argument(
+        "--prompt-ids-file", type=str, default=None,
+        help="JSON file with a list of prompt token ids; bypasses the chat "
+        "template (rescore-consistency harness).")
+    parser.add_argument(
+        "--dump-tokens-file", type=str, default=None,
+        help="Write request 0 token ids (prompt + generated) to this JSON "
+        "file after generation.")
+    parser.add_argument("--prompt", type=str, default=None,
+                        help="Override the built-in prompt text.")
     args = parser.parse_args()
     try:
         from mpi4py import MPI
@@ -139,6 +158,8 @@ if __name__ == "__main__":
     tokens = torch.full((total_num_requests, args.max_seq_length), 0, dtype=torch.long, device="cuda")
 
     prompt = "Give me a short introduction to large language model."
+    if args.prompt:
+        prompt = args.prompt
     # This prompt is copied from https://github.com/apoorvumang/prompt-lookup-decoding/blob/main/demo-pld.ipynb
     code_text = """import numpy as np
                 import matplotlib.pyplot as plt
@@ -169,6 +190,14 @@ if __name__ == "__main__":
         messages, tokenize=False, add_generation_prompt=True
     )
     model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
+    if args.prompt_ids_file:
+        # Raw token ids (no chat template) -- rescore-consistency harness:
+        # a previous run's tokens become this run's prompt.
+        with open(args.prompt_ids_file) as f:
+            prompt_ids = json.load(f)
+        model_inputs.input_ids = torch.tensor(
+            [prompt_ids], dtype=torch.long, device=model.device
+        )
     for r in range(total_num_requests):
         for i in range(model_inputs.input_ids.shape[-1]):
             tokens[r, i] = model_inputs.input_ids[0, i]
@@ -204,6 +233,11 @@ if __name__ == "__main__":
     # get all model weight tensors
     input_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
     output_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
+    prob_buffer_torch = torch.zeros(
+        (args.max_num_batched_tokens, args.max_seq_length),
+        dtype=torch.float32,
+        device="cuda",
+    )
     prev_pos = 0
 
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(
@@ -695,18 +729,45 @@ if __name__ == "__main__":
         else:
             argmax_partial_grid_dim = (mpk.num_workers, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
-        mpk.argmax_partial_layer(
-            input=argmax_in,
-            output=(argmax_part_value, argmax_part_index),
-            grid_dim=argmax_partial_grid_dim,
-            block_dim=(256, 1, 1),
-        )
-        mpk.argmax_reduce_layer(
-            input=(argmax_part_value, argmax_part_index),
-            output=argmax_out,
-            grid_dim=argmax_reduce_grid_dim,
-            block_dim=(256, 1, 1),
-        )
+        if args.sampling_seed is not None:
+            # Gumbel-Max sampling: deterministic given the seed, noise keyed
+            # by (request, position) -- replaces the argmax pair.
+            mpk.sampling_sm100_layer(
+                logits=argmax_in,
+                output=argmax_out,
+                grid_dim=(1, 1, 1),
+                block_dim=(256, 1, 1),
+                seed=args.sampling_seed,
+            )
+        else:
+            mpk.argmax_partial_layer(
+                input=argmax_in,
+                output=(argmax_part_value, argmax_part_index),
+                grid_dim=argmax_partial_grid_dim,
+                block_dim=(256, 1, 1),
+            )
+            mpk.argmax_reduce_layer(
+                input=(argmax_part_value, argmax_part_index),
+                output=argmax_out,
+                grid_dim=argmax_reduce_grid_dim,
+                block_dim=(256, 1, 1),
+            )
+        if args.capture_probs:
+            # Unified per-token probability capture (teacher-forcing rows +
+            # generating row, qo-derived row->request mapping), same wiring
+            # as the dense demo.
+            prob_buffer = mpk.attach_input(
+                torch_tensor=prob_buffer_torch, name="prob_buffer"
+            )
+            mpk.prefill_prob_capture_layer(
+                logits=argmax_in,
+                prompt_lengths=mpk.attach_input(
+                    torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
+                ),
+                chosen_tokens=argmax_out,
+                buffer=prob_buffer,
+                page_size=args.page_size,
+            )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(
                 spec_decode_config = spec_decode_config,
@@ -805,6 +866,17 @@ if __name__ == "__main__":
               prompt_lengths[0], step.max().item() + 1 - prompt_lengths[0], run_time / (step.max().item() + 1)
             )
         )
-        pass
+        if args.dump_tokens_file and rank == 0:
+            out = {
+                "prompt_length": prompt_lengths[0].item(),
+                "token_ids": tokens[0, : step[0].item() + 1].tolist(),
+            }
+            if args.capture_probs:
+                probs = prob_buffer_torch[0, : step[0].item() + 1]
+                out["prob_bits"] = probs.view(torch.int32).tolist()
+                out["probs"] = probs.tolist()
+            with open(args.dump_tokens_file, "w") as f:
+                json.dump(out, f)
+            print(f"Dumped token ids to {args.dump_tokens_file}")
     if world_size > 1:
         dist.destroy_process_group()
