@@ -1,5 +1,20 @@
 # MPK-Det experiment suite
 
+Layout:
+
+- `*.py`, `*.cu` — measurement clients and experiment drivers (details below)
+- `runners/` — the exact orchestration shell scripts used on the B200 pods
+  (server lifecycle, arm sequencing, output collection). `e21b`/`e22b`
+  are matched-length / default-backend reruns of `e21`/`e22`;
+  `tp2_loop2.sh` is the TP=2 upstream crash repro (3/3 SIGABRT with
+  coredumps); `moe_rescore.sh` is the MoE bitwise rescore check.
+- `analysis/` — post-processing: `dt_histogram.py` (Figure 2 binning),
+  `e26_curves.py` (training-arm eval curves).
+- `hopper/h100_pod.yaml` — self-contained H100 validation pod: clones
+  this branch, builds, runs the flagged-vs-stock split-K arms, prints
+  text md5s to stdout (the linter's Hopper falsifiability test).
+- Seed replicates: `e26b` = `e26_train.py` with seeds 20260728→20260729.
+
 Scripts backing the paper's evaluation. Each maps to a research question;
 all were run on B200 (sm_100a) unless noted. Model: Qwen/Qwen3-8B unless
 noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).

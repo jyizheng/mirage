@@ -1,0 +1,74 @@
+# H100 validation pod for the MPK determinism linter's Hopper prediction
+# (linear_swapAB_hopper.cuh:368 tma_reduce_add -> predicted nondeterminism
+# on SM90). Single GPU, ephemeral storage, aws-ue2-prod-1.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ajiao-h100-mirage-val
+  namespace: baseten-devenv
+  labels:
+    app: ajiao-h100-mirage-val
+spec:
+  restartPolicy: Never
+  nodeSelector:
+    nvidia.com/gpu.product: NVIDIA-H100-80GB-HBM3
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: dev
+      image: baseten/gpu-dev:v9-pt25.12
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+          echo "nameserver 1.1.1.1" > /etc/resolv.conf
+          echo "nameserver 1.0.0.1" >> /etc/resolv.conf
+          set -x
+          cd /workspace
+          git clone --recursive -b fix-deterministic-decode https://github.com/jyizheng/mirage.git mirage 2>&1 | tail -2
+          cd mirage
+          pip install -e . 2>&1 | tail -3
+          pip install "z3-solver>=5" 2>&1 | tail -1
+          python -c "import mirage; print('mirage import OK')" || sleep infinity
+          sed -i "s/use_splitk = (target_cc == 100)/use_splitk = (target_cc in (90, 100))/" demo/qwen3/demo.py
+          for i in 1 2 3 4; do
+            python demo/qwen3/demo.py --use-mirage --model Qwen/Qwen3-8B > /tmp/splitk_r$i.log 2>&1
+            echo "ARMA run $i exit=$?"
+          done
+          sed -i "s/use_splitk = (target_cc in (90, 100))/use_splitk = (target_cc == 100)/" demo/qwen3/demo.py
+          for i in 1 2 3; do
+            python demo/qwen3/demo.py --use-mirage --model Qwen/Qwen3-8B > /tmp/stock_r$i.log 2>&1
+            echo "ARMB run $i exit=$?"
+          done
+          echo "=== ARMA (splitk_swapAB_hopper, flagged) text md5s ==="
+          for i in 1 2 3 4; do sed -n "/^<think>/,/per-token latency/p" /tmp/splitk_r$i.log | grep -v "per-token latency" | md5sum; done
+          echo "=== ARMB (stock tma_store) text md5s ==="
+          for i in 1 2 3; do sed -n "/^<think>/,/per-token latency/p" /tmp/stock_r$i.log | grep -v "per-token latency" | md5sum; done
+          for i in 1 2 3 4; do echo "ARMA r$i tail: $(tail -c 300 /tmp/splitk_r$i.log | tr "[:cntrl:]" " " | tail -c 200)"; done
+          echo "H100 VALIDATION COMPLETE"
+          sleep infinity
+      resources:
+        limits:
+          nvidia.com/gpu: 1
+          memory: 128Gi
+        requests:
+          nvidia.com/gpu: 1
+          cpu: 8
+          memory: 64Gi
+      volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+        - name: shm
+          mountPath: /dev/shm
+  volumes:
+    - name: workspace
+      emptyDir: {}
+    - name: hf-cache
+      emptyDir: {}
+    - name: shm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 32Gi
