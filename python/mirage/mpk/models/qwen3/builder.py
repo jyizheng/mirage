@@ -672,6 +672,28 @@ class Qwen3Builder(GraphBuilder):
                 grid_dim=argmax_reduce_grid_dim,
                 block_dim=(128, 1, 1),
             )
+            if getattr(self, "capture_logprobs", False):
+                # Unified per-token probability capture (qo-mapped rows):
+                # buffer[row, pos] = P(chosen token at pos). Read back by
+                # LLMEngine to serve logprobs without a recompute pass.
+                tokens_meta = self.mpk.meta_tensors["tokens"]
+                self.prob_buffer_tensor = torch.zeros(
+                    tokens_meta.shape[0], tokens_meta.shape[1],
+                    dtype=torch.float32, device="cuda",
+                )
+                prob_buffer = self.mpk.attach_input(
+                    torch_tensor=self.prob_buffer_tensor, name="prob_buffer"
+                )
+                self.mpk.prefill_prob_capture_layer(
+                    logits=self.argmax_in,
+                    prompt_lengths=self.mpk.attach_input(
+                        torch_tensor=self.mpk.meta_tensors["prompt_lengths"],
+                        name="prompt_lengths_for_prob",
+                    ),
+                    chosen_tokens=argmax_out,
+                    buffer=prob_buffer,
+                    page_size=self.page_size,
+                )
             # TODO(Jianan Ji): spec_decode_config handling (see previous implementation)
             # if spec_decode_config:
             #     verify_out = self.mpk.verify_layer_dispatcher(

@@ -9,6 +9,8 @@ import time
 
 import torch
 
+import math
+
 from .model_runner import ModelRunner
 from .tokenizer_manager import TokenizerManager
 from ..mpk.online_pinned_runtime import OnlinePinnedRuntime
@@ -198,11 +200,20 @@ class LLMEngine:
                 rid, timeout, poll_interval)
             full_tokens = self.runtime.read_tokens_at_row(buffer_row, final_step)
             output_ids = full_tokens[prompt_len:].tolist()
-            self.runtime.release_request(rid)
-            return {
+            result = {
                 "text": self.tokenizer_manager.decode(output_ids),
                 "token_ids": output_ids,
             }
+            prob_buffer = getattr(self.model_runner, "prob_buffer", None)
+            if prob_buffer is not None:
+                # P(chosen token at position t) sits at buffer[row, t-1];
+                # generated tokens occupy t in [prompt_len, final_step].
+                probs = prob_buffer[
+                    buffer_row, prompt_len - 1 : final_step].tolist()
+                result["logprobs"] = [
+                    math.log(p) if p > 0.0 else None for p in probs]
+            self.runtime.release_request(rid)
+            return result
 
     # ── Internal ──────────────────────────────────────────────────────────
 

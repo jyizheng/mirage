@@ -73,6 +73,9 @@ class MPKMetadata:
     spec_decode_config: Optional[object] = None
     # use cutlass kernel
     use_cutlass_kernel: bool = True
+    # capture per-token P(chosen) into a [n_req, max_seq] buffer (adds a
+    # capture task after the lm_head; read back by the serving layer)
+    capture_logprobs: bool = False
     
     def check_valid(self):
         if self.weight_from_model:
@@ -278,6 +281,7 @@ class MPK:
             self.persistent_kernel.profiler_tensor.data_ptr() if self.persistent_kernel.profiler_tensor is not None else 0
         )
 
+        self.capture_logprobs = args.capture_logprobs
         self.is_built = False
         self.task_graph_generated = False
         self.is_compiled = False
@@ -458,6 +462,7 @@ class MPK:
     def build(self):
         model_builder_class = get_builder(self.model_name)
         self.model_builder = model_builder_class(self.persistent_kernel)
+        self.model_builder.capture_logprobs = self.capture_logprobs
         if self.weight_from_model:
             self.model_builder.build_from_model(model_name=self.model_name)
             self.tokenizer = self.model_builder.tokenizer

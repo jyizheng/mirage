@@ -159,14 +159,17 @@ async def completions(request: Request):
             None, lambda: request.app.state.engine.submit(
                 prompt, timeout=timeout),
         )
+        choice = {
+            "index": 0,
+            "text": result["text"],
+            "finish_reason": "stop",
+        }
+        if "logprobs" in result:
+            choice["logprobs"] = {"token_logprobs": result["logprobs"]}
         return {
             "id": "cmpl-0",
             "object": "text_completion",
-            "choices": [{
-                "index": 0,
-                "text": result["text"],
-                "finish_reason": "stop",
-            }],
+            "choices": [choice],
             "usage": {"completion_tokens": len(result["token_ids"])},
         }
 
@@ -186,6 +189,8 @@ def main():
     parser.add_argument("--max-num-pages", default=16, type=int)
     parser.add_argument("--page-size", default=4096, type=int)
     parser.add_argument("--output-dir", default=None, help="Output directory for compiled artifacts")
+    parser.add_argument("--capture-logprobs", action="store_true",
+                        help="Compile the probability-capture task into the graph and return per-token logprobs in completions")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
                         help="Per-request timeout in seconds (default: 7200)")
     args = parser.parse_args()
@@ -195,6 +200,7 @@ def main():
         model_path=args.model_path,
         max_num_batched_requests=args.max_num_batched_requests,
         max_num_batched_tokens=args.max_num_batched_tokens,
+        capture_logprobs=args.capture_logprobs,
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,
         page_size=args.page_size,

@@ -45,6 +45,9 @@ class GraphBuilder(abc.ABC):
     def __init__(self, mpk, weights: Optional[Dict[str, Any]] = None):
         self.mpk = mpk
         self.weights = weights or {}
+        # Set by MPK.build() when the serving layer wants per-token
+        # P(chosen) capture wired after the lm_head.
+        self.capture_logprobs = False
 
     @abc.abstractmethod
     def build_from_model(self, model_path: str | None = None):

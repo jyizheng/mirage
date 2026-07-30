@@ -38,6 +38,10 @@ class RunnerConfig:
     pinned_ring_capacity: int = 8
     """Power-of-2 capacity for the CPU↔GPU pinned ring buffers."""
 
+    capture_logprobs: bool = False
+    """Wire the per-token probability-capture task into the compiled
+    graph and expose logprobs through the engine (no recompute pass)."""
+
     tensor_parallel_size: int = 1
     """Number of GPUs for tensor parallelism (matches ``mpirun -n`` count)."""
 
@@ -90,6 +94,7 @@ class ModelRunner:
             model_path=config.model_path,
             model_config=MirageModelConfig(with_lm_head=True),
             use_cutlass_kernel=config.use_cutlass_kernel,
+            capture_logprobs=config.capture_logprobs,
             **self.meta_tensors,
         )
         self.mpk = MPK(mpk_meta)
@@ -97,6 +102,11 @@ class ModelRunner:
         self.runtime = OnlinePinnedRuntime(self.mpk)
         self.tokenizer = self.mpk.tokenizer
         self.mpk.compile(output_dir=config.output_dir)
+
+        # [n_req, max_seq] float32 P(chosen) buffer written by the capture
+        # task; None unless config.capture_logprobs.
+        self.prob_buffer = getattr(
+            self.mpk.model_builder, "prob_buffer_tensor", None)
 
     # ── Execution ─────────────────────────────────────────────────────────────
 
