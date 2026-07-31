@@ -1,0 +1,42 @@
+# Raw experiment data
+
+All Qwen3-8B on B200 unless noted. See `../README.md` for the scripts
+that produced each file and the paper section each backs.
+
+## Mismatch (δt) distributions — Figure 2 / RQ5 table
+- `e20_normal.json`, `e20_det.json` — SGLang same-engine per-token
+  signed δt (decode logprobs vs same-server prefill rescore), 8×512
+  sampled tokens; `normal` = triton backend, `det` = deterministic mode.
+- `e20_cross_greedy.json`, `e20_cross_sampled.json` — MPK rollout refs
+  rescored by SGLang prefill (cross-engine deployment).
+- `e27_vllm_greedy.json`, `e27_vllm_sampled.json` — same refs rescored
+  by vLLM `prompt_logprobs`.
+
+## Performance
+- `e21_throughput_runs.log` — closed-loop concurrency (C=1/2/4/8),
+  MPK-Det server + SGLang normal/det, matched ~260-token greedy,
+  actual-token accounting (also contains the earlier 480-token run).
+- `e22_length_sweep.log` — per-token decode latency vs context length
+  (SGLang normal-triton / det-triton / default backend).
+
+## Dose–response and training arms (GSM8K)
+- `e23_noise.json` — one-step GRPO distortion vs injected mismatch
+  scale f (Qwen3-1.7B; empirical e20-det deltas).
+- `e25_f{0,1,3}.jsonl` — 300-step training arms, Qwen3-1.7B.
+- `e26_f{0,1,3}.jsonl`, `e26b_f{0,1,3}.jsonl` — 3,000-step arms,
+  Qwen3-8B, seeds 20260728/20260729; `eval_acc` records every 100
+  steps (held-out 32-prompt greedy).
+
+## RL engine step time (Qwen3-1.7B, G=8)
+- `e32_mpk.jsonl` — e19 GRPO loop with timing decomposition
+  (`t_rollout_s` / `t_recompute_s` (measured, unused) / `t_update_s`).
+- `e32_mpk64.jsonl` — same with max_num_batched_tokens=64.
+- `e32_sgl.jsonl` — SGLang arm (`t_gen_s` + miles-style prefill
+  rescore `t_rescore_s`).
+- `e33_mpk.jsonl` — after parallelizing the capture (+sampling) tasks.
+
+## Serving-level checks
+- `e35_serving_rescore.log` — online-engine rollout vs teacher-forcing
+  resubmission: 260/260 bitwise with deterministic kernels; 69/259
+  with upstream kernels (nondet control).
+- `moe_rescore.log` — Qwen3-30B-A3B rescore: 332/332 bitwise.

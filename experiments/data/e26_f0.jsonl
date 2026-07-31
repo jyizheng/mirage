@@ -1,0 +1,3031 @@
+{"step": 0, "eval_acc": 0.71875}
+{"step": 0, "reward": 1.0, "skipped": true}
+{"step": 1, "reward": 1.0, "skipped": true}
+{"step": 2, "reward": 1.0, "skipped": true}
+{"step": 3, "reward": 1.0, "skipped": true}
+{"step": 4, "reward": 1.0, "skipped": true}
+{"step": 5, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10136920213699341, "grad_norm": 3.0, "gen_len": 192.5}
+{"step": 6, "reward": 1.0, "skipped": true}
+{"step": 7, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2200574278831482, "grad_norm": 4.21875, "gen_len": 187.375}
+{"step": 8, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11000470817089081, "grad_norm": 4.9375, "gen_len": 175.875}
+{"step": 9, "reward": 0.0, "skipped": true}
+{"step": 10, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15675903111696243, "grad_norm": 4.8125, "gen_len": 175.875}
+{"step": 11, "reward": 0.0, "skipped": true}
+{"step": 12, "reward": 1.0, "skipped": true}
+{"step": 13, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10649814270436764, "grad_norm": 4.28125, "gen_len": 145.625}
+{"step": 14, "reward": 1.0, "skipped": true}
+{"step": 15, "reward": 0.0, "skipped": true}
+{"step": 16, "reward": 1.0, "skipped": true}
+{"step": 17, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1496594799682498, "grad_norm": 3.671875, "gen_len": 197.0}
+{"step": 18, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11273595970124006, "grad_norm": 3.6875, "gen_len": 155.0}
+{"step": 19, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13562873378396034, "grad_norm": 3.6875, "gen_len": 195.25}
+{"step": 20, "reward": 1.0, "skipped": true}
+{"step": 21, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.086920031812042, "grad_norm": 3.421875, "gen_len": 182.25}
+{"step": 22, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17266579903662205, "grad_norm": 2.609375, "gen_len": 189.5}
+{"step": 23, "reward": 1.0, "skipped": true}
+{"step": 24, "reward": 1.0, "skipped": true}
+{"step": 25, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08662308659404516, "grad_norm": 3.015625, "gen_len": 159.625}
+{"step": 26, "reward": 1.0, "skipped": true}
+{"step": 27, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07986710034310818, "grad_norm": 3.65625, "gen_len": 178.0}
+{"step": 28, "reward": 1.0, "skipped": true}
+{"step": 29, "reward": 0.0, "skipped": true}
+{"step": 30, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07454241113737226, "grad_norm": 2.734375, "gen_len": 191.75}
+{"step": 31, "reward": 1.0, "skipped": true}
+{"step": 32, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14073228277266026, "grad_norm": 2.90625, "gen_len": 178.375}
+{"step": 33, "reward": 1.0, "skipped": true}
+{"step": 34, "reward": 1.0, "skipped": true}
+{"step": 35, "reward": 1.0, "skipped": true}
+{"step": 36, "reward": 1.0, "skipped": true}
+{"step": 37, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0814852430485189, "grad_norm": 3.40625, "gen_len": 166.75}
+{"step": 38, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1489829020574689, "grad_norm": 5.0625, "gen_len": 153.125}
+{"step": 39, "reward": 1.0, "skipped": true}
+{"step": 40, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.18395944498479366, "grad_norm": 6.40625, "gen_len": 180.375}
+{"step": 41, "reward": 1.0, "skipped": true}
+{"step": 42, "reward": 0.0, "skipped": true}
+{"step": 43, "reward": 1.0, "skipped": true}
+{"step": 44, "reward": 1.0, "skipped": true}
+{"step": 45, "reward": 1.0, "skipped": true}
+{"step": 46, "reward": 1.0, "skipped": true}
+{"step": 47, "reward": 1.0, "skipped": true}
+{"step": 48, "reward": 1.0, "skipped": true}
+{"step": 49, "reward": 1.0, "skipped": true}
+{"step": 50, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11904364638030529, "grad_norm": 7.46875, "gen_len": 146.5}
+{"step": 51, "reward": 1.0, "skipped": true}
+{"step": 52, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17737683281302452, "grad_norm": 3.515625, "gen_len": 193.125}
+{"step": 53, "reward": 1.0, "skipped": true}
+{"step": 54, "reward": 1.0, "skipped": true}
+{"step": 55, "reward": 1.0, "skipped": true}
+{"step": 56, "reward": 1.0, "skipped": true}
+{"step": 57, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0835443832911551, "grad_norm": 4.96875, "gen_len": 192.375}
+{"step": 58, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11309809144586325, "grad_norm": 3.109375, "gen_len": 190.625}
+{"step": 59, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14330431260168552, "grad_norm": 8.4375, "gen_len": 115.875}
+{"step": 60, "reward": 1.0, "skipped": true}
+{"step": 61, "reward": 0.0, "skipped": true}
+{"step": 62, "reward": 1.0, "skipped": true}
+{"step": 63, "reward": 0.0, "skipped": true}
+{"step": 64, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10001620650291443, "grad_norm": 4.03125, "gen_len": 164.5}
+{"step": 65, "reward": 1.0, "skipped": true}
+{"step": 66, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13286456745117903, "grad_norm": 4.3125, "gen_len": 178.25}
+{"step": 67, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.18934384174644947, "grad_norm": 3.765625, "gen_len": 200.0}
+{"step": 68, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15003163740038872, "grad_norm": 4.625, "gen_len": 198.25}
+{"step": 69, "reward": 1.0, "skipped": true}
+{"step": 70, "reward": 1.0, "skipped": true}
+{"step": 71, "reward": 1.0, "skipped": true}
+{"step": 72, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09752026153728366, "grad_norm": 3.75, "gen_len": 167.0}
+{"step": 73, "reward": 1.0, "skipped": true}
+{"step": 74, "reward": 1.0, "skipped": true}
+{"step": 75, "reward": 1.0, "skipped": true}
+{"step": 76, "reward": 1.0, "skipped": true}
+{"step": 77, "reward": 1.0, "skipped": true}
+{"step": 78, "reward": 1.0, "skipped": true}
+{"step": 79, "reward": 1.0, "skipped": true}
+{"step": 80, "reward": 1.0, "skipped": true}
+{"step": 81, "reward": 0.0, "skipped": true}
+{"step": 82, "reward": 1.0, "skipped": true}
+{"step": 83, "reward": 1.0, "skipped": true}
+{"step": 84, "reward": 1.0, "skipped": true}
+{"step": 85, "reward": 1.0, "skipped": true}
+{"step": 86, "reward": 1.0, "skipped": true}
+{"step": 87, "reward": 1.0, "skipped": true}
+{"step": 88, "reward": 1.0, "skipped": true}
+{"step": 89, "reward": 1.0, "skipped": true}
+{"step": 90, "reward": 1.0, "skipped": true}
+{"step": 91, "reward": 1.0, "skipped": true}
+{"step": 92, "reward": 1.0, "skipped": true}
+{"step": 93, "reward": 1.0, "skipped": true}
+{"step": 94, "reward": 1.0, "skipped": true}
+{"step": 95, "reward": 0.0, "skipped": true}
+{"step": 96, "reward": 1.0, "skipped": true}
+{"step": 97, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.19833673536777496, "grad_norm": 3.546875, "gen_len": 198.625}
+{"step": 98, "reward": 0.0, "skipped": true}
+{"step": 99, "reward": 0.0, "skipped": true}
+{"step": 100, "eval_acc": 0.78125}
+{"step": 100, "reward": 1.0, "skipped": true}
+{"step": 101, "reward": 1.0, "skipped": true}
+{"step": 102, "reward": 1.0, "skipped": true}
+{"step": 103, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1504500051960349, "grad_norm": 3.078125, "gen_len": 197.25}
+{"step": 104, "reward": 1.0, "skipped": true}
+{"step": 105, "reward": 1.0, "skipped": true}
+{"step": 106, "reward": 1.0, "skipped": true}
+{"step": 107, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06778680207207799, "grad_norm": 3.328125, "gen_len": 169.125}
+{"step": 108, "reward": 0.0, "skipped": true}
+{"step": 109, "reward": 1.0, "skipped": true}
+{"step": 110, "reward": 1.0, "skipped": true}
+{"step": 111, "reward": 1.0, "skipped": true}
+{"step": 112, "reward": 1.0, "skipped": true}
+{"step": 113, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08302156534045935, "grad_norm": 5.84375, "gen_len": 122.0}
+{"step": 114, "reward": 1.0, "skipped": true}
+{"step": 115, "reward": 1.0, "skipped": true}
+{"step": 116, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16721522994339466, "grad_norm": 5.84375, "gen_len": 199.625}
+{"step": 117, "reward": 0.0, "skipped": true}
+{"step": 118, "reward": 0.0, "skipped": true}
+{"step": 119, "reward": 1.0, "skipped": true}
+{"step": 120, "reward": 1.0, "skipped": true}
+{"step": 121, "reward": 0.0, "skipped": true}
+{"step": 122, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1795343328267336, "grad_norm": 5.9375, "gen_len": 188.25}
+{"step": 123, "reward": 1.0, "skipped": true}
+{"step": 124, "reward": 1.0, "skipped": true}
+{"step": 125, "reward": 1.0, "skipped": true}
+{"step": 126, "reward": 1.0, "skipped": true}
+{"step": 127, "reward": 1.0, "skipped": true}
+{"step": 128, "reward": 1.0, "skipped": true}
+{"step": 129, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.20401756092905998, "grad_norm": 7.875, "gen_len": 156.375}
+{"step": 130, "reward": 1.0, "skipped": true}
+{"step": 131, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14521336648613214, "grad_norm": 4.28125, "gen_len": 179.375}
+{"step": 132, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07715782849118114, "grad_norm": 10.9375, "gen_len": 62.5}
+{"step": 133, "reward": 1.0, "skipped": true}
+{"step": 134, "reward": 1.0, "skipped": true}
+{"step": 135, "reward": 1.0, "skipped": true}
+{"step": 136, "reward": 1.0, "skipped": true}
+{"step": 137, "reward": 1.0, "skipped": true}
+{"step": 138, "reward": 1.0, "skipped": true}
+{"step": 139, "reward": 1.0, "skipped": true}
+{"step": 140, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0747894705273211, "grad_norm": 3.453125, "gen_len": 190.125}
+{"step": 141, "reward": 1.0, "skipped": true}
+{"step": 142, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.21507341228425503, "grad_norm": 4.40625, "gen_len": 179.125}
+{"step": 143, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08447867026552558, "grad_norm": 6.75, "gen_len": 103.0}
+{"step": 144, "reward": 1.0, "skipped": true}
+{"step": 145, "reward": 1.0, "skipped": true}
+{"step": 146, "reward": 1.0, "skipped": true}
+{"step": 147, "reward": 1.0, "skipped": true}
+{"step": 148, "reward": 1.0, "skipped": true}
+{"step": 149, "reward": 1.0, "skipped": true}
+{"step": 150, "reward": 1.0, "skipped": true}
+{"step": 151, "reward": 1.0, "skipped": true}
+{"step": 152, "reward": 1.0, "skipped": true}
+{"step": 153, "reward": 1.0, "skipped": true}
+{"step": 154, "reward": 1.0, "skipped": true}
+{"step": 155, "reward": 1.0, "skipped": true}
+{"step": 156, "reward": 1.0, "skipped": true}
+{"step": 157, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.18893791921436787, "grad_norm": 3.125, "gen_len": 197.5}
+{"step": 158, "reward": 1.0, "skipped": true}
+{"step": 159, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1960607673972845, "grad_norm": 5.6875, "gen_len": 145.625}
+{"step": 160, "reward": 1.0, "skipped": true}
+{"step": 161, "reward": 1.0, "skipped": true}
+{"step": 162, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08833146374672651, "grad_norm": 4.9375, "gen_len": 177.875}
+{"step": 163, "reward": 1.0, "skipped": true}
+{"step": 164, "reward": 1.0, "skipped": true}
+{"step": 165, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15167773142457008, "grad_norm": 5.59375, "gen_len": 195.875}
+{"step": 166, "reward": 1.0, "skipped": true}
+{"step": 167, "reward": 0.0, "skipped": true}
+{"step": 168, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06954111624509096, "grad_norm": 3.78125, "gen_len": 175.875}
+{"step": 169, "reward": 1.0, "skipped": true}
+{"step": 170, "reward": 1.0, "skipped": true}
+{"step": 171, "reward": 1.0, "skipped": true}
+{"step": 172, "reward": 1.0, "skipped": true}
+{"step": 173, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1743088150396943, "grad_norm": 5.1875, "gen_len": 192.875}
+{"step": 174, "reward": 1.0, "skipped": true}
+{"step": 175, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17628000490367413, "grad_norm": 4.90625, "gen_len": 199.75}
+{"step": 176, "reward": 1.0, "skipped": true}
+{"step": 177, "reward": 1.0, "skipped": true}
+{"step": 178, "reward": 0.0, "skipped": true}
+{"step": 179, "reward": 1.0, "skipped": true}
+{"step": 180, "reward": 1.0, "skipped": true}
+{"step": 181, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16237725596874952, "grad_norm": 8.125, "gen_len": 149.125}
+{"step": 182, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.058884778525680304, "grad_norm": 4.3125, "gen_len": 171.875}
+{"step": 183, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0668472871184349, "grad_norm": 7.1875, "gen_len": 155.5}
+{"step": 184, "reward": 1.0, "skipped": true}
+{"step": 185, "reward": 1.0, "skipped": true}
+{"step": 186, "reward": 1.0, "skipped": true}
+{"step": 187, "reward": 0.0, "skipped": true}
+{"step": 188, "reward": 1.0, "skipped": true}
+{"step": 189, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08578132977709174, "grad_norm": 3.296875, "gen_len": 194.5}
+{"step": 190, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09626723360270262, "grad_norm": 3.390625, "gen_len": 138.125}
+{"step": 191, "reward": 1.0, "skipped": true}
+{"step": 192, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.053721833974123, "grad_norm": 2.78125, "gen_len": 198.5}
+{"step": 193, "reward": 1.0, "skipped": true}
+{"step": 194, "reward": 1.0, "skipped": true}
+{"step": 195, "reward": 1.0, "skipped": true}
+{"step": 196, "reward": 1.0, "skipped": true}
+{"step": 197, "reward": 1.0, "skipped": true}
+{"step": 198, "reward": 1.0, "skipped": true}
+{"step": 199, "reward": 1.0, "skipped": true}
+{"step": 200, "eval_acc": 0.84375}
+{"step": 200, "reward": 1.0, "skipped": true}
+{"step": 201, "reward": 1.0, "skipped": true}
+{"step": 202, "reward": 1.0, "skipped": true}
+{"step": 203, "reward": 1.0, "skipped": true}
+{"step": 204, "reward": 1.0, "skipped": true}
+{"step": 205, "reward": 1.0, "skipped": true}
+{"step": 206, "reward": 1.0, "skipped": true}
+{"step": 207, "reward": 1.0, "skipped": true}
+{"step": 208, "reward": 1.0, "skipped": true}
+{"step": 209, "reward": 1.0, "skipped": true}
+{"step": 210, "reward": 1.0, "skipped": true}
+{"step": 211, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07358378544449806, "grad_norm": 3.21875, "gen_len": 200.0}
+{"step": 212, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1255614710971713, "grad_norm": 5.75, "gen_len": 159.25}
+{"step": 213, "reward": 1.0, "skipped": true}
+{"step": 214, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13998289965093136, "grad_norm": 11.9375, "gen_len": 106.75}
+{"step": 215, "reward": 1.0, "skipped": true}
+{"step": 216, "reward": 1.0, "skipped": true}
+{"step": 217, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.18717389926314354, "grad_norm": 5.21875, "gen_len": 194.75}
+{"step": 218, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.050971061922609806, "grad_norm": 3.265625, "gen_len": 158.0}
+{"step": 219, "reward": 1.0, "skipped": true}
+{"step": 220, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07717438414692879, "grad_norm": 4.28125, "gen_len": 96.0}
+{"step": 221, "reward": 1.0, "skipped": true}
+{"step": 222, "reward": 1.0, "skipped": true}
+{"step": 223, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.25597325060516596, "grad_norm": 5.65625, "gen_len": 178.25}
+{"step": 224, "reward": 0.0, "skipped": true}
+{"step": 225, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11922727711498737, "grad_norm": 3.46875, "gen_len": 180.5}
+{"step": 226, "reward": 1.0, "skipped": true}
+{"step": 227, "reward": 1.0, "skipped": true}
+{"step": 228, "reward": 0.0, "skipped": true}
+{"step": 229, "reward": 0.0, "skipped": true}
+{"step": 230, "reward": 1.0, "skipped": true}
+{"step": 231, "reward": 1.0, "skipped": true}
+{"step": 232, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16437373124063015, "grad_norm": 4.0, "gen_len": 168.5}
+{"step": 233, "reward": 1.0, "skipped": true}
+{"step": 234, "reward": 1.0, "skipped": true}
+{"step": 235, "reward": 1.0, "skipped": true}
+{"step": 236, "reward": 1.0, "skipped": true}
+{"step": 237, "reward": 0.0, "skipped": true}
+{"step": 238, "reward": 1.0, "skipped": true}
+{"step": 239, "reward": 1.0, "skipped": true}
+{"step": 240, "reward": 1.0, "skipped": true}
+{"step": 241, "reward": 1.0, "skipped": true}
+{"step": 242, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04302818002179265, "grad_norm": 4.4375, "gen_len": 199.125}
+{"step": 243, "reward": 1.0, "skipped": true}
+{"step": 244, "reward": 1.0, "skipped": true}
+{"step": 245, "reward": 1.0, "skipped": true}
+{"step": 246, "reward": 1.0, "skipped": true}
+{"step": 247, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10420000832527876, "grad_norm": 10.4375, "gen_len": 151.25}
+{"step": 248, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07912723813205957, "grad_norm": 5.4375, "gen_len": 56.375}
+{"step": 249, "reward": 1.0, "skipped": true}
+{"step": 250, "reward": 1.0, "skipped": true}
+{"step": 251, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1510253008455038, "grad_norm": 3.40625, "gen_len": 166.25}
+{"step": 252, "reward": 1.0, "skipped": true}
+{"step": 253, "reward": 1.0, "skipped": true}
+{"step": 254, "reward": 1.0, "skipped": true}
+{"step": 255, "reward": 1.0, "skipped": true}
+{"step": 256, "reward": 1.0, "skipped": true}
+{"step": 257, "reward": 1.0, "skipped": true}
+{"step": 258, "reward": 1.0, "skipped": true}
+{"step": 259, "reward": 1.0, "skipped": true}
+{"step": 260, "reward": 1.0, "skipped": true}
+{"step": 261, "reward": 0.0, "skipped": true}
+{"step": 262, "reward": 1.0, "skipped": true}
+{"step": 263, "reward": 1.0, "skipped": true}
+{"step": 264, "reward": 1.0, "skipped": true}
+{"step": 265, "reward": 1.0, "skipped": true}
+{"step": 266, "reward": 1.0, "skipped": true}
+{"step": 267, "reward": 1.0, "skipped": true}
+{"step": 268, "reward": 1.0, "skipped": true}
+{"step": 269, "reward": 1.0, "skipped": true}
+{"step": 270, "reward": 1.0, "skipped": true}
+{"step": 271, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.061757173389196396, "grad_norm": 6.40625, "gen_len": 112.125}
+{"step": 272, "reward": 1.0, "skipped": true}
+{"step": 273, "reward": 1.0, "skipped": true}
+{"step": 274, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11088958289474249, "grad_norm": 2.984375, "gen_len": 191.375}
+{"step": 275, "reward": 1.0, "skipped": true}
+{"step": 276, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08989170473068953, "grad_norm": 16.875, "gen_len": 95.25}
+{"step": 277, "reward": 1.0, "skipped": true}
+{"step": 278, "reward": 1.0, "skipped": true}
+{"step": 279, "reward": 1.0, "skipped": true}
+{"step": 280, "reward": 0.0, "skipped": true}
+{"step": 281, "reward": 1.0, "skipped": true}
+{"step": 282, "reward": 0.0, "skipped": true}
+{"step": 283, "reward": 1.0, "skipped": true}
+{"step": 284, "reward": 1.0, "skipped": true}
+{"step": 285, "reward": 1.0, "skipped": true}
+{"step": 286, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17203058023005724, "grad_norm": 5.21875, "gen_len": 154.0}
+{"step": 287, "reward": 1.0, "skipped": true}
+{"step": 288, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09478706773370504, "grad_norm": 4.25, "gen_len": 192.5}
+{"step": 289, "reward": 0.0, "skipped": true}
+{"step": 290, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.21031998842954636, "grad_norm": 5.625, "gen_len": 186.875}
+{"step": 291, "reward": 1.0, "skipped": true}
+{"step": 292, "reward": 1.0, "skipped": true}
+{"step": 293, "reward": 1.0, "skipped": true}
+{"step": 294, "reward": 1.0, "skipped": true}
+{"step": 295, "reward": 1.0, "skipped": true}
+{"step": 296, "reward": 1.0, "skipped": true}
+{"step": 297, "reward": 1.0, "skipped": true}
+{"step": 298, "reward": 1.0, "skipped": true}
+{"step": 299, "reward": 1.0, "skipped": true}
+{"step": 300, "eval_acc": 0.84375}
+{"step": 300, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06747219990938902, "grad_norm": 5.03125, "gen_len": 131.125}
+{"step": 301, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06801940081641078, "grad_norm": 2.484375, "gen_len": 189.5}
+{"step": 302, "reward": 1.0, "skipped": true}
+{"step": 303, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16983360517770052, "grad_norm": 4.46875, "gen_len": 177.5}
+{"step": 304, "reward": 0.0, "skipped": true}
+{"step": 305, "reward": 1.0, "skipped": true}
+{"step": 306, "reward": 1.0, "skipped": true}
+{"step": 307, "reward": 1.0, "skipped": true}
+{"step": 308, "reward": 1.0, "skipped": true}
+{"step": 309, "reward": 1.0, "skipped": true}
+{"step": 310, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0638744062744081, "grad_norm": 4.0625, "gen_len": 194.125}
+{"step": 311, "reward": 1.0, "skipped": true}
+{"step": 312, "reward": 1.0, "skipped": true}
+{"step": 313, "reward": 1.0, "skipped": true}
+{"step": 314, "reward": 1.0, "skipped": true}
+{"step": 315, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0726804225705564, "grad_norm": 2.8125, "gen_len": 189.5}
+{"step": 316, "reward": 1.0, "skipped": true}
+{"step": 317, "reward": 1.0, "skipped": true}
+{"step": 318, "reward": 1.0, "skipped": true}
+{"step": 319, "reward": 1.0, "skipped": true}
+{"step": 320, "reward": 0.0, "skipped": true}
+{"step": 321, "reward": 0.0, "skipped": true}
+{"step": 322, "reward": 1.0, "skipped": true}
+{"step": 323, "reward": 1.0, "skipped": true}
+{"step": 324, "reward": 1.0, "skipped": true}
+{"step": 325, "reward": 1.0, "skipped": true}
+{"step": 326, "reward": 1.0, "skipped": true}
+{"step": 327, "reward": 1.0, "skipped": true}
+{"step": 328, "reward": 1.0, "skipped": true}
+{"step": 329, "reward": 1.0, "skipped": true}
+{"step": 330, "reward": 1.0, "skipped": true}
+{"step": 331, "reward": 0.0, "skipped": true}
+{"step": 332, "reward": 1.0, "skipped": true}
+{"step": 333, "reward": 1.0, "skipped": true}
+{"step": 334, "reward": 0.0, "skipped": true}
+{"step": 335, "reward": 0.0, "skipped": true}
+{"step": 336, "reward": 1.0, "skipped": true}
+{"step": 337, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09138158243149519, "grad_norm": 3.65625, "gen_len": 145.625}
+{"step": 338, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.22286486253142357, "grad_norm": 4.84375, "gen_len": 193.5}
+{"step": 339, "reward": 1.0, "skipped": true}
+{"step": 340, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.23297296464443207, "grad_norm": 5.21875, "gen_len": 144.5}
+{"step": 341, "reward": 1.0, "skipped": true}
+{"step": 342, "reward": 1.0, "skipped": true}
+{"step": 343, "reward": 1.0, "skipped": true}
+{"step": 344, "reward": 1.0, "skipped": true}
+{"step": 345, "reward": 1.0, "skipped": true}
+{"step": 346, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05460959114134312, "grad_norm": 3.875, "gen_len": 171.125}
+{"step": 347, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08990032970905304, "grad_norm": 11.0625, "gen_len": 70.375}
+{"step": 348, "reward": 1.0, "skipped": true}
+{"step": 349, "reward": 1.0, "skipped": true}
+{"step": 350, "reward": 1.0, "skipped": true}
+{"step": 351, "reward": 1.0, "skipped": true}
+{"step": 352, "reward": 1.0, "skipped": true}
+{"step": 353, "reward": 1.0, "skipped": true}
+{"step": 354, "reward": 1.0, "skipped": true}
+{"step": 355, "reward": 1.0, "skipped": true}
+{"step": 356, "reward": 0.0, "skipped": true}
+{"step": 357, "reward": 1.0, "skipped": true}
+{"step": 358, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17685543932020664, "grad_norm": 8.4375, "gen_len": 127.25}
+{"step": 359, "reward": 1.0, "skipped": true}
+{"step": 360, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16093568596988916, "grad_norm": 5.09375, "gen_len": 126.875}
+{"step": 361, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08825362101197243, "grad_norm": 4.15625, "gen_len": 196.875}
+{"step": 362, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17247806675732136, "grad_norm": 4.53125, "gen_len": 200.0}
+{"step": 363, "reward": 1.0, "skipped": true}
+{"step": 364, "reward": 1.0, "skipped": true}
+{"step": 365, "reward": 1.0, "skipped": true}
+{"step": 366, "reward": 1.0, "skipped": true}
+{"step": 367, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09513288270682096, "grad_norm": 9.9375, "gen_len": 163.5}
+{"step": 368, "reward": 1.0, "skipped": true}
+{"step": 369, "reward": 1.0, "skipped": true}
+{"step": 370, "reward": 1.0, "skipped": true}
+{"step": 371, "reward": 1.0, "skipped": true}
+{"step": 372, "reward": 1.0, "skipped": true}
+{"step": 373, "reward": 1.0, "skipped": true}
+{"step": 374, "reward": 1.0, "skipped": true}
+{"step": 375, "reward": 1.0, "skipped": true}
+{"step": 376, "reward": 1.0, "skipped": true}
+{"step": 377, "reward": 1.0, "skipped": true}
+{"step": 378, "reward": 1.0, "skipped": true}
+{"step": 379, "reward": 1.0, "skipped": true}
+{"step": 380, "reward": 1.0, "skipped": true}
+{"step": 381, "reward": 1.0, "skipped": true}
+{"step": 382, "reward": 1.0, "skipped": true}
+{"step": 383, "reward": 1.0, "skipped": true}
+{"step": 384, "reward": 1.0, "skipped": true}
+{"step": 385, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16742816381156445, "grad_norm": 7.4375, "gen_len": 118.0}
+{"step": 386, "reward": 1.0, "skipped": true}
+{"step": 387, "reward": 1.0, "skipped": true}
+{"step": 388, "reward": 1.0, "skipped": true}
+{"step": 389, "reward": 1.0, "skipped": true}
+{"step": 390, "reward": 1.0, "skipped": true}
+{"step": 391, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07610070798546076, "grad_norm": 15.0, "gen_len": 78.25}
+{"step": 392, "reward": 1.0, "skipped": true}
+{"step": 393, "reward": 1.0, "skipped": true}
+{"step": 394, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09668153338134289, "grad_norm": 10.25, "gen_len": 97.625}
+{"step": 395, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0850129434838891, "grad_norm": 4.78125, "gen_len": 196.5}
+{"step": 396, "reward": 1.0, "skipped": true}
+{"step": 397, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10088944807648659, "grad_norm": 3.484375, "gen_len": 186.5}
+{"step": 398, "reward": 1.0, "skipped": true}
+{"step": 399, "reward": 0.0, "skipped": true}
+{"step": 400, "eval_acc": 0.875}
+{"step": 400, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07849446684122086, "grad_norm": 5.09375, "gen_len": 176.25}
+{"step": 401, "reward": 1.0, "skipped": true}
+{"step": 402, "reward": 0.0, "skipped": true}
+{"step": 403, "reward": 1.0, "skipped": true}
+{"step": 404, "reward": 0.0, "skipped": true}
+{"step": 405, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.28110056556761265, "grad_norm": 5.34375, "gen_len": 160.125}
+{"step": 406, "reward": 1.0, "skipped": true}
+{"step": 407, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1087197344750166, "grad_norm": 11.6875, "gen_len": 82.125}
+{"step": 408, "reward": 1.0, "skipped": true}
+{"step": 409, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04534405982121825, "grad_norm": 11.6875, "gen_len": 103.75}
+{"step": 410, "reward": 1.0, "skipped": true}
+{"step": 411, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.3041114769876003, "grad_norm": 6.03125, "gen_len": 175.625}
+{"step": 412, "reward": 1.0, "skipped": true}
+{"step": 413, "reward": 1.0, "skipped": true}
+{"step": 414, "reward": 0.0, "skipped": true}
+{"step": 415, "reward": 1.0, "skipped": true}
+{"step": 416, "reward": 1.0, "skipped": true}
+{"step": 417, "reward": 1.0, "skipped": true}
+{"step": 418, "reward": 1.0, "skipped": true}
+{"step": 419, "reward": 1.0, "skipped": true}
+{"step": 420, "reward": 1.0, "skipped": true}
+{"step": 421, "reward": 1.0, "skipped": true}
+{"step": 422, "reward": 1.0, "skipped": true}
+{"step": 423, "reward": 1.0, "skipped": true}
+{"step": 424, "reward": 0.0, "skipped": true}
+{"step": 425, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.045786820352077484, "grad_norm": 17.875, "gen_len": 82.75}
+{"step": 426, "reward": 1.0, "skipped": true}
+{"step": 427, "reward": 1.0, "skipped": true}
+{"step": 428, "reward": 1.0, "skipped": true}
+{"step": 429, "reward": 1.0, "skipped": true}
+{"step": 430, "reward": 1.0, "skipped": true}
+{"step": 431, "reward": 1.0, "skipped": true}
+{"step": 432, "reward": 1.0, "skipped": true}
+{"step": 433, "reward": 1.0, "skipped": true}
+{"step": 434, "reward": 1.0, "skipped": true}
+{"step": 435, "reward": 1.0, "skipped": true}
+{"step": 436, "reward": 1.0, "skipped": true}
+{"step": 437, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1157084871083498, "grad_norm": 4.28125, "gen_len": 164.375}
+{"step": 438, "reward": 1.0, "skipped": true}
+{"step": 439, "reward": 1.0, "skipped": true}
+{"step": 440, "reward": 1.0, "skipped": true}
+{"step": 441, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1714752558618784, "grad_norm": 4.5625, "gen_len": 168.375}
+{"step": 442, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05218134913593531, "grad_norm": 3.5, "gen_len": 197.0}
+{"step": 443, "reward": 1.0, "skipped": true}
+{"step": 444, "reward": 1.0, "skipped": true}
+{"step": 445, "reward": 0.0, "skipped": true}
+{"step": 446, "reward": 1.0, "skipped": true}
+{"step": 447, "reward": 1.0, "skipped": true}
+{"step": 448, "reward": 1.0, "skipped": true}
+{"step": 449, "reward": 1.0, "skipped": true}
+{"step": 450, "reward": 1.0, "skipped": true}
+{"step": 451, "reward": 1.0, "skipped": true}
+{"step": 452, "reward": 1.0, "skipped": true}
+{"step": 453, "reward": 1.0, "skipped": true}
+{"step": 454, "reward": 1.0, "skipped": true}
+{"step": 455, "reward": 1.0, "skipped": true}
+{"step": 456, "reward": 1.0, "skipped": true}
+{"step": 457, "reward": 1.0, "skipped": true}
+{"step": 458, "reward": 1.0, "skipped": true}
+{"step": 459, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10089767072349787, "grad_norm": 5.8125, "gen_len": 133.5}
+{"step": 460, "reward": 1.0, "skipped": true}
+{"step": 461, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08818957582116127, "grad_norm": 7.3125, "gen_len": 119.75}
+{"step": 462, "reward": 1.0, "skipped": true}
+{"step": 463, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.16920507699251175, "grad_norm": 4.5625, "gen_len": 169.25}
+{"step": 464, "reward": 1.0, "skipped": true}
+{"step": 465, "reward": 1.0, "skipped": true}
+{"step": 466, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0810299813747406, "grad_norm": 10.6875, "gen_len": 91.875}
+{"step": 467, "reward": 1.0, "skipped": true}
+{"step": 468, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08043587114661932, "grad_norm": 2.859375, "gen_len": 168.75}
+{"step": 469, "reward": 1.0, "skipped": true}
+{"step": 470, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10343794897198677, "grad_norm": 4.125, "gen_len": 177.0}
+{"step": 471, "reward": 1.0, "skipped": true}
+{"step": 472, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0779453138820827, "grad_norm": 16.375, "gen_len": 65.375}
+{"step": 473, "reward": 1.0, "skipped": true}
+{"step": 474, "reward": 0.0, "skipped": true}
+{"step": 475, "reward": 1.0, "skipped": true}
+{"step": 476, "reward": 1.0, "skipped": true}
+{"step": 477, "reward": 1.0, "skipped": true}
+{"step": 478, "reward": 1.0, "skipped": true}
+{"step": 479, "reward": 1.0, "skipped": true}
+{"step": 480, "reward": 1.0, "skipped": true}
+{"step": 481, "reward": 1.0, "skipped": true}
+{"step": 482, "reward": 1.0, "skipped": true}
+{"step": 483, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09679820947349072, "grad_norm": 4.15625, "gen_len": 182.5}
+{"step": 484, "reward": 1.0, "skipped": true}
+{"step": 485, "reward": 1.0, "skipped": true}
+{"step": 486, "reward": 0.0, "skipped": true}
+{"step": 487, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08191475085914135, "grad_norm": 17.125, "gen_len": 89.75}
+{"step": 488, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1000982727855444, "grad_norm": 8.25, "gen_len": 142.5}
+{"step": 489, "reward": 1.0, "skipped": true}
+{"step": 490, "reward": 1.0, "skipped": true}
+{"step": 491, "reward": 1.0, "skipped": true}
+{"step": 492, "reward": 1.0, "skipped": true}
+{"step": 493, "reward": 1.0, "skipped": true}
+{"step": 494, "reward": 1.0, "skipped": true}
+{"step": 495, "reward": 1.0, "skipped": true}
+{"step": 496, "reward": 1.0, "skipped": true}
+{"step": 497, "reward": 1.0, "skipped": true}
+{"step": 498, "reward": 1.0, "skipped": true}
+{"step": 499, "reward": 1.0, "skipped": true}
+{"step": 500, "eval_acc": 0.90625}
+{"step": 500, "reward": 1.0, "skipped": true}
+{"step": 501, "reward": 0.0, "skipped": true}
+{"step": 502, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12448835000395775, "grad_norm": 3.109375, "gen_len": 145.125}
+{"step": 503, "reward": 1.0, "skipped": true}
+{"step": 504, "reward": 0.0, "skipped": true}
+{"step": 505, "reward": 1.0, "skipped": true}
+{"step": 506, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09480706928297877, "grad_norm": 6.96875, "gen_len": 62.375}
+{"step": 507, "reward": 1.0, "skipped": true}
+{"step": 508, "reward": 1.0, "skipped": true}
+{"step": 509, "reward": 0.0, "skipped": true}
+{"step": 510, "reward": 1.0, "skipped": true}
+{"step": 511, "reward": 1.0, "skipped": true}
+{"step": 512, "reward": 1.0, "skipped": true}
+{"step": 513, "reward": 1.0, "skipped": true}
+{"step": 514, "reward": 1.0, "skipped": true}
+{"step": 515, "reward": 1.0, "skipped": true}
+{"step": 516, "reward": 1.0, "skipped": true}
+{"step": 517, "reward": 1.0, "skipped": true}
+{"step": 518, "reward": 1.0, "skipped": true}
+{"step": 519, "reward": 1.0, "skipped": true}
+{"step": 520, "reward": 1.0, "skipped": true}
+{"step": 521, "reward": 1.0, "skipped": true}
+{"step": 522, "reward": 1.0, "skipped": true}
+{"step": 523, "reward": 1.0, "skipped": true}
+{"step": 524, "reward": 1.0, "skipped": true}
+{"step": 525, "reward": 0.0, "skipped": true}
+{"step": 526, "reward": 1.0, "skipped": true}
+{"step": 527, "reward": 1.0, "skipped": true}
+{"step": 528, "reward": 1.0, "skipped": true}
+{"step": 529, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1251846607774496, "grad_norm": 4.375, "gen_len": 160.75}
+{"step": 530, "reward": 0.0, "skipped": true}
+{"step": 531, "reward": 1.0, "skipped": true}
+{"step": 532, "reward": 1.0, "skipped": true}
+{"step": 533, "reward": 1.0, "skipped": true}
+{"step": 534, "reward": 1.0, "skipped": true}
+{"step": 535, "reward": 1.0, "skipped": true}
+{"step": 536, "reward": 1.0, "skipped": true}
+{"step": 537, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14096550084650517, "grad_norm": 8.375, "gen_len": 174.5}
+{"step": 538, "reward": 1.0, "skipped": true}
+{"step": 539, "reward": 1.0, "skipped": true}
+{"step": 540, "reward": 1.0, "skipped": true}
+{"step": 541, "reward": 1.0, "skipped": true}
+{"step": 542, "reward": 1.0, "skipped": true}
+{"step": 543, "reward": 1.0, "skipped": true}
+{"step": 544, "reward": 1.0, "skipped": true}
+{"step": 545, "reward": 1.0, "skipped": true}
+{"step": 546, "reward": 1.0, "skipped": true}
+{"step": 547, "reward": 1.0, "skipped": true}
+{"step": 548, "reward": 1.0, "skipped": true}
+{"step": 549, "reward": 1.0, "skipped": true}
+{"step": 550, "reward": 1.0, "skipped": true}
+{"step": 551, "reward": 1.0, "skipped": true}
+{"step": 552, "reward": 1.0, "skipped": true}
+{"step": 553, "reward": 1.0, "skipped": true}
+{"step": 554, "reward": 1.0, "skipped": true}
+{"step": 555, "reward": 1.0, "skipped": true}
+{"step": 556, "reward": 1.0, "skipped": true}
+{"step": 557, "reward": 1.0, "skipped": true}
+{"step": 558, "reward": 1.0, "skipped": true}
+{"step": 559, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10578001011162996, "grad_norm": 3.515625, "gen_len": 191.125}
+{"step": 560, "reward": 1.0, "skipped": true}
+{"step": 561, "reward": 1.0, "skipped": true}
+{"step": 562, "reward": 1.0, "skipped": true}
+{"step": 563, "reward": 1.0, "skipped": true}
+{"step": 564, "reward": 1.0, "skipped": true}
+{"step": 565, "reward": 1.0, "skipped": true}
+{"step": 566, "reward": 1.0, "skipped": true}
+{"step": 567, "reward": 1.0, "skipped": true}
+{"step": 568, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06185800628736615, "grad_norm": 4.1875, "gen_len": 171.0}
+{"step": 569, "reward": 1.0, "skipped": true}
+{"step": 570, "reward": 0.0, "skipped": true}
+{"step": 571, "reward": 1.0, "skipped": true}
+{"step": 572, "reward": 1.0, "skipped": true}
+{"step": 573, "reward": 1.0, "skipped": true}
+{"step": 574, "reward": 1.0, "skipped": true}
+{"step": 575, "reward": 1.0, "skipped": true}
+{"step": 576, "reward": 1.0, "skipped": true}
+{"step": 577, "reward": 1.0, "skipped": true}
+{"step": 578, "reward": 1.0, "skipped": true}
+{"step": 579, "reward": 1.0, "skipped": true}
+{"step": 580, "reward": 1.0, "skipped": true}
+{"step": 581, "reward": 0.0, "skipped": true}
+{"step": 582, "reward": 1.0, "skipped": true}
+{"step": 583, "reward": 1.0, "skipped": true}
+{"step": 584, "reward": 1.0, "skipped": true}
+{"step": 585, "reward": 1.0, "skipped": true}
+{"step": 586, "reward": 1.0, "skipped": true}
+{"step": 587, "reward": 0.0, "skipped": true}
+{"step": 588, "reward": 1.0, "skipped": true}
+{"step": 589, "reward": 1.0, "skipped": true}
+{"step": 590, "reward": 1.0, "skipped": true}
+{"step": 591, "reward": 1.0, "skipped": true}
+{"step": 592, "reward": 1.0, "skipped": true}
+{"step": 593, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11088651791214943, "grad_norm": 3.21875, "gen_len": 192.0}
+{"step": 594, "reward": 1.0, "skipped": true}
+{"step": 595, "reward": 1.0, "skipped": true}
+{"step": 596, "reward": 1.0, "skipped": true}
+{"step": 597, "reward": 1.0, "skipped": true}
+{"step": 598, "reward": 1.0, "skipped": true}
+{"step": 599, "reward": 1.0, "skipped": true}
+{"step": 600, "eval_acc": 0.90625}
+{"step": 600, "reward": 1.0, "skipped": true}
+{"step": 601, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10282883746549487, "grad_norm": 3.609375, "gen_len": 176.875}
+{"step": 602, "reward": 1.0, "skipped": true}
+{"step": 603, "reward": 1.0, "skipped": true}
+{"step": 604, "reward": 0.0, "skipped": true}
+{"step": 605, "reward": 1.0, "skipped": true}
+{"step": 606, "reward": 1.0, "skipped": true}
+{"step": 607, "reward": 1.0, "skipped": true}
+{"step": 608, "reward": 1.0, "skipped": true}
+{"step": 609, "reward": 1.0, "skipped": true}
+{"step": 610, "reward": 1.0, "skipped": true}
+{"step": 611, "reward": 1.0, "skipped": true}
+{"step": 612, "reward": 1.0, "skipped": true}
+{"step": 613, "reward": 1.0, "skipped": true}
+{"step": 614, "reward": 1.0, "skipped": true}
+{"step": 615, "reward": 0.0, "skipped": true}
+{"step": 616, "reward": 1.0, "skipped": true}
+{"step": 617, "reward": 1.0, "skipped": true}
+{"step": 618, "reward": 0.0, "skipped": true}
+{"step": 619, "reward": 1.0, "skipped": true}
+{"step": 620, "reward": 1.0, "skipped": true}
+{"step": 621, "reward": 1.0, "skipped": true}
+{"step": 622, "reward": 1.0, "skipped": true}
+{"step": 623, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08553069829940796, "grad_norm": 6.875, "gen_len": 141.0}
+{"step": 624, "reward": 1.0, "skipped": true}
+{"step": 625, "reward": 1.0, "skipped": true}
+{"step": 626, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12883145548403263, "grad_norm": 8.4375, "gen_len": 121.125}
+{"step": 627, "reward": 1.0, "skipped": true}
+{"step": 628, "reward": 1.0, "skipped": true}
+{"step": 629, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09178013727068901, "grad_norm": 13.8125, "gen_len": 77.875}
+{"step": 630, "reward": 1.0, "skipped": true}
+{"step": 631, "reward": 1.0, "skipped": true}
+{"step": 632, "reward": 1.0, "skipped": true}
+{"step": 633, "reward": 1.0, "skipped": true}
+{"step": 634, "reward": 1.0, "skipped": true}
+{"step": 635, "reward": 1.0, "skipped": true}
+{"step": 636, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1511856485158205, "grad_norm": 11.125, "gen_len": 86.375}
+{"step": 637, "reward": 1.0, "skipped": true}
+{"step": 638, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05944701097905636, "grad_norm": 5.0, "gen_len": 178.75}
+{"step": 639, "reward": 1.0, "skipped": true}
+{"step": 640, "reward": 1.0, "skipped": true}
+{"step": 641, "reward": 1.0, "skipped": true}
+{"step": 642, "reward": 1.0, "skipped": true}
+{"step": 643, "reward": 1.0, "skipped": true}
+{"step": 644, "reward": 1.0, "skipped": true}
+{"step": 645, "reward": 1.0, "skipped": true}
+{"step": 646, "reward": 1.0, "skipped": true}
+{"step": 647, "reward": 1.0, "skipped": true}
+{"step": 648, "reward": 1.0, "skipped": true}
+{"step": 649, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04412176157347858, "grad_norm": 11.3125, "gen_len": 72.625}
+{"step": 650, "reward": 1.0, "skipped": true}
+{"step": 651, "reward": 1.0, "skipped": true}
+{"step": 652, "reward": 1.0, "skipped": true}
+{"step": 653, "reward": 1.0, "skipped": true}
+{"step": 654, "reward": 1.0, "skipped": true}
+{"step": 655, "reward": 1.0, "skipped": true}
+{"step": 656, "reward": 1.0, "skipped": true}
+{"step": 657, "reward": 0.0, "skipped": true}
+{"step": 658, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.061741454526782036, "grad_norm": 4.90625, "gen_len": 111.875}
+{"step": 659, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05919030215591192, "grad_norm": 6.0, "gen_len": 147.25}
+{"step": 660, "reward": 1.0, "skipped": true}
+{"step": 661, "reward": 1.0, "skipped": true}
+{"step": 662, "reward": 1.0, "skipped": true}
+{"step": 663, "reward": 1.0, "skipped": true}
+{"step": 664, "reward": 1.0, "skipped": true}
+{"step": 665, "reward": 1.0, "skipped": true}
+{"step": 666, "reward": 1.0, "skipped": true}
+{"step": 667, "reward": 1.0, "skipped": true}
+{"step": 668, "reward": 1.0, "skipped": true}
+{"step": 669, "reward": 0.0, "skipped": true}
+{"step": 670, "reward": 1.0, "skipped": true}
+{"step": 671, "reward": 1.0, "skipped": true}
+{"step": 672, "reward": 1.0, "skipped": true}
+{"step": 673, "reward": 1.0, "skipped": true}
+{"step": 674, "reward": 1.0, "skipped": true}
+{"step": 675, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.077696667984128, "grad_norm": 4.09375, "gen_len": 190.25}
+{"step": 676, "reward": 1.0, "skipped": true}
+{"step": 677, "reward": 1.0, "skipped": true}
+{"step": 678, "reward": 1.0, "skipped": true}
+{"step": 679, "reward": 1.0, "skipped": true}
+{"step": 680, "reward": 1.0, "skipped": true}
+{"step": 681, "reward": 1.0, "skipped": true}
+{"step": 682, "reward": 1.0, "skipped": true}
+{"step": 683, "reward": 1.0, "skipped": true}
+{"step": 684, "reward": 1.0, "skipped": true}
+{"step": 685, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.059532987885177135, "grad_norm": 2.359375, "gen_len": 198.625}
+{"step": 686, "reward": 1.0, "skipped": true}
+{"step": 687, "reward": 1.0, "skipped": true}
+{"step": 688, "reward": 1.0, "skipped": true}
+{"step": 689, "reward": 1.0, "skipped": true}
+{"step": 690, "reward": 1.0, "skipped": true}
+{"step": 691, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11688264273107052, "grad_norm": 6.21875, "gen_len": 125.0}
+{"step": 692, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09514239151030779, "grad_norm": 19.875, "gen_len": 82.375}
+{"step": 693, "reward": 1.0, "skipped": true}
+{"step": 694, "reward": 1.0, "skipped": true}
+{"step": 695, "reward": 1.0, "skipped": true}
+{"step": 696, "reward": 1.0, "skipped": true}
+{"step": 697, "reward": 1.0, "skipped": true}
+{"step": 698, "reward": 1.0, "skipped": true}
+{"step": 699, "reward": 1.0, "skipped": true}
+{"step": 700, "eval_acc": 0.90625}
+{"step": 700, "reward": 0.0, "skipped": true}
+{"step": 701, "reward": 1.0, "skipped": true}
+{"step": 702, "reward": 1.0, "skipped": true}
+{"step": 703, "reward": 1.0, "skipped": true}
+{"step": 704, "reward": 1.0, "skipped": true}
+{"step": 705, "reward": 1.0, "skipped": true}
+{"step": 706, "reward": 1.0, "skipped": true}
+{"step": 707, "reward": 1.0, "skipped": true}
+{"step": 708, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.25990732945501804, "grad_norm": 5.1875, "gen_len": 200.0}
+{"step": 709, "reward": 1.0, "skipped": true}
+{"step": 710, "reward": 1.0, "skipped": true}
+{"step": 711, "reward": 1.0, "skipped": true}
+{"step": 712, "reward": 1.0, "skipped": true}
+{"step": 713, "reward": 1.0, "skipped": true}
+{"step": 714, "reward": 1.0, "skipped": true}
+{"step": 715, "reward": 1.0, "skipped": true}
+{"step": 716, "reward": 1.0, "skipped": true}
+{"step": 717, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08993376325815916, "grad_norm": 6.03125, "gen_len": 89.0}
+{"step": 718, "reward": 1.0, "skipped": true}
+{"step": 719, "reward": 1.0, "skipped": true}
+{"step": 720, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07930332235991955, "grad_norm": 2.734375, "gen_len": 199.75}
+{"step": 721, "reward": 1.0, "skipped": true}
+{"step": 722, "reward": 1.0, "skipped": true}
+{"step": 723, "reward": 1.0, "skipped": true}
+{"step": 724, "reward": 1.0, "skipped": true}
+{"step": 725, "reward": 1.0, "skipped": true}
+{"step": 726, "reward": 1.0, "skipped": true}
+{"step": 727, "reward": 1.0, "skipped": true}
+{"step": 728, "reward": 1.0, "skipped": true}
+{"step": 729, "reward": 1.0, "skipped": true}
+{"step": 730, "reward": 1.0, "skipped": true}
+{"step": 731, "reward": 1.0, "skipped": true}
+{"step": 732, "reward": 1.0, "skipped": true}
+{"step": 733, "reward": 1.0, "skipped": true}
+{"step": 734, "reward": 1.0, "skipped": true}
+{"step": 735, "reward": 1.0, "skipped": true}
+{"step": 736, "reward": 1.0, "skipped": true}
+{"step": 737, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06271318579092622, "grad_norm": 9.375, "gen_len": 58.125}
+{"step": 738, "reward": 1.0, "skipped": true}
+{"step": 739, "reward": 1.0, "skipped": true}
+{"step": 740, "reward": 1.0, "skipped": true}
+{"step": 741, "reward": 1.0, "skipped": true}
+{"step": 742, "reward": 1.0, "skipped": true}
+{"step": 743, "reward": 1.0, "skipped": true}
+{"step": 744, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13063033763319254, "grad_norm": 5.3125, "gen_len": 189.125}
+{"step": 745, "reward": 1.0, "skipped": true}
+{"step": 746, "reward": 1.0, "skipped": true}
+{"step": 747, "reward": 1.0, "skipped": true}
+{"step": 748, "reward": 1.0, "skipped": true}
+{"step": 749, "reward": 1.0, "skipped": true}
+{"step": 750, "reward": 1.0, "skipped": true}
+{"step": 751, "reward": 1.0, "skipped": true}
+{"step": 752, "reward": 1.0, "skipped": true}
+{"step": 753, "reward": 1.0, "skipped": true}
+{"step": 754, "reward": 0.0, "skipped": true}
+{"step": 755, "reward": 1.0, "skipped": true}
+{"step": 756, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12375794257968664, "grad_norm": 8.125, "gen_len": 111.75}
+{"step": 757, "reward": 1.0, "skipped": true}
+{"step": 758, "reward": 1.0, "skipped": true}
+{"step": 759, "reward": 1.0, "skipped": true}
+{"step": 760, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07536320015788078, "grad_norm": 4.15625, "gen_len": 158.0}
+{"step": 761, "reward": 1.0, "skipped": true}
+{"step": 762, "reward": 1.0, "skipped": true}
+{"step": 763, "reward": 1.0, "skipped": true}
+{"step": 764, "reward": 1.0, "skipped": true}
+{"step": 765, "reward": 1.0, "skipped": true}
+{"step": 766, "reward": 1.0, "skipped": true}
+{"step": 767, "reward": 1.0, "skipped": true}
+{"step": 768, "reward": 1.0, "skipped": true}
+{"step": 769, "reward": 1.0, "skipped": true}
+{"step": 770, "reward": 1.0, "skipped": true}
+{"step": 771, "reward": 1.0, "skipped": true}
+{"step": 772, "reward": 1.0, "skipped": true}
+{"step": 773, "reward": 1.0, "skipped": true}
+{"step": 774, "reward": 1.0, "skipped": true}
+{"step": 775, "reward": 1.0, "skipped": true}
+{"step": 776, "reward": 1.0, "skipped": true}
+{"step": 777, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04227790189906955, "grad_norm": 15.1875, "gen_len": 67.0}
+{"step": 778, "reward": 0.0, "skipped": true}
+{"step": 779, "reward": 1.0, "skipped": true}
+{"step": 780, "reward": 1.0, "skipped": true}
+{"step": 781, "reward": 1.0, "skipped": true}
+{"step": 782, "reward": 1.0, "skipped": true}
+{"step": 783, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07481494918465614, "grad_norm": 5.5, "gen_len": 126.125}
+{"step": 784, "reward": 1.0, "skipped": true}
+{"step": 785, "reward": 1.0, "skipped": true}
+{"step": 786, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09098607767373323, "grad_norm": 5.03125, "gen_len": 170.875}
+{"step": 787, "reward": 1.0, "skipped": true}
+{"step": 788, "reward": 1.0, "skipped": true}
+{"step": 789, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10785698425024748, "grad_norm": 11.375, "gen_len": 102.375}
+{"step": 790, "reward": 1.0, "skipped": true}
+{"step": 791, "reward": 1.0, "skipped": true}
+{"step": 792, "reward": 1.0, "skipped": true}
+{"step": 793, "reward": 1.0, "skipped": true}
+{"step": 794, "reward": 1.0, "skipped": true}
+{"step": 795, "reward": 1.0, "skipped": true}
+{"step": 796, "reward": 0.0, "skipped": true}
+{"step": 797, "reward": 1.0, "skipped": true}
+{"step": 798, "reward": 1.0, "skipped": true}
+{"step": 799, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08274927455931902, "grad_norm": 5.375, "gen_len": 162.75}
+{"step": 800, "eval_acc": 0.90625}
+{"step": 800, "reward": 1.0, "skipped": true}
+{"step": 801, "reward": 1.0, "skipped": true}
+{"step": 802, "reward": 1.0, "skipped": true}
+{"step": 803, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1101674921810627, "grad_norm": 2.921875, "gen_len": 190.125}
+{"step": 804, "reward": 1.0, "skipped": true}
+{"step": 805, "reward": 1.0, "skipped": true}
+{"step": 806, "reward": 1.0, "skipped": true}
+{"step": 807, "reward": 1.0, "skipped": true}
+{"step": 808, "reward": 1.0, "skipped": true}
+{"step": 809, "reward": 1.0, "skipped": true}
+{"step": 810, "reward": 1.0, "skipped": true}
+{"step": 811, "reward": 1.0, "skipped": true}
+{"step": 812, "reward": 1.0, "skipped": true}
+{"step": 813, "reward": 1.0, "skipped": true}
+{"step": 814, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.03839044366031885, "grad_norm": 3.890625, "gen_len": 134.5}
+{"step": 815, "reward": 1.0, "skipped": true}
+{"step": 816, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09397687390446663, "grad_norm": 13.6875, "gen_len": 81.375}
+{"step": 817, "reward": 1.0, "skipped": true}
+{"step": 818, "reward": 1.0, "skipped": true}
+{"step": 819, "reward": 1.0, "skipped": true}
+{"step": 820, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11536809615790844, "grad_norm": 10.125, "gen_len": 81.375}
+{"step": 821, "reward": 1.0, "skipped": true}
+{"step": 822, "reward": 1.0, "skipped": true}
+{"step": 823, "reward": 1.0, "skipped": true}
+{"step": 824, "reward": 1.0, "skipped": true}
+{"step": 825, "reward": 1.0, "skipped": true}
+{"step": 826, "reward": 1.0, "skipped": true}
+{"step": 827, "reward": 1.0, "skipped": true}
+{"step": 828, "reward": 1.0, "skipped": true}
+{"step": 829, "reward": 1.0, "skipped": true}
+{"step": 830, "reward": 1.0, "skipped": true}
+{"step": 831, "reward": 1.0, "skipped": true}
+{"step": 832, "reward": 1.0, "skipped": true}
+{"step": 833, "reward": 1.0, "skipped": true}
+{"step": 834, "reward": 1.0, "skipped": true}
+{"step": 835, "reward": 0.0, "skipped": true}
+{"step": 836, "reward": 1.0, "skipped": true}
+{"step": 837, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1628270549699664, "grad_norm": 10.4375, "gen_len": 138.625}
+{"step": 838, "reward": 1.0, "skipped": true}
+{"step": 839, "reward": 1.0, "skipped": true}
+{"step": 840, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.144273666664958, "grad_norm": 5.71875, "gen_len": 193.0}
+{"step": 841, "reward": 1.0, "skipped": true}
+{"step": 842, "reward": 1.0, "skipped": true}
+{"step": 843, "reward": 1.0, "skipped": true}
+{"step": 844, "reward": 1.0, "skipped": true}
+{"step": 845, "reward": 1.0, "skipped": true}
+{"step": 846, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06765602994710207, "grad_norm": 11.3125, "gen_len": 61.125}
+{"step": 847, "reward": 1.0, "skipped": true}
+{"step": 848, "reward": 1.0, "skipped": true}
+{"step": 849, "reward": 1.0, "skipped": true}
+{"step": 850, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0913391187787056, "grad_norm": 3.3125, "gen_len": 179.125}
+{"step": 851, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.21668468974530697, "grad_norm": 9.5, "gen_len": 93.625}
+{"step": 852, "reward": 1.0, "skipped": true}
+{"step": 853, "reward": 1.0, "skipped": true}
+{"step": 854, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0992625905200839, "grad_norm": 10.25, "gen_len": 130.75}
+{"step": 855, "reward": 1.0, "skipped": true}
+{"step": 856, "reward": 1.0, "skipped": true}
+{"step": 857, "reward": 1.0, "skipped": true}
+{"step": 858, "reward": 1.0, "skipped": true}
+{"step": 859, "reward": 1.0, "skipped": true}
+{"step": 860, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0766757344827056, "grad_norm": 4.21875, "gen_len": 193.0}
+{"step": 861, "reward": 1.0, "skipped": true}
+{"step": 862, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.052987837232649326, "grad_norm": 6.5625, "gen_len": 90.875}
+{"step": 863, "reward": 1.0, "skipped": true}
+{"step": 864, "reward": 1.0, "skipped": true}
+{"step": 865, "reward": 1.0, "skipped": true}
+{"step": 866, "reward": 1.0, "skipped": true}
+{"step": 867, "reward": 1.0, "skipped": true}
+{"step": 868, "reward": 0.0, "skipped": true}
+{"step": 869, "reward": 0.0, "skipped": true}
+{"step": 870, "reward": 1.0, "skipped": true}
+{"step": 871, "reward": 1.0, "skipped": true}
+{"step": 872, "reward": 1.0, "skipped": true}
+{"step": 873, "reward": 1.0, "skipped": true}
+{"step": 874, "reward": 1.0, "skipped": true}
+{"step": 875, "reward": 1.0, "skipped": true}
+{"step": 876, "reward": 1.0, "skipped": true}
+{"step": 877, "reward": 1.0, "skipped": true}
+{"step": 878, "reward": 1.0, "skipped": true}
+{"step": 879, "reward": 1.0, "skipped": true}
+{"step": 880, "reward": 1.0, "skipped": true}
+{"step": 881, "reward": 1.0, "skipped": true}
+{"step": 882, "reward": 1.0, "skipped": true}
+{"step": 883, "reward": 1.0, "skipped": true}
+{"step": 884, "reward": 1.0, "skipped": true}
+{"step": 885, "reward": 1.0, "skipped": true}
+{"step": 886, "reward": 1.0, "skipped": true}
+{"step": 887, "reward": 1.0, "skipped": true}
+{"step": 888, "reward": 1.0, "skipped": true}
+{"step": 889, "reward": 1.0, "skipped": true}
+{"step": 890, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10569257661700249, "grad_norm": 5.375, "gen_len": 150.0}
+{"step": 891, "reward": 1.0, "skipped": true}
+{"step": 892, "reward": 1.0, "skipped": true}
+{"step": 893, "reward": 1.0, "skipped": true}
+{"step": 894, "reward": 1.0, "skipped": true}
+{"step": 895, "reward": 1.0, "skipped": true}
+{"step": 896, "reward": 1.0, "skipped": true}
+{"step": 897, "reward": 1.0, "skipped": true}
+{"step": 898, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12805523350834846, "grad_norm": 10.5, "gen_len": 99.25}
+{"step": 899, "reward": 1.0, "skipped": true}
+{"step": 900, "eval_acc": 0.90625}
+{"step": 900, "reward": 1.0, "skipped": true}
+{"step": 901, "reward": 1.0, "skipped": true}
+{"step": 902, "reward": 0.0, "skipped": true}
+{"step": 903, "reward": 1.0, "skipped": true}
+{"step": 904, "reward": 1.0, "skipped": true}
+{"step": 905, "reward": 1.0, "skipped": true}
+{"step": 906, "reward": 1.0, "skipped": true}
+{"step": 907, "reward": 1.0, "skipped": true}
+{"step": 908, "reward": 1.0, "skipped": true}
+{"step": 909, "reward": 1.0, "skipped": true}
+{"step": 910, "reward": 1.0, "skipped": true}
+{"step": 911, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12679804023355246, "grad_norm": 8.875, "gen_len": 109.875}
+{"step": 912, "reward": 1.0, "skipped": true}
+{"step": 913, "reward": 1.0, "skipped": true}
+{"step": 914, "reward": 1.0, "skipped": true}
+{"step": 915, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08649823814630508, "grad_norm": 5.59375, "gen_len": 110.875}
+{"step": 916, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12689361441880465, "grad_norm": 4.28125, "gen_len": 179.5}
+{"step": 917, "reward": 1.0, "skipped": true}
+{"step": 918, "reward": 1.0, "skipped": true}
+{"step": 919, "reward": 1.0, "skipped": true}
+{"step": 920, "reward": 1.0, "skipped": true}
+{"step": 921, "reward": 1.0, "skipped": true}
+{"step": 922, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08858803100883961, "grad_norm": 5.875, "gen_len": 175.5}
+{"step": 923, "reward": 1.0, "skipped": true}
+{"step": 924, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.22209278214722872, "grad_norm": 6.96875, "gen_len": 111.875}
+{"step": 925, "reward": 1.0, "skipped": true}
+{"step": 926, "reward": 1.0, "skipped": true}
+{"step": 927, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.20390219800174236, "grad_norm": 7.4375, "gen_len": 99.125}
+{"step": 928, "reward": 1.0, "skipped": true}
+{"step": 929, "reward": 1.0, "skipped": true}
+{"step": 930, "reward": 1.0, "skipped": true}
+{"step": 931, "reward": 1.0, "skipped": true}
+{"step": 932, "reward": 1.0, "skipped": true}
+{"step": 933, "reward": 1.0, "skipped": true}
+{"step": 934, "reward": 1.0, "skipped": true}
+{"step": 935, "reward": 1.0, "skipped": true}
+{"step": 936, "reward": 1.0, "skipped": true}
+{"step": 937, "reward": 1.0, "skipped": true}
+{"step": 938, "reward": 1.0, "skipped": true}
+{"step": 939, "reward": 1.0, "skipped": true}
+{"step": 940, "reward": 1.0, "skipped": true}
+{"step": 941, "reward": 1.0, "skipped": true}
+{"step": 942, "reward": 1.0, "skipped": true}
+{"step": 943, "reward": 1.0, "skipped": true}
+{"step": 944, "reward": 1.0, "skipped": true}
+{"step": 945, "reward": 1.0, "skipped": true}
+{"step": 946, "reward": 1.0, "skipped": true}
+{"step": 947, "reward": 0.0, "skipped": true}
+{"step": 948, "reward": 1.0, "skipped": true}
+{"step": 949, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12661539018154144, "grad_norm": 5.90625, "gen_len": 174.875}
+{"step": 950, "reward": 1.0, "skipped": true}
+{"step": 951, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11101002991199493, "grad_norm": 10.8125, "gen_len": 76.375}
+{"step": 952, "reward": 1.0, "skipped": true}
+{"step": 953, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09561769291758537, "grad_norm": 10.0, "gen_len": 91.375}
+{"step": 954, "reward": 1.0, "skipped": true}
+{"step": 955, "reward": 1.0, "skipped": true}
+{"step": 956, "reward": 1.0, "skipped": true}
+{"step": 957, "reward": 1.0, "skipped": true}
+{"step": 958, "reward": 1.0, "skipped": true}
+{"step": 959, "reward": 1.0, "skipped": true}
+{"step": 960, "reward": 1.0, "skipped": true}
+{"step": 961, "reward": 1.0, "skipped": true}
+{"step": 962, "reward": 1.0, "skipped": true}
+{"step": 963, "reward": 1.0, "skipped": true}
+{"step": 964, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11647727712988853, "grad_norm": 6.6875, "gen_len": 148.875}
+{"step": 965, "reward": 1.0, "skipped": true}
+{"step": 966, "reward": 1.0, "skipped": true}
+{"step": 967, "reward": 1.0, "skipped": true}
+{"step": 968, "reward": 1.0, "skipped": true}
+{"step": 969, "reward": 1.0, "skipped": true}
+{"step": 970, "reward": 1.0, "skipped": true}
+{"step": 971, "reward": 1.0, "skipped": true}
+{"step": 972, "reward": 1.0, "skipped": true}
+{"step": 973, "reward": 1.0, "skipped": true}
+{"step": 974, "reward": 1.0, "skipped": true}
+{"step": 975, "reward": 1.0, "skipped": true}
+{"step": 976, "reward": 1.0, "skipped": true}
+{"step": 977, "reward": 1.0, "skipped": true}
+{"step": 978, "reward": 1.0, "skipped": true}
+{"step": 979, "reward": 1.0, "skipped": true}
+{"step": 980, "reward": 1.0, "skipped": true}
+{"step": 981, "reward": 1.0, "skipped": true}
+{"step": 982, "reward": 1.0, "skipped": true}
+{"step": 983, "reward": 1.0, "skipped": true}
+{"step": 984, "reward": 1.0, "skipped": true}
+{"step": 985, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15715352073311806, "grad_norm": 3.546875, "gen_len": 166.125}
+{"step": 986, "reward": 1.0, "skipped": true}
+{"step": 987, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14355261344462633, "grad_norm": 6.25, "gen_len": 100.25}
+{"step": 988, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06374144740402699, "grad_norm": 8.75, "gen_len": 103.375}
+{"step": 989, "reward": 1.0, "skipped": true}
+{"step": 990, "reward": 1.0, "skipped": true}
+{"step": 991, "reward": 1.0, "skipped": true}
+{"step": 992, "reward": 1.0, "skipped": true}
+{"step": 993, "reward": 1.0, "skipped": true}
+{"step": 994, "reward": 1.0, "skipped": true}
+{"step": 995, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2074616402387619, "grad_norm": 3.765625, "gen_len": 196.875}
+{"step": 996, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05749286385253072, "grad_norm": 6.8125, "gen_len": 151.875}
+{"step": 997, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1534453658387065, "grad_norm": 6.84375, "gen_len": 149.0}
+{"step": 998, "reward": 1.0, "skipped": true}
+{"step": 999, "reward": 1.0, "skipped": true}
+{"step": 1000, "eval_acc": 0.84375}
+{"step": 1000, "reward": 1.0, "skipped": true}
+{"step": 1001, "reward": 1.0, "skipped": true}
+{"step": 1002, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1306721167638898, "grad_norm": 5.96875, "gen_len": 161.625}
+{"step": 1003, "reward": 1.0, "skipped": true}
+{"step": 1004, "reward": 1.0, "skipped": true}
+{"step": 1005, "reward": 1.0, "skipped": true}
+{"step": 1006, "reward": 1.0, "skipped": true}
+{"step": 1007, "reward": 1.0, "skipped": true}
+{"step": 1008, "reward": 1.0, "skipped": true}
+{"step": 1009, "reward": 1.0, "skipped": true}
+{"step": 1010, "reward": 1.0, "skipped": true}
+{"step": 1011, "reward": 1.0, "skipped": true}
+{"step": 1012, "reward": 1.0, "skipped": true}
+{"step": 1013, "reward": 1.0, "skipped": true}
+{"step": 1014, "reward": 1.0, "skipped": true}
+{"step": 1015, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09291926957666874, "grad_norm": 12.375, "gen_len": 78.125}
+{"step": 1016, "reward": 1.0, "skipped": true}
+{"step": 1017, "reward": 1.0, "skipped": true}
+{"step": 1018, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14542580489069223, "grad_norm": 12.0, "gen_len": 93.125}
+{"step": 1019, "reward": 1.0, "skipped": true}
+{"step": 1020, "reward": 1.0, "skipped": true}
+{"step": 1021, "reward": 1.0, "skipped": true}
+{"step": 1022, "reward": 1.0, "skipped": true}
+{"step": 1023, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09593391325324774, "grad_norm": 13.25, "gen_len": 68.125}
+{"step": 1024, "reward": 1.0, "skipped": true}
+{"step": 1025, "reward": 1.0, "skipped": true}
+{"step": 1026, "reward": 1.0, "skipped": true}
+{"step": 1027, "reward": 1.0, "skipped": true}
+{"step": 1028, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06987791787832975, "grad_norm": 3.578125, "gen_len": 179.125}
+{"step": 1029, "reward": 1.0, "skipped": true}
+{"step": 1030, "reward": 1.0, "skipped": true}
+{"step": 1031, "reward": 1.0, "skipped": true}
+{"step": 1032, "reward": 1.0, "skipped": true}
+{"step": 1033, "reward": 1.0, "skipped": true}
+{"step": 1034, "reward": 1.0, "skipped": true}
+{"step": 1035, "reward": 1.0, "skipped": true}
+{"step": 1036, "reward": 1.0, "skipped": true}
+{"step": 1037, "reward": 1.0, "skipped": true}
+{"step": 1038, "reward": 1.0, "skipped": true}
+{"step": 1039, "reward": 1.0, "skipped": true}
+{"step": 1040, "reward": 1.0, "skipped": true}
+{"step": 1041, "reward": 1.0, "skipped": true}
+{"step": 1042, "reward": 1.0, "skipped": true}
+{"step": 1043, "reward": 1.0, "skipped": true}
+{"step": 1044, "reward": 1.0, "skipped": true}
+{"step": 1045, "reward": 1.0, "skipped": true}
+{"step": 1046, "reward": 1.0, "skipped": true}
+{"step": 1047, "reward": 1.0, "skipped": true}
+{"step": 1048, "reward": 1.0, "skipped": true}
+{"step": 1049, "reward": 1.0, "skipped": true}
+{"step": 1050, "reward": 1.0, "skipped": true}
+{"step": 1051, "reward": 1.0, "skipped": true}
+{"step": 1052, "reward": 0.0, "skipped": true}
+{"step": 1053, "reward": 1.0, "skipped": true}
+{"step": 1054, "reward": 1.0, "skipped": true}
+{"step": 1055, "reward": 1.0, "skipped": true}
+{"step": 1056, "reward": 1.0, "skipped": true}
+{"step": 1057, "reward": 1.0, "skipped": true}
+{"step": 1058, "reward": 1.0, "skipped": true}
+{"step": 1059, "reward": 1.0, "skipped": true}
+{"step": 1060, "reward": 1.0, "skipped": true}
+{"step": 1061, "reward": 1.0, "skipped": true}
+{"step": 1062, "reward": 1.0, "skipped": true}
+{"step": 1063, "reward": 1.0, "skipped": true}
+{"step": 1064, "reward": 1.0, "skipped": true}
+{"step": 1065, "reward": 1.0, "skipped": true}
+{"step": 1066, "reward": 1.0, "skipped": true}
+{"step": 1067, "reward": 1.0, "skipped": true}
+{"step": 1068, "reward": 1.0, "skipped": true}
+{"step": 1069, "reward": 0.0, "skipped": true}
+{"step": 1070, "reward": 1.0, "skipped": true}
+{"step": 1071, "reward": 1.0, "skipped": true}
+{"step": 1072, "reward": 1.0, "skipped": true}
+{"step": 1073, "reward": 1.0, "skipped": true}
+{"step": 1074, "reward": 1.0, "skipped": true}
+{"step": 1075, "reward": 1.0, "skipped": true}
+{"step": 1076, "reward": 1.0, "skipped": true}
+{"step": 1077, "reward": 1.0, "skipped": true}
+{"step": 1078, "reward": 1.0, "skipped": true}
+{"step": 1079, "reward": 1.0, "skipped": true}
+{"step": 1080, "reward": 1.0, "skipped": true}
+{"step": 1081, "reward": 0.0, "skipped": true}
+{"step": 1082, "reward": 1.0, "skipped": true}
+{"step": 1083, "reward": 1.0, "skipped": true}
+{"step": 1084, "reward": 1.0, "skipped": true}
+{"step": 1085, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07798510743305087, "grad_norm": 12.5, "gen_len": 65.375}
+{"step": 1086, "reward": 1.0, "skipped": true}
+{"step": 1087, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10746065294370055, "grad_norm": 5.90625, "gen_len": 150.25}
+{"step": 1088, "reward": 1.0, "skipped": true}
+{"step": 1089, "reward": 1.0, "skipped": true}
+{"step": 1090, "reward": 1.0, "skipped": true}
+{"step": 1091, "reward": 1.0, "skipped": true}
+{"step": 1092, "reward": 1.0, "skipped": true}
+{"step": 1093, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13218971528112888, "grad_norm": 8.875, "gen_len": 134.875}
+{"step": 1094, "reward": 1.0, "skipped": true}
+{"step": 1095, "reward": 1.0, "skipped": true}
+{"step": 1096, "reward": 1.0, "skipped": true}
+{"step": 1097, "reward": 1.0, "skipped": true}
+{"step": 1098, "reward": 1.0, "skipped": true}
+{"step": 1099, "reward": 1.0, "skipped": true}
+{"step": 1100, "eval_acc": 0.84375}
+{"step": 1100, "reward": 1.0, "skipped": true}
+{"step": 1101, "reward": 1.0, "skipped": true}
+{"step": 1102, "reward": 0.0, "skipped": true}
+{"step": 1103, "reward": 1.0, "skipped": true}
+{"step": 1104, "reward": 1.0, "skipped": true}
+{"step": 1105, "reward": 1.0, "skipped": true}
+{"step": 1106, "reward": 1.0, "skipped": true}
+{"step": 1107, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.3733598440885544, "grad_norm": 9.9375, "gen_len": 168.875}
+{"step": 1108, "reward": 1.0, "skipped": true}
+{"step": 1109, "reward": 1.0, "skipped": true}
+{"step": 1110, "reward": 1.0, "skipped": true}
+{"step": 1111, "reward": 0.0, "skipped": true}
+{"step": 1112, "reward": 1.0, "skipped": true}
+{"step": 1113, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14123201090842485, "grad_norm": 6.125, "gen_len": 162.0}
+{"step": 1114, "reward": 1.0, "skipped": true}
+{"step": 1115, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08701903279870749, "grad_norm": 8.25, "gen_len": 81.125}
+{"step": 1116, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17429647222161293, "grad_norm": 5.71875, "gen_len": 170.0}
+{"step": 1117, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11633828934282064, "grad_norm": 4.03125, "gen_len": 146.75}
+{"step": 1118, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11441583000123501, "grad_norm": 3.8125, "gen_len": 169.875}
+{"step": 1119, "reward": 1.0, "skipped": true}
+{"step": 1120, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15744739025831223, "grad_norm": 5.34375, "gen_len": 181.875}
+{"step": 1121, "reward": 1.0, "skipped": true}
+{"step": 1122, "reward": 1.0, "skipped": true}
+{"step": 1123, "reward": 1.0, "skipped": true}
+{"step": 1124, "reward": 1.0, "skipped": true}
+{"step": 1125, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08246011566370726, "grad_norm": 2.875, "gen_len": 186.0}
+{"step": 1126, "reward": 1.0, "skipped": true}
+{"step": 1127, "reward": 1.0, "skipped": true}
+{"step": 1128, "reward": 1.0, "skipped": true}
+{"step": 1129, "reward": 1.0, "skipped": true}
+{"step": 1130, "reward": 0.0, "skipped": true}
+{"step": 1131, "reward": 1.0, "skipped": true}
+{"step": 1132, "reward": 1.0, "skipped": true}
+{"step": 1133, "reward": 1.0, "skipped": true}
+{"step": 1134, "reward": 1.0, "skipped": true}
+{"step": 1135, "reward": 1.0, "skipped": true}
+{"step": 1136, "reward": 1.0, "skipped": true}
+{"step": 1137, "reward": 1.0, "skipped": true}
+{"step": 1138, "reward": 0.0, "skipped": true}
+{"step": 1139, "reward": 1.0, "skipped": true}
+{"step": 1140, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08437853772193193, "grad_norm": 7.8125, "gen_len": 131.375}
+{"step": 1141, "reward": 1.0, "skipped": true}
+{"step": 1142, "reward": 1.0, "skipped": true}
+{"step": 1143, "reward": 1.0, "skipped": true}
+{"step": 1144, "reward": 0.0, "skipped": true}
+{"step": 1145, "reward": 1.0, "skipped": true}
+{"step": 1146, "reward": 1.0, "skipped": true}
+{"step": 1147, "reward": 1.0, "skipped": true}
+{"step": 1148, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08082597656175494, "grad_norm": 10.875, "gen_len": 87.125}
+{"step": 1149, "reward": 1.0, "skipped": true}
+{"step": 1150, "reward": 1.0, "skipped": true}
+{"step": 1151, "reward": 1.0, "skipped": true}
+{"step": 1152, "reward": 1.0, "skipped": true}
+{"step": 1153, "reward": 1.0, "skipped": true}
+{"step": 1154, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09588231611996889, "grad_norm": 10.6875, "gen_len": 140.75}
+{"step": 1155, "reward": 1.0, "skipped": true}
+{"step": 1156, "reward": 1.0, "skipped": true}
+{"step": 1157, "reward": 1.0, "skipped": true}
+{"step": 1158, "reward": 1.0, "skipped": true}
+{"step": 1159, "reward": 1.0, "skipped": true}
+{"step": 1160, "reward": 1.0, "skipped": true}
+{"step": 1161, "reward": 1.0, "skipped": true}
+{"step": 1162, "reward": 1.0, "skipped": true}
+{"step": 1163, "reward": 1.0, "skipped": true}
+{"step": 1164, "reward": 1.0, "skipped": true}
+{"step": 1165, "reward": 1.0, "skipped": true}
+{"step": 1166, "reward": 1.0, "skipped": true}
+{"step": 1167, "reward": 1.0, "skipped": true}
+{"step": 1168, "reward": 1.0, "skipped": true}
+{"step": 1169, "reward": 1.0, "skipped": true}
+{"step": 1170, "reward": 1.0, "skipped": true}
+{"step": 1171, "reward": 1.0, "skipped": true}
+{"step": 1172, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05234985798597336, "grad_norm": 16.375, "gen_len": 132.0}
+{"step": 1173, "reward": 1.0, "skipped": true}
+{"step": 1174, "reward": 1.0, "skipped": true}
+{"step": 1175, "reward": 1.0, "skipped": true}
+{"step": 1176, "reward": 1.0, "skipped": true}
+{"step": 1177, "reward": 1.0, "skipped": true}
+{"step": 1178, "reward": 1.0, "skipped": true}
+{"step": 1179, "reward": 1.0, "skipped": true}
+{"step": 1180, "reward": 1.0, "skipped": true}
+{"step": 1181, "reward": 1.0, "skipped": true}
+{"step": 1182, "reward": 1.0, "skipped": true}
+{"step": 1183, "reward": 1.0, "skipped": true}
+{"step": 1184, "reward": 1.0, "skipped": true}
+{"step": 1185, "reward": 1.0, "skipped": true}
+{"step": 1186, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04787445534020662, "grad_norm": 8.375, "gen_len": 94.5}
+{"step": 1187, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12394223269075155, "grad_norm": 6.8125, "gen_len": 125.375}
+{"step": 1188, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08968921843916178, "grad_norm": 10.75, "gen_len": 88.375}
+{"step": 1189, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06027423357591033, "grad_norm": 4.28125, "gen_len": 170.125}
+{"step": 1190, "reward": 1.0, "skipped": true}
+{"step": 1191, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15364375989884138, "grad_norm": 6.375, "gen_len": 128.625}
+{"step": 1192, "reward": 1.0, "skipped": true}
+{"step": 1193, "reward": 1.0, "skipped": true}
+{"step": 1194, "reward": 0.0, "skipped": true}
+{"step": 1195, "reward": 1.0, "skipped": true}
+{"step": 1196, "reward": 1.0, "skipped": true}
+{"step": 1197, "reward": 1.0, "skipped": true}
+{"step": 1198, "reward": 1.0, "skipped": true}
+{"step": 1199, "reward": 1.0, "skipped": true}
+{"step": 1200, "eval_acc": 0.90625}
+{"step": 1200, "reward": 1.0, "skipped": true}
+{"step": 1201, "reward": 1.0, "skipped": true}
+{"step": 1202, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05545716546475887, "grad_norm": 3.453125, "gen_len": 197.625}
+{"step": 1203, "reward": 1.0, "skipped": true}
+{"step": 1204, "reward": 0.0, "skipped": true}
+{"step": 1205, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0935457069426775, "grad_norm": 2.453125, "gen_len": 180.5}
+{"step": 1206, "reward": 1.0, "skipped": true}
+{"step": 1207, "reward": 1.0, "skipped": true}
+{"step": 1208, "reward": 1.0, "skipped": true}
+{"step": 1209, "reward": 1.0, "skipped": true}
+{"step": 1210, "reward": 1.0, "skipped": true}
+{"step": 1211, "reward": 1.0, "skipped": true}
+{"step": 1212, "reward": 1.0, "skipped": true}
+{"step": 1213, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08738892478868365, "grad_norm": 10.25, "gen_len": 111.375}
+{"step": 1214, "reward": 1.0, "skipped": true}
+{"step": 1215, "reward": 1.0, "skipped": true}
+{"step": 1216, "reward": 1.0, "skipped": true}
+{"step": 1217, "reward": 1.0, "skipped": true}
+{"step": 1218, "reward": 1.0, "skipped": true}
+{"step": 1219, "reward": 1.0, "skipped": true}
+{"step": 1220, "reward": 1.0, "skipped": true}
+{"step": 1221, "reward": 1.0, "skipped": true}
+{"step": 1222, "reward": 1.0, "skipped": true}
+{"step": 1223, "reward": 1.0, "skipped": true}
+{"step": 1224, "reward": 1.0, "skipped": true}
+{"step": 1225, "reward": 1.0, "skipped": true}
+{"step": 1226, "reward": 1.0, "skipped": true}
+{"step": 1227, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15804601833224297, "grad_norm": 25.125, "gen_len": 123.375}
+{"step": 1228, "reward": 1.0, "skipped": true}
+{"step": 1229, "reward": 1.0, "skipped": true}
+{"step": 1230, "reward": 1.0, "skipped": true}
+{"step": 1231, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05580943636596203, "grad_norm": 14.0, "gen_len": 114.75}
+{"step": 1232, "reward": 1.0, "skipped": true}
+{"step": 1233, "reward": 1.0, "skipped": true}
+{"step": 1234, "reward": 1.0, "skipped": true}
+{"step": 1235, "reward": 1.0, "skipped": true}
+{"step": 1236, "reward": 1.0, "skipped": true}
+{"step": 1237, "reward": 1.0, "skipped": true}
+{"step": 1238, "reward": 1.0, "skipped": true}
+{"step": 1239, "reward": 1.0, "skipped": true}
+{"step": 1240, "reward": 1.0, "skipped": true}
+{"step": 1241, "reward": 1.0, "skipped": true}
+{"step": 1242, "reward": 1.0, "skipped": true}
+{"step": 1243, "reward": 1.0, "skipped": true}
+{"step": 1244, "reward": 1.0, "skipped": true}
+{"step": 1245, "reward": 1.0, "skipped": true}
+{"step": 1246, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2181684784591198, "grad_norm": 5.46875, "gen_len": 199.25}
+{"step": 1247, "reward": 1.0, "skipped": true}
+{"step": 1248, "reward": 1.0, "skipped": true}
+{"step": 1249, "reward": 1.0, "skipped": true}
+{"step": 1250, "reward": 1.0, "skipped": true}
+{"step": 1251, "reward": 1.0, "skipped": true}
+{"step": 1252, "reward": 1.0, "skipped": true}
+{"step": 1253, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09266746323555708, "grad_norm": 7.46875, "gen_len": 71.625}
+{"step": 1254, "reward": 1.0, "skipped": true}
+{"step": 1255, "reward": 1.0, "skipped": true}
+{"step": 1256, "reward": 1.0, "skipped": true}
+{"step": 1257, "reward": 0.0, "skipped": true}
+{"step": 1258, "reward": 1.0, "skipped": true}
+{"step": 1259, "reward": 1.0, "skipped": true}
+{"step": 1260, "reward": 1.0, "skipped": true}
+{"step": 1261, "reward": 1.0, "skipped": true}
+{"step": 1262, "reward": 1.0, "skipped": true}
+{"step": 1263, "reward": 1.0, "skipped": true}
+{"step": 1264, "reward": 1.0, "skipped": true}
+{"step": 1265, "reward": 1.0, "skipped": true}
+{"step": 1266, "reward": 1.0, "skipped": true}
+{"step": 1267, "reward": 1.0, "skipped": true}
+{"step": 1268, "reward": 1.0, "skipped": true}
+{"step": 1269, "reward": 1.0, "skipped": true}
+{"step": 1270, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0709661329165101, "grad_norm": 6.96875, "gen_len": 82.125}
+{"step": 1271, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12631668522953987, "grad_norm": 7.40625, "gen_len": 151.0}
+{"step": 1272, "reward": 1.0, "skipped": true}
+{"step": 1273, "reward": 1.0, "skipped": true}
+{"step": 1274, "reward": 1.0, "skipped": true}
+{"step": 1275, "reward": 1.0, "skipped": true}
+{"step": 1276, "reward": 1.0, "skipped": true}
+{"step": 1277, "reward": 1.0, "skipped": true}
+{"step": 1278, "reward": 1.0, "skipped": true}
+{"step": 1279, "reward": 1.0, "skipped": true}
+{"step": 1280, "reward": 1.0, "skipped": true}
+{"step": 1281, "reward": 1.0, "skipped": true}
+{"step": 1282, "reward": 1.0, "skipped": true}
+{"step": 1283, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08036128245294094, "grad_norm": 14.875, "gen_len": 64.25}
+{"step": 1284, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07762914430350065, "grad_norm": 13.4375, "gen_len": 89.25}
+{"step": 1285, "reward": 1.0, "skipped": true}
+{"step": 1286, "reward": 1.0, "skipped": true}
+{"step": 1287, "reward": 1.0, "skipped": true}
+{"step": 1288, "reward": 1.0, "skipped": true}
+{"step": 1289, "reward": 1.0, "skipped": true}
+{"step": 1290, "reward": 1.0, "skipped": true}
+{"step": 1291, "reward": 1.0, "skipped": true}
+{"step": 1292, "reward": 0.0, "skipped": true}
+{"step": 1293, "reward": 1.0, "skipped": true}
+{"step": 1294, "reward": 1.0, "skipped": true}
+{"step": 1295, "reward": 1.0, "skipped": true}
+{"step": 1296, "reward": 1.0, "skipped": true}
+{"step": 1297, "reward": 1.0, "skipped": true}
+{"step": 1298, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06476886197924614, "grad_norm": 11.875, "gen_len": 75.375}
+{"step": 1299, "reward": 1.0, "skipped": true}
+{"step": 1300, "eval_acc": 0.90625}
+{"step": 1300, "reward": 1.0, "skipped": true}
+{"step": 1301, "reward": 1.0, "skipped": true}
+{"step": 1302, "reward": 0.0, "skipped": true}
+{"step": 1303, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12134668976068497, "grad_norm": 10.375, "gen_len": 85.625}
+{"step": 1304, "reward": 1.0, "skipped": true}
+{"step": 1305, "reward": 1.0, "skipped": true}
+{"step": 1306, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.048476398922502995, "grad_norm": 5.40625, "gen_len": 101.625}
+{"step": 1307, "reward": 1.0, "skipped": true}
+{"step": 1308, "reward": 1.0, "skipped": true}
+{"step": 1309, "reward": 1.0, "skipped": true}
+{"step": 1310, "reward": 1.0, "skipped": true}
+{"step": 1311, "reward": 1.0, "skipped": true}
+{"step": 1312, "reward": 1.0, "skipped": true}
+{"step": 1313, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11463916953653097, "grad_norm": 11.375, "gen_len": 125.75}
+{"step": 1314, "reward": 1.0, "skipped": true}
+{"step": 1315, "reward": 1.0, "skipped": true}
+{"step": 1316, "reward": 1.0, "skipped": true}
+{"step": 1317, "reward": 1.0, "skipped": true}
+{"step": 1318, "reward": 1.0, "skipped": true}
+{"step": 1319, "reward": 0.0, "skipped": true}
+{"step": 1320, "reward": 1.0, "skipped": true}
+{"step": 1321, "reward": 1.0, "skipped": true}
+{"step": 1322, "reward": 1.0, "skipped": true}
+{"step": 1323, "reward": 1.0, "skipped": true}
+{"step": 1324, "reward": 1.0, "skipped": true}
+{"step": 1325, "reward": 1.0, "skipped": true}
+{"step": 1326, "reward": 1.0, "skipped": true}
+{"step": 1327, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14920827746391296, "grad_norm": 10.375, "gen_len": 112.75}
+{"step": 1328, "reward": 1.0, "skipped": true}
+{"step": 1329, "reward": 1.0, "skipped": true}
+{"step": 1330, "reward": 1.0, "skipped": true}
+{"step": 1331, "reward": 1.0, "skipped": true}
+{"step": 1332, "reward": 1.0, "skipped": true}
+{"step": 1333, "reward": 1.0, "skipped": true}
+{"step": 1334, "reward": 1.0, "skipped": true}
+{"step": 1335, "reward": 1.0, "skipped": true}
+{"step": 1336, "reward": 1.0, "skipped": true}
+{"step": 1337, "reward": 1.0, "skipped": true}
+{"step": 1338, "reward": 1.0, "skipped": true}
+{"step": 1339, "reward": 0.0, "skipped": true}
+{"step": 1340, "reward": 1.0, "skipped": true}
+{"step": 1341, "reward": 1.0, "skipped": true}
+{"step": 1342, "reward": 0.0, "skipped": true}
+{"step": 1343, "reward": 1.0, "skipped": true}
+{"step": 1344, "reward": 1.0, "skipped": true}
+{"step": 1345, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.047639486379921436, "grad_norm": 8.6875, "gen_len": 154.25}
+{"step": 1346, "reward": 1.0, "skipped": true}
+{"step": 1347, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08714589383453131, "grad_norm": 18.375, "gen_len": 62.875}
+{"step": 1348, "reward": 1.0, "skipped": true}
+{"step": 1349, "reward": 1.0, "skipped": true}
+{"step": 1350, "reward": 1.0, "skipped": true}
+{"step": 1351, "reward": 1.0, "skipped": true}
+{"step": 1352, "reward": 1.0, "skipped": true}
+{"step": 1353, "reward": 1.0, "skipped": true}
+{"step": 1354, "reward": 1.0, "skipped": true}
+{"step": 1355, "reward": 1.0, "skipped": true}
+{"step": 1356, "reward": 1.0, "skipped": true}
+{"step": 1357, "reward": 1.0, "skipped": true}
+{"step": 1358, "reward": 1.0, "skipped": true}
+{"step": 1359, "reward": 1.0, "skipped": true}
+{"step": 1360, "reward": 1.0, "skipped": true}
+{"step": 1361, "reward": 1.0, "skipped": true}
+{"step": 1362, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.046919967979192734, "grad_norm": 21.5, "gen_len": 105.875}
+{"step": 1363, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10080974828451872, "grad_norm": 4.46875, "gen_len": 161.25}
+{"step": 1364, "reward": 1.0, "skipped": true}
+{"step": 1365, "reward": 1.0, "skipped": true}
+{"step": 1366, "reward": 1.0, "skipped": true}
+{"step": 1367, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.046500062104314566, "grad_norm": 3.328125, "gen_len": 200.0}
+{"step": 1368, "reward": 1.0, "skipped": true}
+{"step": 1369, "reward": 1.0, "skipped": true}
+{"step": 1370, "reward": 1.0, "skipped": true}
+{"step": 1371, "reward": 1.0, "skipped": true}
+{"step": 1372, "reward": 1.0, "skipped": true}
+{"step": 1373, "reward": 1.0, "skipped": true}
+{"step": 1374, "reward": 1.0, "skipped": true}
+{"step": 1375, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0778154581785202, "grad_norm": 4.96875, "gen_len": 150.0}
+{"step": 1376, "reward": 1.0, "skipped": true}
+{"step": 1377, "reward": 1.0, "skipped": true}
+{"step": 1378, "reward": 1.0, "skipped": true}
+{"step": 1379, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10720899701118469, "grad_norm": 7.3125, "gen_len": 122.375}
+{"step": 1380, "reward": 1.0, "skipped": true}
+{"step": 1381, "reward": 1.0, "skipped": true}
+{"step": 1382, "reward": 1.0, "skipped": true}
+{"step": 1383, "reward": 1.0, "skipped": true}
+{"step": 1384, "reward": 1.0, "skipped": true}
+{"step": 1385, "reward": 0.0, "skipped": true}
+{"step": 1386, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17171734757721424, "grad_norm": 6.71875, "gen_len": 187.75}
+{"step": 1387, "reward": 1.0, "skipped": true}
+{"step": 1388, "reward": 1.0, "skipped": true}
+{"step": 1389, "reward": 1.0, "skipped": true}
+{"step": 1390, "reward": 1.0, "skipped": true}
+{"step": 1391, "reward": 1.0, "skipped": true}
+{"step": 1392, "reward": 1.0, "skipped": true}
+{"step": 1393, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11907493323087692, "grad_norm": 6.90625, "gen_len": 127.5}
+{"step": 1394, "reward": 1.0, "skipped": true}
+{"step": 1395, "reward": 1.0, "skipped": true}
+{"step": 1396, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04593845037743449, "grad_norm": 11.6875, "gen_len": 92.375}
+{"step": 1397, "reward": 1.0, "skipped": true}
+{"step": 1398, "reward": 1.0, "skipped": true}
+{"step": 1399, "reward": 1.0, "skipped": true}
+{"step": 1400, "eval_acc": 0.90625}
+{"step": 1400, "reward": 1.0, "skipped": true}
+{"step": 1401, "reward": 1.0, "skipped": true}
+{"step": 1402, "reward": 1.0, "skipped": true}
+{"step": 1403, "reward": 0.0, "skipped": true}
+{"step": 1404, "reward": 1.0, "skipped": true}
+{"step": 1405, "reward": 1.0, "skipped": true}
+{"step": 1406, "reward": 1.0, "skipped": true}
+{"step": 1407, "reward": 1.0, "skipped": true}
+{"step": 1408, "reward": 1.0, "skipped": true}
+{"step": 1409, "reward": 1.0, "skipped": true}
+{"step": 1410, "reward": 1.0, "skipped": true}
+{"step": 1411, "reward": 1.0, "skipped": true}
+{"step": 1412, "reward": 0.0, "skipped": true}
+{"step": 1413, "reward": 1.0, "skipped": true}
+{"step": 1414, "reward": 1.0, "skipped": true}
+{"step": 1415, "reward": 1.0, "skipped": true}
+{"step": 1416, "reward": 0.0, "skipped": true}
+{"step": 1417, "reward": 1.0, "skipped": true}
+{"step": 1418, "reward": 1.0, "skipped": true}
+{"step": 1419, "reward": 1.0, "skipped": true}
+{"step": 1420, "reward": 1.0, "skipped": true}
+{"step": 1421, "reward": 1.0, "skipped": true}
+{"step": 1422, "reward": 1.0, "skipped": true}
+{"step": 1423, "reward": 1.0, "skipped": true}
+{"step": 1424, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.045713243540376425, "grad_norm": 44.75, "gen_len": 120.0}
+{"step": 1425, "reward": 1.0, "skipped": true}
+{"step": 1426, "reward": 1.0, "skipped": true}
+{"step": 1427, "reward": 1.0, "skipped": true}
+{"step": 1428, "reward": 1.0, "skipped": true}
+{"step": 1429, "reward": 1.0, "skipped": true}
+{"step": 1430, "reward": 1.0, "skipped": true}
+{"step": 1431, "reward": 1.0, "skipped": true}
+{"step": 1432, "reward": 1.0, "skipped": true}
+{"step": 1433, "reward": 1.0, "skipped": true}
+{"step": 1434, "reward": 1.0, "skipped": true}
+{"step": 1435, "reward": 0.0, "skipped": true}
+{"step": 1436, "reward": 1.0, "skipped": true}
+{"step": 1437, "reward": 1.0, "skipped": true}
+{"step": 1438, "reward": 1.0, "skipped": true}
+{"step": 1439, "reward": 1.0, "skipped": true}
+{"step": 1440, "reward": 1.0, "skipped": true}
+{"step": 1441, "reward": 1.0, "skipped": true}
+{"step": 1442, "reward": 1.0, "skipped": true}
+{"step": 1443, "reward": 1.0, "skipped": true}
+{"step": 1444, "reward": 1.0, "skipped": true}
+{"step": 1445, "reward": 1.0, "skipped": true}
+{"step": 1446, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12379160989075899, "grad_norm": 7.46875, "gen_len": 109.625}
+{"step": 1447, "reward": 1.0, "skipped": true}
+{"step": 1448, "reward": 1.0, "skipped": true}
+{"step": 1449, "reward": 1.0, "skipped": true}
+{"step": 1450, "reward": 1.0, "skipped": true}
+{"step": 1451, "reward": 1.0, "skipped": true}
+{"step": 1452, "reward": 0.0, "skipped": true}
+{"step": 1453, "reward": 1.0, "skipped": true}
+{"step": 1454, "reward": 1.0, "skipped": true}
+{"step": 1455, "reward": 1.0, "skipped": true}
+{"step": 1456, "reward": 1.0, "skipped": true}
+{"step": 1457, "reward": 1.0, "skipped": true}
+{"step": 1458, "reward": 1.0, "skipped": true}
+{"step": 1459, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11314306454733014, "grad_norm": 55.25, "gen_len": 86.125}
+{"step": 1460, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06802925560623407, "grad_norm": 10.9375, "gen_len": 65.875}
+{"step": 1461, "reward": 1.0, "skipped": true}
+{"step": 1462, "reward": 1.0, "skipped": true}
+{"step": 1463, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09351529832929373, "grad_norm": 14.8125, "gen_len": 100.75}
+{"step": 1464, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09228597534820437, "grad_norm": 9.3125, "gen_len": 82.0}
+{"step": 1465, "reward": 1.0, "skipped": true}
+{"step": 1466, "reward": 1.0, "skipped": true}
+{"step": 1467, "reward": 1.0, "skipped": true}
+{"step": 1468, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05711972573772073, "grad_norm": 17.375, "gen_len": 72.0}
+{"step": 1469, "reward": 1.0, "skipped": true}
+{"step": 1470, "reward": 1.0, "skipped": true}
+{"step": 1471, "reward": 1.0, "skipped": true}
+{"step": 1472, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08891093358397484, "grad_norm": 11.0625, "gen_len": 118.125}
+{"step": 1473, "reward": 1.0, "skipped": true}
+{"step": 1474, "reward": 1.0, "skipped": true}
+{"step": 1475, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.19253037497401237, "grad_norm": 8.375, "gen_len": 189.125}
+{"step": 1476, "reward": 1.0, "skipped": true}
+{"step": 1477, "reward": 1.0, "skipped": true}
+{"step": 1478, "reward": 1.0, "skipped": true}
+{"step": 1479, "reward": 1.0, "skipped": true}
+{"step": 1480, "reward": 1.0, "skipped": true}
+{"step": 1481, "reward": 1.0, "skipped": true}
+{"step": 1482, "reward": 1.0, "skipped": true}
+{"step": 1483, "reward": 1.0, "skipped": true}
+{"step": 1484, "reward": 1.0, "skipped": true}
+{"step": 1485, "reward": 1.0, "skipped": true}
+{"step": 1486, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15090101025998592, "grad_norm": 10.6875, "gen_len": 110.125}
+{"step": 1487, "reward": 1.0, "skipped": true}
+{"step": 1488, "reward": 1.0, "skipped": true}
+{"step": 1489, "reward": 1.0, "skipped": true}
+{"step": 1490, "reward": 1.0, "skipped": true}
+{"step": 1491, "reward": 1.0, "skipped": true}
+{"step": 1492, "reward": 1.0, "skipped": true}
+{"step": 1493, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2124671135097742, "grad_norm": 13.6875, "gen_len": 62.625}
+{"step": 1494, "reward": 1.0, "skipped": true}
+{"step": 1495, "reward": 1.0, "skipped": true}
+{"step": 1496, "reward": 1.0, "skipped": true}
+{"step": 1497, "reward": 1.0, "skipped": true}
+{"step": 1498, "reward": 1.0, "skipped": true}
+{"step": 1499, "reward": 1.0, "skipped": true}
+{"step": 1500, "eval_acc": 0.9375}
+{"step": 1500, "reward": 1.0, "skipped": true}
+{"step": 1501, "reward": 1.0, "skipped": true}
+{"step": 1502, "reward": 1.0, "skipped": true}
+{"step": 1503, "reward": 1.0, "skipped": true}
+{"step": 1504, "reward": 1.0, "skipped": true}
+{"step": 1505, "reward": 1.0, "skipped": true}
+{"step": 1506, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05715869599953294, "grad_norm": 25.375, "gen_len": 85.25}
+{"step": 1507, "reward": 1.0, "skipped": true}
+{"step": 1508, "reward": 1.0, "skipped": true}
+{"step": 1509, "reward": 1.0, "skipped": true}
+{"step": 1510, "reward": 1.0, "skipped": true}
+{"step": 1511, "reward": 1.0, "skipped": true}
+{"step": 1512, "reward": 1.0, "skipped": true}
+{"step": 1513, "reward": 1.0, "skipped": true}
+{"step": 1514, "reward": 1.0, "skipped": true}
+{"step": 1515, "reward": 1.0, "skipped": true}
+{"step": 1516, "reward": 1.0, "skipped": true}
+{"step": 1517, "reward": 1.0, "skipped": true}
+{"step": 1518, "reward": 1.0, "skipped": true}
+{"step": 1519, "reward": 1.0, "skipped": true}
+{"step": 1520, "reward": 1.0, "skipped": true}
+{"step": 1521, "reward": 1.0, "skipped": true}
+{"step": 1522, "reward": 1.0, "skipped": true}
+{"step": 1523, "reward": 1.0, "skipped": true}
+{"step": 1524, "reward": 1.0, "skipped": true}
+{"step": 1525, "reward": 1.0, "skipped": true}
+{"step": 1526, "reward": 1.0, "skipped": true}
+{"step": 1527, "reward": 1.0, "skipped": true}
+{"step": 1528, "reward": 1.0, "skipped": true}
+{"step": 1529, "reward": 1.0, "skipped": true}
+{"step": 1530, "reward": 1.0, "skipped": true}
+{"step": 1531, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08033305499702692, "grad_norm": 8.0, "gen_len": 154.125}
+{"step": 1532, "reward": 1.0, "skipped": true}
+{"step": 1533, "reward": 1.0, "skipped": true}
+{"step": 1534, "reward": 1.0, "skipped": true}
+{"step": 1535, "reward": 1.0, "skipped": true}
+{"step": 1536, "reward": 1.0, "skipped": true}
+{"step": 1537, "reward": 1.0, "skipped": true}
+{"step": 1538, "reward": 1.0, "skipped": true}
+{"step": 1539, "reward": 1.0, "skipped": true}
+{"step": 1540, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0762603203766048, "grad_norm": 3.765625, "gen_len": 151.5}
+{"step": 1541, "reward": 1.0, "skipped": true}
+{"step": 1542, "reward": 1.0, "skipped": true}
+{"step": 1543, "reward": 1.0, "skipped": true}
+{"step": 1544, "reward": 1.0, "skipped": true}
+{"step": 1545, "reward": 1.0, "skipped": true}
+{"step": 1546, "reward": 1.0, "skipped": true}
+{"step": 1547, "reward": 1.0, "skipped": true}
+{"step": 1548, "reward": 1.0, "skipped": true}
+{"step": 1549, "reward": 1.0, "skipped": true}
+{"step": 1550, "reward": 1.0, "skipped": true}
+{"step": 1551, "reward": 1.0, "skipped": true}
+{"step": 1552, "reward": 1.0, "skipped": true}
+{"step": 1553, "reward": 1.0, "skipped": true}
+{"step": 1554, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15199758391827345, "grad_norm": 13.25, "gen_len": 101.125}
+{"step": 1555, "reward": 1.0, "skipped": true}
+{"step": 1556, "reward": 1.0, "skipped": true}
+{"step": 1557, "reward": 1.0, "skipped": true}
+{"step": 1558, "reward": 1.0, "skipped": true}
+{"step": 1559, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05711152032017708, "grad_norm": 9.375, "gen_len": 92.75}
+{"step": 1560, "reward": 1.0, "skipped": true}
+{"step": 1561, "reward": 1.0, "skipped": true}
+{"step": 1562, "reward": 1.0, "skipped": true}
+{"step": 1563, "reward": 1.0, "skipped": true}
+{"step": 1564, "reward": 1.0, "skipped": true}
+{"step": 1565, "reward": 1.0, "skipped": true}
+{"step": 1566, "reward": 1.0, "skipped": true}
+{"step": 1567, "reward": 1.0, "skipped": true}
+{"step": 1568, "reward": 1.0, "skipped": true}
+{"step": 1569, "reward": 1.0, "skipped": true}
+{"step": 1570, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1567249083891511, "grad_norm": 6.8125, "gen_len": 137.25}
+{"step": 1571, "reward": 1.0, "skipped": true}
+{"step": 1572, "reward": 1.0, "skipped": true}
+{"step": 1573, "reward": 1.0, "skipped": true}
+{"step": 1574, "reward": 1.0, "skipped": true}
+{"step": 1575, "reward": 1.0, "skipped": true}
+{"step": 1576, "reward": 1.0, "skipped": true}
+{"step": 1577, "reward": 1.0, "skipped": true}
+{"step": 1578, "reward": 1.0, "skipped": true}
+{"step": 1579, "reward": 1.0, "skipped": true}
+{"step": 1580, "reward": 1.0, "skipped": true}
+{"step": 1581, "reward": 1.0, "skipped": true}
+{"step": 1582, "reward": 1.0, "skipped": true}
+{"step": 1583, "reward": 1.0, "skipped": true}
+{"step": 1584, "reward": 1.0, "skipped": true}
+{"step": 1585, "reward": 1.0, "skipped": true}
+{"step": 1586, "reward": 1.0, "skipped": true}
+{"step": 1587, "reward": 1.0, "skipped": true}
+{"step": 1588, "reward": 1.0, "skipped": true}
+{"step": 1589, "reward": 1.0, "skipped": true}
+{"step": 1590, "reward": 1.0, "skipped": true}
+{"step": 1591, "reward": 1.0, "skipped": true}
+{"step": 1592, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08867783565074205, "grad_norm": 11.0, "gen_len": 74.125}
+{"step": 1593, "reward": 0.0, "skipped": true}
+{"step": 1594, "reward": 1.0, "skipped": true}
+{"step": 1595, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0817632139660418, "grad_norm": 5.4375, "gen_len": 123.75}
+{"step": 1596, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09320108499377966, "grad_norm": 8.3125, "gen_len": 108.25}
+{"step": 1597, "reward": 1.0, "skipped": true}
+{"step": 1598, "reward": 1.0, "skipped": true}
+{"step": 1599, "reward": 1.0, "skipped": true}
+{"step": 1600, "eval_acc": 0.90625}
+{"step": 1600, "reward": 1.0, "skipped": true}
+{"step": 1601, "reward": 1.0, "skipped": true}
+{"step": 1602, "reward": 1.0, "skipped": true}
+{"step": 1603, "reward": 1.0, "skipped": true}
+{"step": 1604, "reward": 1.0, "skipped": true}
+{"step": 1605, "reward": 1.0, "skipped": true}
+{"step": 1606, "reward": 1.0, "skipped": true}
+{"step": 1607, "reward": 1.0, "skipped": true}
+{"step": 1608, "reward": 1.0, "skipped": true}
+{"step": 1609, "reward": 1.0, "skipped": true}
+{"step": 1610, "reward": 1.0, "skipped": true}
+{"step": 1611, "reward": 1.0, "skipped": true}
+{"step": 1612, "reward": 1.0, "skipped": true}
+{"step": 1613, "reward": 1.0, "skipped": true}
+{"step": 1614, "reward": 1.0, "skipped": true}
+{"step": 1615, "reward": 1.0, "skipped": true}
+{"step": 1616, "reward": 1.0, "skipped": true}
+{"step": 1617, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08510447246953845, "grad_norm": 16.625, "gen_len": 82.75}
+{"step": 1618, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1775981169193983, "grad_norm": 5.125, "gen_len": 149.125}
+{"step": 1619, "reward": 1.0, "skipped": true}
+{"step": 1620, "reward": 1.0, "skipped": true}
+{"step": 1621, "reward": 1.0, "skipped": true}
+{"step": 1622, "reward": 1.0, "skipped": true}
+{"step": 1623, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1578014474362135, "grad_norm": 10.0, "gen_len": 162.0}
+{"step": 1624, "reward": 1.0, "skipped": true}
+{"step": 1625, "reward": 1.0, "skipped": true}
+{"step": 1626, "reward": 1.0, "skipped": true}
+{"step": 1627, "reward": 1.0, "skipped": true}
+{"step": 1628, "reward": 1.0, "skipped": true}
+{"step": 1629, "reward": 1.0, "skipped": true}
+{"step": 1630, "reward": 1.0, "skipped": true}
+{"step": 1631, "reward": 1.0, "skipped": true}
+{"step": 1632, "reward": 1.0, "skipped": true}
+{"step": 1633, "reward": 1.0, "skipped": true}
+{"step": 1634, "reward": 1.0, "skipped": true}
+{"step": 1635, "reward": 1.0, "skipped": true}
+{"step": 1636, "reward": 1.0, "skipped": true}
+{"step": 1637, "reward": 1.0, "skipped": true}
+{"step": 1638, "reward": 1.0, "skipped": true}
+{"step": 1639, "reward": 1.0, "skipped": true}
+{"step": 1640, "reward": 1.0, "skipped": true}
+{"step": 1641, "reward": 1.0, "skipped": true}
+{"step": 1642, "reward": 1.0, "skipped": true}
+{"step": 1643, "reward": 1.0, "skipped": true}
+{"step": 1644, "reward": 1.0, "skipped": true}
+{"step": 1645, "reward": 1.0, "skipped": true}
+{"step": 1646, "reward": 1.0, "skipped": true}
+{"step": 1647, "reward": 1.0, "skipped": true}
+{"step": 1648, "reward": 1.0, "skipped": true}
+{"step": 1649, "reward": 1.0, "skipped": true}
+{"step": 1650, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1385890394449234, "grad_norm": 6.75, "gen_len": 122.25}
+{"step": 1651, "reward": 1.0, "skipped": true}
+{"step": 1652, "reward": 1.0, "skipped": true}
+{"step": 1653, "reward": 1.0, "skipped": true}
+{"step": 1654, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04462336516007781, "grad_norm": 13.75, "gen_len": 80.625}
+{"step": 1655, "reward": 1.0, "skipped": true}
+{"step": 1656, "reward": 1.0, "skipped": true}
+{"step": 1657, "reward": 1.0, "skipped": true}
+{"step": 1658, "reward": 1.0, "skipped": true}
+{"step": 1659, "reward": 1.0, "skipped": true}
+{"step": 1660, "reward": 1.0, "skipped": true}
+{"step": 1661, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0790556794963777, "grad_norm": 16.625, "gen_len": 67.5}
+{"step": 1662, "reward": 1.0, "skipped": true}
+{"step": 1663, "reward": 1.0, "skipped": true}
+{"step": 1664, "reward": 1.0, "skipped": true}
+{"step": 1665, "reward": 1.0, "skipped": true}
+{"step": 1666, "reward": 1.0, "skipped": true}
+{"step": 1667, "reward": 1.0, "skipped": true}
+{"step": 1668, "reward": 1.0, "skipped": true}
+{"step": 1669, "reward": 1.0, "skipped": true}
+{"step": 1670, "reward": 1.0, "skipped": true}
+{"step": 1671, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1953912004828453, "grad_norm": 5.625, "gen_len": 183.375}
+{"step": 1672, "reward": 1.0, "skipped": true}
+{"step": 1673, "reward": 0.0, "skipped": true}
+{"step": 1674, "reward": 1.0, "skipped": true}
+{"step": 1675, "reward": 1.0, "skipped": true}
+{"step": 1676, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17448751535266638, "grad_norm": 8.1875, "gen_len": 89.125}
+{"step": 1677, "reward": 0.0, "skipped": true}
+{"step": 1678, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07661428116261959, "grad_norm": 13.5, "gen_len": 89.125}
+{"step": 1679, "reward": 1.0, "skipped": true}
+{"step": 1680, "reward": 1.0, "skipped": true}
+{"step": 1681, "reward": 1.0, "skipped": true}
+{"step": 1682, "reward": 1.0, "skipped": true}
+{"step": 1683, "reward": 1.0, "skipped": true}
+{"step": 1684, "reward": 1.0, "skipped": true}
+{"step": 1685, "reward": 1.0, "skipped": true}
+{"step": 1686, "reward": 1.0, "skipped": true}
+{"step": 1687, "reward": 1.0, "skipped": true}
+{"step": 1688, "reward": 1.0, "skipped": true}
+{"step": 1689, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08499221038073301, "grad_norm": 4.71875, "gen_len": 176.375}
+{"step": 1690, "reward": 1.0, "skipped": true}
+{"step": 1691, "reward": 1.0, "skipped": true}
+{"step": 1692, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12432623654603958, "grad_norm": 5.90625, "gen_len": 188.875}
+{"step": 1693, "reward": 1.0, "skipped": true}
+{"step": 1694, "reward": 1.0, "skipped": true}
+{"step": 1695, "reward": 1.0, "skipped": true}
+{"step": 1696, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11047580279409885, "grad_norm": 9.3125, "gen_len": 77.125}
+{"step": 1697, "reward": 1.0, "skipped": true}
+{"step": 1698, "reward": 1.0, "skipped": true}
+{"step": 1699, "reward": 1.0, "skipped": true}
+{"step": 1700, "eval_acc": 0.875}
+{"step": 1700, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08899812959134579, "grad_norm": 14.25, "gen_len": 134.25}
+{"step": 1701, "reward": 1.0, "skipped": true}
+{"step": 1702, "reward": 1.0, "skipped": true}
+{"step": 1703, "reward": 1.0, "skipped": true}
+{"step": 1704, "reward": 1.0, "skipped": true}
+{"step": 1705, "reward": 1.0, "skipped": true}
+{"step": 1706, "reward": 1.0, "skipped": true}
+{"step": 1707, "reward": 1.0, "skipped": true}
+{"step": 1708, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.03070504544302821, "grad_norm": 5.53125, "gen_len": 194.625}
+{"step": 1709, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.018945892807096243, "grad_norm": 26.75, "gen_len": 83.0}
+{"step": 1710, "reward": 1.0, "skipped": true}
+{"step": 1711, "reward": 1.0, "skipped": true}
+{"step": 1712, "reward": 1.0, "skipped": true}
+{"step": 1713, "reward": 1.0, "skipped": true}
+{"step": 1714, "reward": 1.0, "skipped": true}
+{"step": 1715, "reward": 1.0, "skipped": true}
+{"step": 1716, "reward": 1.0, "skipped": true}
+{"step": 1717, "reward": 1.0, "skipped": true}
+{"step": 1718, "reward": 1.0, "skipped": true}
+{"step": 1719, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09102446120232344, "grad_norm": 6.34375, "gen_len": 116.75}
+{"step": 1720, "reward": 1.0, "skipped": true}
+{"step": 1721, "reward": 1.0, "skipped": true}
+{"step": 1722, "reward": 0.0, "skipped": true}
+{"step": 1723, "reward": 1.0, "skipped": true}
+{"step": 1724, "reward": 1.0, "skipped": true}
+{"step": 1725, "reward": 1.0, "skipped": true}
+{"step": 1726, "reward": 1.0, "skipped": true}
+{"step": 1727, "reward": 1.0, "skipped": true}
+{"step": 1728, "reward": 1.0, "skipped": true}
+{"step": 1729, "reward": 1.0, "skipped": true}
+{"step": 1730, "reward": 1.0, "skipped": true}
+{"step": 1731, "reward": 1.0, "skipped": true}
+{"step": 1732, "reward": 1.0, "skipped": true}
+{"step": 1733, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10628246050328016, "grad_norm": 5.28125, "gen_len": 157.25}
+{"step": 1734, "reward": 1.0, "skipped": true}
+{"step": 1735, "reward": 1.0, "skipped": true}
+{"step": 1736, "reward": 1.0, "skipped": true}
+{"step": 1737, "reward": 1.0, "skipped": true}
+{"step": 1738, "reward": 1.0, "skipped": true}
+{"step": 1739, "reward": 1.0, "skipped": true}
+{"step": 1740, "reward": 1.0, "skipped": true}
+{"step": 1741, "reward": 1.0, "skipped": true}
+{"step": 1742, "reward": 1.0, "skipped": true}
+{"step": 1743, "reward": 1.0, "skipped": true}
+{"step": 1744, "reward": 1.0, "skipped": true}
+{"step": 1745, "reward": 1.0, "skipped": true}
+{"step": 1746, "reward": 1.0, "skipped": true}
+{"step": 1747, "reward": 1.0, "skipped": true}
+{"step": 1748, "reward": 1.0, "skipped": true}
+{"step": 1749, "reward": 1.0, "skipped": true}
+{"step": 1750, "reward": 0.0, "skipped": true}
+{"step": 1751, "reward": 1.0, "skipped": true}
+{"step": 1752, "reward": 1.0, "skipped": true}
+{"step": 1753, "reward": 1.0, "skipped": true}
+{"step": 1754, "reward": 1.0, "skipped": true}
+{"step": 1755, "reward": 1.0, "skipped": true}
+{"step": 1756, "reward": 1.0, "skipped": true}
+{"step": 1757, "reward": 1.0, "skipped": true}
+{"step": 1758, "reward": 1.0, "skipped": true}
+{"step": 1759, "reward": 1.0, "skipped": true}
+{"step": 1760, "reward": 1.0, "skipped": true}
+{"step": 1761, "reward": 1.0, "skipped": true}
+{"step": 1762, "reward": 1.0, "skipped": true}
+{"step": 1763, "reward": 1.0, "skipped": true}
+{"step": 1764, "reward": 1.0, "skipped": true}
+{"step": 1765, "reward": 1.0, "skipped": true}
+{"step": 1766, "reward": 1.0, "skipped": true}
+{"step": 1767, "reward": 1.0, "skipped": true}
+{"step": 1768, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.055910889990627766, "grad_norm": 24.125, "gen_len": 49.875}
+{"step": 1769, "reward": 1.0, "skipped": true}
+{"step": 1770, "reward": 1.0, "skipped": true}
+{"step": 1771, "reward": 1.0, "skipped": true}
+{"step": 1772, "reward": 1.0, "skipped": true}
+{"step": 1773, "reward": 1.0, "skipped": true}
+{"step": 1774, "reward": 1.0, "skipped": true}
+{"step": 1775, "reward": 1.0, "skipped": true}
+{"step": 1776, "reward": 0.0, "skipped": true}
+{"step": 1777, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09745827689766884, "grad_norm": 7.4375, "gen_len": 133.125}
+{"step": 1778, "reward": 1.0, "skipped": true}
+{"step": 1779, "reward": 1.0, "skipped": true}
+{"step": 1780, "reward": 1.0, "skipped": true}
+{"step": 1781, "reward": 1.0, "skipped": true}
+{"step": 1782, "reward": 1.0, "skipped": true}
+{"step": 1783, "reward": 1.0, "skipped": true}
+{"step": 1784, "reward": 1.0, "skipped": true}
+{"step": 1785, "reward": 1.0, "skipped": true}
+{"step": 1786, "reward": 1.0, "skipped": true}
+{"step": 1787, "reward": 1.0, "skipped": true}
+{"step": 1788, "reward": 1.0, "skipped": true}
+{"step": 1789, "reward": 1.0, "skipped": true}
+{"step": 1790, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06330232927575707, "grad_norm": 8.125, "gen_len": 84.125}
+{"step": 1791, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08374222973361611, "grad_norm": 10.25, "gen_len": 80.625}
+{"step": 1792, "reward": 1.0, "skipped": true}
+{"step": 1793, "reward": 1.0, "skipped": true}
+{"step": 1794, "reward": 1.0, "skipped": true}
+{"step": 1795, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1304239733144641, "grad_norm": 2.34375, "gen_len": 200.0}
+{"step": 1796, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10325007606297731, "grad_norm": 25.5, "gen_len": 49.375}
+{"step": 1797, "reward": 1.0, "skipped": true}
+{"step": 1798, "reward": 1.0, "skipped": true}
+{"step": 1799, "reward": 1.0, "skipped": true}
+{"step": 1800, "eval_acc": 0.9375}
+{"step": 1800, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.17011867463588715, "grad_norm": 7.5, "gen_len": 129.0}
+{"step": 1801, "reward": 1.0, "skipped": true}
+{"step": 1802, "reward": 0.0, "skipped": true}
+{"step": 1803, "reward": 1.0, "skipped": true}
+{"step": 1804, "reward": 1.0, "skipped": true}
+{"step": 1805, "reward": 1.0, "skipped": true}
+{"step": 1806, "reward": 1.0, "skipped": true}
+{"step": 1807, "reward": 1.0, "skipped": true}
+{"step": 1808, "reward": 1.0, "skipped": true}
+{"step": 1809, "reward": 1.0, "skipped": true}
+{"step": 1810, "reward": 1.0, "skipped": true}
+{"step": 1811, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0924816457554698, "grad_norm": 10.625, "gen_len": 85.75}
+{"step": 1812, "reward": 1.0, "skipped": true}
+{"step": 1813, "reward": 1.0, "skipped": true}
+{"step": 1814, "reward": 1.0, "skipped": true}
+{"step": 1815, "reward": 1.0, "skipped": true}
+{"step": 1816, "reward": 0.0, "skipped": true}
+{"step": 1817, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04685450904071331, "grad_norm": 10.9375, "gen_len": 128.25}
+{"step": 1818, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05753709049895406, "grad_norm": 28.875, "gen_len": 70.125}
+{"step": 1819, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.03698807815089822, "grad_norm": 6.1875, "gen_len": 163.0}
+{"step": 1820, "reward": 0.0, "skipped": true}
+{"step": 1821, "reward": 1.0, "skipped": true}
+{"step": 1822, "reward": 1.0, "skipped": true}
+{"step": 1823, "reward": 1.0, "skipped": true}
+{"step": 1824, "reward": 1.0, "skipped": true}
+{"step": 1825, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07086489722132683, "grad_norm": 9.125, "gen_len": 118.125}
+{"step": 1826, "reward": 1.0, "skipped": true}
+{"step": 1827, "reward": 1.0, "skipped": true}
+{"step": 1828, "reward": 0.0, "skipped": true}
+{"step": 1829, "reward": 1.0, "skipped": true}
+{"step": 1830, "reward": 1.0, "skipped": true}
+{"step": 1831, "reward": 1.0, "skipped": true}
+{"step": 1832, "reward": 1.0, "skipped": true}
+{"step": 1833, "reward": 1.0, "skipped": true}
+{"step": 1834, "reward": 0.0, "skipped": true}
+{"step": 1835, "reward": 1.0, "skipped": true}
+{"step": 1836, "reward": 1.0, "skipped": true}
+{"step": 1837, "reward": 1.0, "skipped": true}
+{"step": 1838, "reward": 1.0, "skipped": true}
+{"step": 1839, "reward": 1.0, "skipped": true}
+{"step": 1840, "reward": 1.0, "skipped": true}
+{"step": 1841, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09633760247379541, "grad_norm": 9.875, "gen_len": 162.5}
+{"step": 1842, "reward": 1.0, "skipped": true}
+{"step": 1843, "reward": 1.0, "skipped": true}
+{"step": 1844, "reward": 1.0, "skipped": true}
+{"step": 1845, "reward": 1.0, "skipped": true}
+{"step": 1846, "reward": 1.0, "skipped": true}
+{"step": 1847, "reward": 1.0, "skipped": true}
+{"step": 1848, "reward": 1.0, "skipped": true}
+{"step": 1849, "reward": 0.0, "skipped": true}
+{"step": 1850, "reward": 1.0, "skipped": true}
+{"step": 1851, "reward": 1.0, "skipped": true}
+{"step": 1852, "reward": 1.0, "skipped": true}
+{"step": 1853, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1275406451895833, "grad_norm": 14.0, "gen_len": 78.375}
+{"step": 1854, "reward": 1.0, "skipped": true}
+{"step": 1855, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2424475895240903, "grad_norm": 5.4375, "gen_len": 162.0}
+{"step": 1856, "reward": 1.0, "skipped": true}
+{"step": 1857, "reward": 1.0, "skipped": true}
+{"step": 1858, "reward": 1.0, "skipped": true}
+{"step": 1859, "reward": 1.0, "skipped": true}
+{"step": 1860, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13954731449484825, "grad_norm": 11.75, "gen_len": 91.625}
+{"step": 1861, "reward": 1.0, "skipped": true}
+{"step": 1862, "reward": 1.0, "skipped": true}
+{"step": 1863, "reward": 1.0, "skipped": true}
+{"step": 1864, "reward": 1.0, "skipped": true}
+{"step": 1865, "reward": 1.0, "skipped": true}
+{"step": 1866, "reward": 1.0, "skipped": true}
+{"step": 1867, "reward": 1.0, "skipped": true}
+{"step": 1868, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12928725499659777, "grad_norm": 7.8125, "gen_len": 142.75}
+{"step": 1869, "reward": 1.0, "skipped": true}
+{"step": 1870, "reward": 1.0, "skipped": true}
+{"step": 1871, "reward": 1.0, "skipped": true}
+{"step": 1872, "reward": 1.0, "skipped": true}
+{"step": 1873, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09086842648684978, "grad_norm": 4.3125, "gen_len": 165.875}
+{"step": 1874, "reward": 1.0, "skipped": true}
+{"step": 1875, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1180547708645463, "grad_norm": 4.375, "gen_len": 163.75}
+{"step": 1876, "reward": 1.0, "skipped": true}
+{"step": 1877, "reward": 1.0, "skipped": true}
+{"step": 1878, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10486021544784307, "grad_norm": 11.1875, "gen_len": 76.875}
+{"step": 1879, "reward": 1.0, "skipped": true}
+{"step": 1880, "reward": 1.0, "skipped": true}
+{"step": 1881, "reward": 1.0, "skipped": true}
+{"step": 1882, "reward": 1.0, "skipped": true}
+{"step": 1883, "reward": 1.0, "skipped": true}
+{"step": 1884, "reward": 1.0, "skipped": true}
+{"step": 1885, "reward": 1.0, "skipped": true}
+{"step": 1886, "reward": 1.0, "skipped": true}
+{"step": 1887, "reward": 1.0, "skipped": true}
+{"step": 1888, "reward": 1.0, "skipped": true}
+{"step": 1889, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08437320590019226, "grad_norm": 8.875, "gen_len": 110.875}
+{"step": 1890, "reward": 1.0, "skipped": true}
+{"step": 1891, "reward": 1.0, "skipped": true}
+{"step": 1892, "reward": 1.0, "skipped": true}
+{"step": 1893, "reward": 1.0, "skipped": true}
+{"step": 1894, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11856240965425968, "grad_norm": 5.03125, "gen_len": 187.5}
+{"step": 1895, "reward": 1.0, "skipped": true}
+{"step": 1896, "reward": 1.0, "skipped": true}
+{"step": 1897, "reward": 1.0, "skipped": true}
+{"step": 1898, "reward": 1.0, "skipped": true}
+{"step": 1899, "reward": 1.0, "skipped": true}
+{"step": 1900, "eval_acc": 0.9375}
+{"step": 1900, "reward": 1.0, "skipped": true}
+{"step": 1901, "reward": 1.0, "skipped": true}
+{"step": 1902, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05015056557022035, "grad_norm": 7.53125, "gen_len": 139.125}
+{"step": 1903, "reward": 1.0, "skipped": true}
+{"step": 1904, "reward": 1.0, "skipped": true}
+{"step": 1905, "reward": 1.0, "skipped": true}
+{"step": 1906, "reward": 1.0, "skipped": true}
+{"step": 1907, "reward": 1.0, "skipped": true}
+{"step": 1908, "reward": 1.0, "skipped": true}
+{"step": 1909, "reward": 1.0, "skipped": true}
+{"step": 1910, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10385641362518072, "grad_norm": 8.3125, "gen_len": 143.125}
+{"step": 1911, "reward": 1.0, "skipped": true}
+{"step": 1912, "reward": 1.0, "skipped": true}
+{"step": 1913, "reward": 1.0, "skipped": true}
+{"step": 1914, "reward": 1.0, "skipped": true}
+{"step": 1915, "reward": 1.0, "skipped": true}
+{"step": 1916, "reward": 1.0, "skipped": true}
+{"step": 1917, "reward": 1.0, "skipped": true}
+{"step": 1918, "reward": 1.0, "skipped": true}
+{"step": 1919, "reward": 1.0, "skipped": true}
+{"step": 1920, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09548294451087713, "grad_norm": 9.4375, "gen_len": 68.0}
+{"step": 1921, "reward": 1.0, "skipped": true}
+{"step": 1922, "reward": 1.0, "skipped": true}
+{"step": 1923, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13082695938646793, "grad_norm": 5.71875, "gen_len": 113.5}
+{"step": 1924, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13144500833004713, "grad_norm": 4.0625, "gen_len": 163.625}
+{"step": 1925, "reward": 1.0, "skipped": true}
+{"step": 1926, "reward": 1.0, "skipped": true}
+{"step": 1927, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08045959891751409, "grad_norm": 4.5, "gen_len": 186.5}
+{"step": 1928, "reward": 1.0, "skipped": true}
+{"step": 1929, "reward": 1.0, "skipped": true}
+{"step": 1930, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05005152337253094, "grad_norm": 8.1875, "gen_len": 104.875}
+{"step": 1931, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11017985921353102, "grad_norm": 4.75, "gen_len": 183.375}
+{"step": 1932, "reward": 1.0, "skipped": true}
+{"step": 1933, "reward": 1.0, "skipped": true}
+{"step": 1934, "reward": 1.0, "skipped": true}
+{"step": 1935, "reward": 1.0, "skipped": true}
+{"step": 1936, "reward": 1.0, "skipped": true}
+{"step": 1937, "reward": 1.0, "skipped": true}
+{"step": 1938, "reward": 1.0, "skipped": true}
+{"step": 1939, "reward": 1.0, "skipped": true}
+{"step": 1940, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.02143631805665791, "grad_norm": 23.125, "gen_len": 77.375}
+{"step": 1941, "reward": 1.0, "skipped": true}
+{"step": 1942, "reward": 1.0, "skipped": true}
+{"step": 1943, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10142754437401891, "grad_norm": 12.375, "gen_len": 92.375}
+{"step": 1944, "reward": 1.0, "skipped": true}
+{"step": 1945, "reward": 1.0, "skipped": true}
+{"step": 1946, "reward": 1.0, "skipped": true}
+{"step": 1947, "reward": 1.0, "skipped": true}
+{"step": 1948, "reward": 1.0, "skipped": true}
+{"step": 1949, "reward": 0.0, "skipped": true}
+{"step": 1950, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05250254273414612, "grad_norm": 13.25, "gen_len": 60.5}
+{"step": 1951, "reward": 1.0, "skipped": true}
+{"step": 1952, "reward": 1.0, "skipped": true}
+{"step": 1953, "reward": 1.0, "skipped": true}
+{"step": 1954, "reward": 1.0, "skipped": true}
+{"step": 1955, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1159144351258874, "grad_norm": 6.875, "gen_len": 121.625}
+{"step": 1956, "reward": 1.0, "skipped": true}
+{"step": 1957, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07361936010420322, "grad_norm": 11.0, "gen_len": 94.5}
+{"step": 1958, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07352315820753574, "grad_norm": 5.09375, "gen_len": 109.375}
+{"step": 1959, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12497244216501713, "grad_norm": 15.5, "gen_len": 50.375}
+{"step": 1960, "reward": 1.0, "skipped": true}
+{"step": 1961, "reward": 1.0, "skipped": true}
+{"step": 1962, "reward": 1.0, "skipped": true}
+{"step": 1963, "reward": 1.0, "skipped": true}
+{"step": 1964, "reward": 1.0, "skipped": true}
+{"step": 1965, "reward": 1.0, "skipped": true}
+{"step": 1966, "reward": 1.0, "skipped": true}
+{"step": 1967, "reward": 1.0, "skipped": true}
+{"step": 1968, "reward": 1.0, "skipped": true}
+{"step": 1969, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14220560435205698, "grad_norm": 11.5625, "gen_len": 85.25}
+{"step": 1970, "reward": 1.0, "skipped": true}
+{"step": 1971, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.035068984143435955, "grad_norm": 3.609375, "gen_len": 184.875}
+{"step": 1972, "reward": 1.0, "skipped": true}
+{"step": 1973, "reward": 1.0, "skipped": true}
+{"step": 1974, "reward": 1.0, "skipped": true}
+{"step": 1975, "reward": 1.0, "skipped": true}
+{"step": 1976, "reward": 1.0, "skipped": true}
+{"step": 1977, "reward": 1.0, "skipped": true}
+{"step": 1978, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11684511043131351, "grad_norm": 13.3125, "gen_len": 91.125}
+{"step": 1979, "reward": 1.0, "skipped": true}
+{"step": 1980, "reward": 1.0, "skipped": true}
+{"step": 1981, "reward": 1.0, "skipped": true}
+{"step": 1982, "reward": 1.0, "skipped": true}
+{"step": 1983, "reward": 1.0, "skipped": true}
+{"step": 1984, "reward": 1.0, "skipped": true}
+{"step": 1985, "reward": 1.0, "skipped": true}
+{"step": 1986, "reward": 1.0, "skipped": true}
+{"step": 1987, "reward": 1.0, "skipped": true}
+{"step": 1988, "reward": 1.0, "skipped": true}
+{"step": 1989, "reward": 1.0, "skipped": true}
+{"step": 1990, "reward": 1.0, "skipped": true}
+{"step": 1991, "reward": 0.0, "skipped": true}
+{"step": 1992, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05681242002174258, "grad_norm": 4.125, "gen_len": 150.75}
+{"step": 1993, "reward": 1.0, "skipped": true}
+{"step": 1994, "reward": 1.0, "skipped": true}
+{"step": 1995, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1393553614616394, "grad_norm": 8.9375, "gen_len": 99.25}
+{"step": 1996, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12667232658714056, "grad_norm": 8.375, "gen_len": 48.375}
+{"step": 1997, "reward": 1.0, "skipped": true}
+{"step": 1998, "reward": 1.0, "skipped": true}
+{"step": 1999, "reward": 1.0, "skipped": true}
+{"step": 2000, "eval_acc": 0.9375}
+{"step": 2000, "reward": 0.0, "skipped": true}
+{"step": 2001, "reward": 1.0, "skipped": true}
+{"step": 2002, "reward": 1.0, "skipped": true}
+{"step": 2003, "reward": 1.0, "skipped": true}
+{"step": 2004, "reward": 1.0, "skipped": true}
+{"step": 2005, "reward": 1.0, "skipped": true}
+{"step": 2006, "reward": 1.0, "skipped": true}
+{"step": 2007, "reward": 1.0, "skipped": true}
+{"step": 2008, "reward": 1.0, "skipped": true}
+{"step": 2009, "reward": 1.0, "skipped": true}
+{"step": 2010, "reward": 1.0, "skipped": true}
+{"step": 2011, "reward": 1.0, "skipped": true}
+{"step": 2012, "reward": 1.0, "skipped": true}
+{"step": 2013, "reward": 1.0, "skipped": true}
+{"step": 2014, "reward": 1.0, "skipped": true}
+{"step": 2015, "reward": 1.0, "skipped": true}
+{"step": 2016, "reward": 1.0, "skipped": true}
+{"step": 2017, "reward": 1.0, "skipped": true}
+{"step": 2018, "reward": 1.0, "skipped": true}
+{"step": 2019, "reward": 1.0, "skipped": true}
+{"step": 2020, "reward": 1.0, "skipped": true}
+{"step": 2021, "reward": 1.0, "skipped": true}
+{"step": 2022, "reward": 1.0, "skipped": true}
+{"step": 2023, "reward": 1.0, "skipped": true}
+{"step": 2024, "reward": 1.0, "skipped": true}
+{"step": 2025, "reward": 1.0, "skipped": true}
+{"step": 2026, "reward": 1.0, "skipped": true}
+{"step": 2027, "reward": 1.0, "skipped": true}
+{"step": 2028, "reward": 1.0, "skipped": true}
+{"step": 2029, "reward": 1.0, "skipped": true}
+{"step": 2030, "reward": 1.0, "skipped": true}
+{"step": 2031, "reward": 1.0, "skipped": true}
+{"step": 2032, "reward": 1.0, "skipped": true}
+{"step": 2033, "reward": 1.0, "skipped": true}
+{"step": 2034, "reward": 1.0, "skipped": true}
+{"step": 2035, "reward": 1.0, "skipped": true}
+{"step": 2036, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09484370052814484, "grad_norm": 3.515625, "gen_len": 170.0}
+{"step": 2037, "reward": 1.0, "skipped": true}
+{"step": 2038, "reward": 1.0, "skipped": true}
+{"step": 2039, "reward": 1.0, "skipped": true}
+{"step": 2040, "reward": 1.0, "skipped": true}
+{"step": 2041, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09285555314272642, "grad_norm": 4.65625, "gen_len": 181.875}
+{"step": 2042, "reward": 1.0, "skipped": true}
+{"step": 2043, "reward": 1.0, "skipped": true}
+{"step": 2044, "reward": 1.0, "skipped": true}
+{"step": 2045, "reward": 1.0, "skipped": true}
+{"step": 2046, "reward": 1.0, "skipped": true}
+{"step": 2047, "reward": 1.0, "skipped": true}
+{"step": 2048, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08532484946772456, "grad_norm": 3.359375, "gen_len": 167.0}
+{"step": 2049, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09659576136618853, "grad_norm": 10.3125, "gen_len": 103.5}
+{"step": 2050, "reward": 1.0, "skipped": true}
+{"step": 2051, "reward": 1.0, "skipped": true}
+{"step": 2052, "reward": 1.0, "skipped": true}
+{"step": 2053, "reward": 1.0, "skipped": true}
+{"step": 2054, "reward": 1.0, "skipped": true}
+{"step": 2055, "reward": 1.0, "skipped": true}
+{"step": 2056, "reward": 1.0, "skipped": true}
+{"step": 2057, "reward": 1.0, "skipped": true}
+{"step": 2058, "reward": 1.0, "skipped": true}
+{"step": 2059, "reward": 1.0, "skipped": true}
+{"step": 2060, "reward": 1.0, "skipped": true}
+{"step": 2061, "reward": 1.0, "skipped": true}
+{"step": 2062, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09440351277589798, "grad_norm": 9.75, "gen_len": 66.5}
+{"step": 2063, "reward": 0.0, "skipped": true}
+{"step": 2064, "reward": 1.0, "skipped": true}
+{"step": 2065, "reward": 0.0, "skipped": true}
+{"step": 2066, "reward": 1.0, "skipped": true}
+{"step": 2067, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0721927797421813, "grad_norm": 7.15625, "gen_len": 164.5}
+{"step": 2068, "reward": 1.0, "skipped": true}
+{"step": 2069, "reward": 1.0, "skipped": true}
+{"step": 2070, "reward": 1.0, "skipped": true}
+{"step": 2071, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12397712375968695, "grad_norm": 9.0, "gen_len": 96.75}
+{"step": 2072, "reward": 1.0, "skipped": true}
+{"step": 2073, "reward": 1.0, "skipped": true}
+{"step": 2074, "reward": 1.0, "skipped": true}
+{"step": 2075, "reward": 1.0, "skipped": true}
+{"step": 2076, "reward": 1.0, "skipped": true}
+{"step": 2077, "reward": 1.0, "skipped": true}
+{"step": 2078, "reward": 1.0, "skipped": true}
+{"step": 2079, "reward": 1.0, "skipped": true}
+{"step": 2080, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05893111415207386, "grad_norm": 5.1875, "gen_len": 81.0}
+{"step": 2081, "reward": 1.0, "skipped": true}
+{"step": 2082, "reward": 1.0, "skipped": true}
+{"step": 2083, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07929500984027982, "grad_norm": 7.5, "gen_len": 86.0}
+{"step": 2084, "reward": 1.0, "skipped": true}
+{"step": 2085, "reward": 0.0, "skipped": true}
+{"step": 2086, "reward": 1.0, "skipped": true}
+{"step": 2087, "reward": 1.0, "skipped": true}
+{"step": 2088, "reward": 0.0, "skipped": true}
+{"step": 2089, "reward": 1.0, "skipped": true}
+{"step": 2090, "reward": 1.0, "skipped": true}
+{"step": 2091, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08900789637118578, "grad_norm": 11.375, "gen_len": 55.5}
+{"step": 2092, "reward": 1.0, "skipped": true}
+{"step": 2093, "reward": 1.0, "skipped": true}
+{"step": 2094, "reward": 1.0, "skipped": true}
+{"step": 2095, "reward": 1.0, "skipped": true}
+{"step": 2096, "reward": 1.0, "skipped": true}
+{"step": 2097, "reward": 1.0, "skipped": true}
+{"step": 2098, "reward": 1.0, "skipped": true}
+{"step": 2099, "reward": 1.0, "skipped": true}
+{"step": 2100, "eval_acc": 0.96875}
+{"step": 2100, "reward": 1.0, "skipped": true}
+{"step": 2101, "reward": 1.0, "skipped": true}
+{"step": 2102, "reward": 1.0, "skipped": true}
+{"step": 2103, "reward": 1.0, "skipped": true}
+{"step": 2104, "reward": 1.0, "skipped": true}
+{"step": 2105, "reward": 1.0, "skipped": true}
+{"step": 2106, "reward": 1.0, "skipped": true}
+{"step": 2107, "reward": 1.0, "skipped": true}
+{"step": 2108, "reward": 1.0, "skipped": true}
+{"step": 2109, "reward": 1.0, "skipped": true}
+{"step": 2110, "reward": 1.0, "skipped": true}
+{"step": 2111, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.088344506919384, "grad_norm": 10.75, "gen_len": 79.5}
+{"step": 2112, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11704510357230902, "grad_norm": 9.0625, "gen_len": 95.25}
+{"step": 2113, "reward": 1.0, "skipped": true}
+{"step": 2114, "reward": 1.0, "skipped": true}
+{"step": 2115, "reward": 1.0, "skipped": true}
+{"step": 2116, "reward": 1.0, "skipped": true}
+{"step": 2117, "reward": 1.0, "skipped": true}
+{"step": 2118, "reward": 1.0, "skipped": true}
+{"step": 2119, "reward": 1.0, "skipped": true}
+{"step": 2120, "reward": 1.0, "skipped": true}
+{"step": 2121, "reward": 1.0, "skipped": true}
+{"step": 2122, "reward": 1.0, "skipped": true}
+{"step": 2123, "reward": 1.0, "skipped": true}
+{"step": 2124, "reward": 1.0, "skipped": true}
+{"step": 2125, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14397836942225695, "grad_norm": 6.9375, "gen_len": 86.875}
+{"step": 2126, "reward": 1.0, "skipped": true}
+{"step": 2127, "reward": 1.0, "skipped": true}
+{"step": 2128, "reward": 1.0, "skipped": true}
+{"step": 2129, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11583289410918951, "grad_norm": 3.296875, "gen_len": 189.875}
+{"step": 2130, "reward": 1.0, "skipped": true}
+{"step": 2131, "reward": 1.0, "skipped": true}
+{"step": 2132, "reward": 1.0, "skipped": true}
+{"step": 2133, "reward": 1.0, "skipped": true}
+{"step": 2134, "reward": 1.0, "skipped": true}
+{"step": 2135, "reward": 1.0, "skipped": true}
+{"step": 2136, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08724823873490095, "grad_norm": 10.25, "gen_len": 66.125}
+{"step": 2137, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11269450932741165, "grad_norm": 11.875, "gen_len": 60.25}
+{"step": 2138, "reward": 1.0, "skipped": true}
+{"step": 2139, "reward": 1.0, "skipped": true}
+{"step": 2140, "reward": 1.0, "skipped": true}
+{"step": 2141, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09501446224749088, "grad_norm": 8.75, "gen_len": 85.875}
+{"step": 2142, "reward": 1.0, "skipped": true}
+{"step": 2143, "reward": 1.0, "skipped": true}
+{"step": 2144, "reward": 1.0, "skipped": true}
+{"step": 2145, "reward": 1.0, "skipped": true}
+{"step": 2146, "reward": 1.0, "skipped": true}
+{"step": 2147, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07656367449089885, "grad_norm": 5.21875, "gen_len": 143.625}
+{"step": 2148, "reward": 1.0, "skipped": true}
+{"step": 2149, "reward": 1.0, "skipped": true}
+{"step": 2150, "reward": 1.0, "skipped": true}
+{"step": 2151, "reward": 1.0, "skipped": true}
+{"step": 2152, "reward": 1.0, "skipped": true}
+{"step": 2153, "reward": 1.0, "skipped": true}
+{"step": 2154, "reward": 1.0, "skipped": true}
+{"step": 2155, "reward": 1.0, "skipped": true}
+{"step": 2156, "reward": 1.0, "skipped": true}
+{"step": 2157, "reward": 1.0, "skipped": true}
+{"step": 2158, "reward": 1.0, "skipped": true}
+{"step": 2159, "reward": 1.0, "skipped": true}
+{"step": 2160, "reward": 1.0, "skipped": true}
+{"step": 2161, "reward": 1.0, "skipped": true}
+{"step": 2162, "reward": 1.0, "skipped": true}
+{"step": 2163, "reward": 1.0, "skipped": true}
+{"step": 2164, "reward": 1.0, "skipped": true}
+{"step": 2165, "reward": 1.0, "skipped": true}
+{"step": 2166, "reward": 1.0, "skipped": true}
+{"step": 2167, "reward": 1.0, "skipped": true}
+{"step": 2168, "reward": 1.0, "skipped": true}
+{"step": 2169, "reward": 1.0, "skipped": true}
+{"step": 2170, "reward": 1.0, "skipped": true}
+{"step": 2171, "reward": 1.0, "skipped": true}
+{"step": 2172, "reward": 1.0, "skipped": true}
+{"step": 2173, "reward": 1.0, "skipped": true}
+{"step": 2174, "reward": 1.0, "skipped": true}
+{"step": 2175, "reward": 1.0, "skipped": true}
+{"step": 2176, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.29528224654495716, "grad_norm": 3.34375, "gen_len": 190.75}
+{"step": 2177, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.060337467584759, "grad_norm": 12.1875, "gen_len": 136.5}
+{"step": 2178, "reward": 1.0, "skipped": true}
+{"step": 2179, "reward": 1.0, "skipped": true}
+{"step": 2180, "reward": 1.0, "skipped": true}
+{"step": 2181, "reward": 1.0, "skipped": true}
+{"step": 2182, "reward": 1.0, "skipped": true}
+{"step": 2183, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07440228294581175, "grad_norm": 10.1875, "gen_len": 127.75}
+{"step": 2184, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14413303695619106, "grad_norm": 11.5, "gen_len": 163.125}
+{"step": 2185, "reward": 1.0, "skipped": true}
+{"step": 2186, "reward": 1.0, "skipped": true}
+{"step": 2187, "reward": 1.0, "skipped": true}
+{"step": 2188, "reward": 1.0, "skipped": true}
+{"step": 2189, "reward": 1.0, "skipped": true}
+{"step": 2190, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09796355850994587, "grad_norm": 11.0, "gen_len": 100.375}
+{"step": 2191, "reward": 0.0, "skipped": true}
+{"step": 2192, "reward": 1.0, "skipped": true}
+{"step": 2193, "reward": 0.0, "skipped": true}
+{"step": 2194, "reward": 1.0, "skipped": true}
+{"step": 2195, "reward": 1.0, "skipped": true}
+{"step": 2196, "reward": 1.0, "skipped": true}
+{"step": 2197, "reward": 1.0, "skipped": true}
+{"step": 2198, "reward": 0.0, "skipped": true}
+{"step": 2199, "reward": 1.0, "skipped": true}
+{"step": 2200, "eval_acc": 0.96875}
+{"step": 2200, "reward": 1.0, "skipped": true}
+{"step": 2201, "reward": 1.0, "skipped": true}
+{"step": 2202, "reward": 1.0, "skipped": true}
+{"step": 2203, "reward": 1.0, "skipped": true}
+{"step": 2204, "reward": 1.0, "skipped": true}
+{"step": 2205, "reward": 1.0, "skipped": true}
+{"step": 2206, "reward": 1.0, "skipped": true}
+{"step": 2207, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0937020224519074, "grad_norm": 12.6875, "gen_len": 37.875}
+{"step": 2208, "reward": 1.0, "skipped": true}
+{"step": 2209, "reward": 1.0, "skipped": true}
+{"step": 2210, "reward": 1.0, "skipped": true}
+{"step": 2211, "reward": 1.0, "skipped": true}
+{"step": 2212, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.03301042038947344, "grad_norm": 18.75, "gen_len": 88.125}
+{"step": 2213, "reward": 1.0, "skipped": true}
+{"step": 2214, "reward": 1.0, "skipped": true}
+{"step": 2215, "reward": 1.0, "skipped": true}
+{"step": 2216, "reward": 1.0, "skipped": true}
+{"step": 2217, "reward": 1.0, "skipped": true}
+{"step": 2218, "reward": 1.0, "skipped": true}
+{"step": 2219, "reward": 1.0, "skipped": true}
+{"step": 2220, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.046066378708928823, "grad_norm": 6.0, "gen_len": 115.125}
+{"step": 2221, "reward": 1.0, "skipped": true}
+{"step": 2222, "reward": 1.0, "skipped": true}
+{"step": 2223, "reward": 1.0, "skipped": true}
+{"step": 2224, "reward": 1.0, "skipped": true}
+{"step": 2225, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05767669714987278, "grad_norm": 4.53125, "gen_len": 131.5}
+{"step": 2226, "reward": 1.0, "skipped": true}
+{"step": 2227, "reward": 1.0, "skipped": true}
+{"step": 2228, "reward": 1.0, "skipped": true}
+{"step": 2229, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10008095391094685, "grad_norm": 15.375, "gen_len": 59.25}
+{"step": 2230, "reward": 1.0, "skipped": true}
+{"step": 2231, "reward": 1.0, "skipped": true}
+{"step": 2232, "reward": 1.0, "skipped": true}
+{"step": 2233, "reward": 1.0, "skipped": true}
+{"step": 2234, "reward": 1.0, "skipped": true}
+{"step": 2235, "reward": 1.0, "skipped": true}
+{"step": 2236, "reward": 1.0, "skipped": true}
+{"step": 2237, "reward": 1.0, "skipped": true}
+{"step": 2238, "reward": 1.0, "skipped": true}
+{"step": 2239, "reward": 1.0, "skipped": true}
+{"step": 2240, "reward": 1.0, "skipped": true}
+{"step": 2241, "reward": 1.0, "skipped": true}
+{"step": 2242, "reward": 1.0, "skipped": true}
+{"step": 2243, "reward": 1.0, "skipped": true}
+{"step": 2244, "reward": 1.0, "skipped": true}
+{"step": 2245, "reward": 1.0, "skipped": true}
+{"step": 2246, "reward": 1.0, "skipped": true}
+{"step": 2247, "reward": 1.0, "skipped": true}
+{"step": 2248, "reward": 1.0, "skipped": true}
+{"step": 2249, "reward": 1.0, "skipped": true}
+{"step": 2250, "reward": 1.0, "skipped": true}
+{"step": 2251, "reward": 1.0, "skipped": true}
+{"step": 2252, "reward": 1.0, "skipped": true}
+{"step": 2253, "reward": 1.0, "skipped": true}
+{"step": 2254, "reward": 1.0, "skipped": true}
+{"step": 2255, "reward": 1.0, "skipped": true}
+{"step": 2256, "reward": 1.0, "skipped": true}
+{"step": 2257, "reward": 1.0, "skipped": true}
+{"step": 2258, "reward": 1.0, "skipped": true}
+{"step": 2259, "reward": 1.0, "skipped": true}
+{"step": 2260, "reward": 1.0, "skipped": true}
+{"step": 2261, "reward": 1.0, "skipped": true}
+{"step": 2262, "reward": 1.0, "skipped": true}
+{"step": 2263, "reward": 1.0, "skipped": true}
+{"step": 2264, "reward": 1.0, "skipped": true}
+{"step": 2265, "reward": 1.0, "skipped": true}
+{"step": 2266, "reward": 1.0, "skipped": true}
+{"step": 2267, "reward": 1.0, "skipped": true}
+{"step": 2268, "reward": 1.0, "skipped": true}
+{"step": 2269, "reward": 0.0, "skipped": true}
+{"step": 2270, "reward": 1.0, "skipped": true}
+{"step": 2271, "reward": 1.0, "skipped": true}
+{"step": 2272, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05830322951078415, "grad_norm": 12.875, "gen_len": 186.75}
+{"step": 2273, "reward": 1.0, "skipped": true}
+{"step": 2274, "reward": 1.0, "skipped": true}
+{"step": 2275, "reward": 1.0, "skipped": true}
+{"step": 2276, "reward": 1.0, "skipped": true}
+{"step": 2277, "reward": 1.0, "skipped": true}
+{"step": 2278, "reward": 0.0, "skipped": true}
+{"step": 2279, "reward": 1.0, "skipped": true}
+{"step": 2280, "reward": 1.0, "skipped": true}
+{"step": 2281, "reward": 1.0, "skipped": true}
+{"step": 2282, "reward": 1.0, "skipped": true}
+{"step": 2283, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05308304354548454, "grad_norm": 7.0, "gen_len": 89.5}
+{"step": 2284, "reward": 1.0, "skipped": true}
+{"step": 2285, "reward": 1.0, "skipped": true}
+{"step": 2286, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1129490053281188, "grad_norm": 11.1875, "gen_len": 66.0}
+{"step": 2287, "reward": 1.0, "skipped": true}
+{"step": 2288, "reward": 1.0, "skipped": true}
+{"step": 2289, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06780762085691094, "grad_norm": 6.0625, "gen_len": 163.0}
+{"step": 2290, "reward": 1.0, "skipped": true}
+{"step": 2291, "reward": 1.0, "skipped": true}
+{"step": 2292, "reward": 1.0, "skipped": true}
+{"step": 2293, "reward": 1.0, "skipped": true}
+{"step": 2294, "reward": 1.0, "skipped": true}
+{"step": 2295, "reward": 1.0, "skipped": true}
+{"step": 2296, "reward": 1.0, "skipped": true}
+{"step": 2297, "reward": 1.0, "skipped": true}
+{"step": 2298, "reward": 1.0, "skipped": true}
+{"step": 2299, "reward": 1.0, "skipped": true}
+{"step": 2300, "eval_acc": 0.96875}
+{"step": 2300, "reward": 1.0, "skipped": true}
+{"step": 2301, "reward": 1.0, "skipped": true}
+{"step": 2302, "reward": 1.0, "skipped": true}
+{"step": 2303, "reward": 1.0, "skipped": true}
+{"step": 2304, "reward": 1.0, "skipped": true}
+{"step": 2305, "reward": 1.0, "skipped": true}
+{"step": 2306, "reward": 1.0, "skipped": true}
+{"step": 2307, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10272968374192715, "grad_norm": 15.75, "gen_len": 69.125}
+{"step": 2308, "reward": 1.0, "skipped": true}
+{"step": 2309, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09609094634652138, "grad_norm": 3.921875, "gen_len": 196.375}
+{"step": 2310, "reward": 1.0, "skipped": true}
+{"step": 2311, "reward": 1.0, "skipped": true}
+{"step": 2312, "reward": 1.0, "skipped": true}
+{"step": 2313, "reward": 1.0, "skipped": true}
+{"step": 2314, "reward": 1.0, "skipped": true}
+{"step": 2315, "reward": 1.0, "skipped": true}
+{"step": 2316, "reward": 1.0, "skipped": true}
+{"step": 2317, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07086123432964087, "grad_norm": 4.28125, "gen_len": 188.0}
+{"step": 2318, "reward": 1.0, "skipped": true}
+{"step": 2319, "reward": 1.0, "skipped": true}
+{"step": 2320, "reward": 1.0, "skipped": true}
+{"step": 2321, "reward": 1.0, "skipped": true}
+{"step": 2322, "reward": 1.0, "skipped": true}
+{"step": 2323, "reward": 1.0, "skipped": true}
+{"step": 2324, "reward": 1.0, "skipped": true}
+{"step": 2325, "reward": 1.0, "skipped": true}
+{"step": 2326, "reward": 1.0, "skipped": true}
+{"step": 2327, "reward": 1.0, "skipped": true}
+{"step": 2328, "reward": 1.0, "skipped": true}
+{"step": 2329, "reward": 1.0, "skipped": true}
+{"step": 2330, "reward": 1.0, "skipped": true}
+{"step": 2331, "reward": 1.0, "skipped": true}
+{"step": 2332, "reward": 1.0, "skipped": true}
+{"step": 2333, "reward": 1.0, "skipped": true}
+{"step": 2334, "reward": 1.0, "skipped": true}
+{"step": 2335, "reward": 1.0, "skipped": true}
+{"step": 2336, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06888164626434445, "grad_norm": 15.3125, "gen_len": 82.875}
+{"step": 2337, "reward": 1.0, "skipped": true}
+{"step": 2338, "reward": 0.0, "skipped": true}
+{"step": 2339, "reward": 1.0, "skipped": true}
+{"step": 2340, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12237838190048933, "grad_norm": 9.9375, "gen_len": 83.5}
+{"step": 2341, "reward": 1.0, "skipped": true}
+{"step": 2342, "reward": 0.0, "skipped": true}
+{"step": 2343, "reward": 1.0, "skipped": true}
+{"step": 2344, "reward": 1.0, "skipped": true}
+{"step": 2345, "reward": 1.0, "skipped": true}
+{"step": 2346, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.083701953291893, "grad_norm": 8.75, "gen_len": 115.75}
+{"step": 2347, "reward": 1.0, "skipped": true}
+{"step": 2348, "reward": 1.0, "skipped": true}
+{"step": 2349, "reward": 1.0, "skipped": true}
+{"step": 2350, "reward": 1.0, "skipped": true}
+{"step": 2351, "reward": 1.0, "skipped": true}
+{"step": 2352, "reward": 1.0, "skipped": true}
+{"step": 2353, "reward": 1.0, "skipped": true}
+{"step": 2354, "reward": 1.0, "skipped": true}
+{"step": 2355, "reward": 1.0, "skipped": true}
+{"step": 2356, "reward": 0.0, "skipped": true}
+{"step": 2357, "reward": 1.0, "skipped": true}
+{"step": 2358, "reward": 1.0, "skipped": true}
+{"step": 2359, "reward": 1.0, "skipped": true}
+{"step": 2360, "reward": 1.0, "skipped": true}
+{"step": 2361, "reward": 1.0, "skipped": true}
+{"step": 2362, "reward": 1.0, "skipped": true}
+{"step": 2363, "reward": 1.0, "skipped": true}
+{"step": 2364, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09050650149583817, "grad_norm": 7.90625, "gen_len": 115.375}
+{"step": 2365, "reward": 0.0, "skipped": true}
+{"step": 2366, "reward": 1.0, "skipped": true}
+{"step": 2367, "reward": 1.0, "skipped": true}
+{"step": 2368, "reward": 1.0, "skipped": true}
+{"step": 2369, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12553073558956385, "grad_norm": 7.125, "gen_len": 104.125}
+{"step": 2370, "reward": 1.0, "skipped": true}
+{"step": 2371, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14995147101581097, "grad_norm": 8.625, "gen_len": 83.125}
+{"step": 2372, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10747027955949306, "grad_norm": 4.875, "gen_len": 112.625}
+{"step": 2373, "reward": 1.0, "skipped": true}
+{"step": 2374, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05251578846946359, "grad_norm": 8.9375, "gen_len": 123.0}
+{"step": 2375, "reward": 1.0, "skipped": true}
+{"step": 2376, "reward": 0.0, "skipped": true}
+{"step": 2377, "reward": 1.0, "skipped": true}
+{"step": 2378, "reward": 1.0, "skipped": true}
+{"step": 2379, "reward": 1.0, "skipped": true}
+{"step": 2380, "reward": 1.0, "skipped": true}
+{"step": 2381, "reward": 1.0, "skipped": true}
+{"step": 2382, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.040302188601344824, "grad_norm": 14.1875, "gen_len": 122.5}
+{"step": 2383, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06718142703175545, "grad_norm": 19.25, "gen_len": 69.0}
+{"step": 2384, "reward": 1.0, "skipped": true}
+{"step": 2385, "reward": 1.0, "skipped": true}
+{"step": 2386, "reward": 1.0, "skipped": true}
+{"step": 2387, "reward": 1.0, "skipped": true}
+{"step": 2388, "reward": 1.0, "skipped": true}
+{"step": 2389, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.2349916361272335, "grad_norm": 5.15625, "gen_len": 200.0}
+{"step": 2390, "reward": 1.0, "skipped": true}
+{"step": 2391, "reward": 1.0, "skipped": true}
+{"step": 2392, "reward": 1.0, "skipped": true}
+{"step": 2393, "reward": 1.0, "skipped": true}
+{"step": 2394, "reward": 1.0, "skipped": true}
+{"step": 2395, "reward": 1.0, "skipped": true}
+{"step": 2396, "reward": 1.0, "skipped": true}
+{"step": 2397, "reward": 1.0, "skipped": true}
+{"step": 2398, "reward": 1.0, "skipped": true}
+{"step": 2399, "reward": 1.0, "skipped": true}
+{"step": 2400, "eval_acc": 0.9375}
+{"step": 2400, "reward": 1.0, "skipped": true}
+{"step": 2401, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13379099126905203, "grad_norm": 3.921875, "gen_len": 185.125}
+{"step": 2402, "reward": 1.0, "skipped": true}
+{"step": 2403, "reward": 1.0, "skipped": true}
+{"step": 2404, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06288454681634903, "grad_norm": 16.5, "gen_len": 53.875}
+{"step": 2405, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12428990565240383, "grad_norm": 5.5, "gen_len": 132.375}
+{"step": 2406, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08403885224834085, "grad_norm": 6.96875, "gen_len": 98.25}
+{"step": 2407, "reward": 0.0, "skipped": true}
+{"step": 2408, "reward": 1.0, "skipped": true}
+{"step": 2409, "reward": 1.0, "skipped": true}
+{"step": 2410, "reward": 1.0, "skipped": true}
+{"step": 2411, "reward": 1.0, "skipped": true}
+{"step": 2412, "reward": 1.0, "skipped": true}
+{"step": 2413, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.05332811130210757, "grad_norm": 4.625, "gen_len": 169.25}
+{"step": 2414, "reward": 1.0, "skipped": true}
+{"step": 2415, "reward": 1.0, "skipped": true}
+{"step": 2416, "reward": 1.0, "skipped": true}
+{"step": 2417, "reward": 1.0, "skipped": true}
+{"step": 2418, "reward": 1.0, "skipped": true}
+{"step": 2419, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08361121919006109, "grad_norm": 5.75, "gen_len": 86.25}
+{"step": 2420, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.024112854152917862, "grad_norm": 20.375, "gen_len": 77.875}
+{"step": 2421, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.14418063592165709, "grad_norm": 5.75, "gen_len": 144.0}
+{"step": 2422, "reward": 1.0, "skipped": true}
+{"step": 2423, "reward": 1.0, "skipped": true}
+{"step": 2424, "reward": 1.0, "skipped": true}
+{"step": 2425, "reward": 1.0, "skipped": true}
+{"step": 2426, "reward": 1.0, "skipped": true}
+{"step": 2427, "reward": 1.0, "skipped": true}
+{"step": 2428, "reward": 1.0, "skipped": true}
+{"step": 2429, "reward": 1.0, "skipped": true}
+{"step": 2430, "reward": 1.0, "skipped": true}
+{"step": 2431, "reward": 1.0, "skipped": true}
+{"step": 2432, "reward": 1.0, "skipped": true}
+{"step": 2433, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1011151485145092, "grad_norm": 16.625, "gen_len": 109.375}
+{"step": 2434, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.039173653814941645, "grad_norm": 12.5625, "gen_len": 65.375}
+{"step": 2435, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08299396559596062, "grad_norm": 5.9375, "gen_len": 111.375}
+{"step": 2436, "reward": 1.0, "skipped": true}
+{"step": 2437, "reward": 1.0, "skipped": true}
+{"step": 2438, "reward": 1.0, "skipped": true}
+{"step": 2439, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06100775580853224, "grad_norm": 4.28125, "gen_len": 190.0}
+{"step": 2440, "reward": 1.0, "skipped": true}
+{"step": 2441, "reward": 1.0, "skipped": true}
+{"step": 2442, "reward": 1.0, "skipped": true}
+{"step": 2443, "reward": 1.0, "skipped": true}
+{"step": 2444, "reward": 1.0, "skipped": true}
+{"step": 2445, "reward": 0.0, "skipped": true}
+{"step": 2446, "reward": 1.0, "skipped": true}
+{"step": 2447, "reward": 1.0, "skipped": true}
+{"step": 2448, "reward": 1.0, "skipped": true}
+{"step": 2449, "reward": 1.0, "skipped": true}
+{"step": 2450, "reward": 1.0, "skipped": true}
+{"step": 2451, "reward": 1.0, "skipped": true}
+{"step": 2452, "reward": 1.0, "skipped": true}
+{"step": 2453, "reward": 1.0, "skipped": true}
+{"step": 2454, "reward": 1.0, "skipped": true}
+{"step": 2455, "reward": 1.0, "skipped": true}
+{"step": 2456, "reward": 1.0, "skipped": true}
+{"step": 2457, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07665963657200336, "grad_norm": 8.625, "gen_len": 105.625}
+{"step": 2458, "reward": 1.0, "skipped": true}
+{"step": 2459, "reward": 1.0, "skipped": true}
+{"step": 2460, "reward": 1.0, "skipped": true}
+{"step": 2461, "reward": 1.0, "skipped": true}
+{"step": 2462, "reward": 1.0, "skipped": true}
+{"step": 2463, "reward": 1.0, "skipped": true}
+{"step": 2464, "reward": 1.0, "skipped": true}
+{"step": 2465, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12747306656092405, "grad_norm": 13.6875, "gen_len": 99.5}
+{"step": 2466, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.055086817126721144, "grad_norm": 14.5, "gen_len": 63.75}
+{"step": 2467, "reward": 1.0, "skipped": true}
+{"step": 2468, "reward": 1.0, "skipped": true}
+{"step": 2469, "reward": 1.0, "skipped": true}
+{"step": 2470, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10395344160497189, "grad_norm": 13.125, "gen_len": 62.625}
+{"step": 2471, "reward": 1.0, "skipped": true}
+{"step": 2472, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13496713992208242, "grad_norm": 27.125, "gen_len": 91.875}
+{"step": 2473, "reward": 1.0, "skipped": true}
+{"step": 2474, "reward": 1.0, "skipped": true}
+{"step": 2475, "reward": 1.0, "skipped": true}
+{"step": 2476, "reward": 1.0, "skipped": true}
+{"step": 2477, "reward": 1.0, "skipped": true}
+{"step": 2478, "reward": 1.0, "skipped": true}
+{"step": 2479, "reward": 1.0, "skipped": true}
+{"step": 2480, "reward": 1.0, "skipped": true}
+{"step": 2481, "reward": 1.0, "skipped": true}
+{"step": 2482, "reward": 1.0, "skipped": true}
+{"step": 2483, "reward": 1.0, "skipped": true}
+{"step": 2484, "reward": 1.0, "skipped": true}
+{"step": 2485, "reward": 1.0, "skipped": true}
+{"step": 2486, "reward": 1.0, "skipped": true}
+{"step": 2487, "reward": 1.0, "skipped": true}
+{"step": 2488, "reward": 1.0, "skipped": true}
+{"step": 2489, "reward": 1.0, "skipped": true}
+{"step": 2490, "reward": 1.0, "skipped": true}
+{"step": 2491, "reward": 1.0, "skipped": true}
+{"step": 2492, "reward": 1.0, "skipped": true}
+{"step": 2493, "reward": 1.0, "skipped": true}
+{"step": 2494, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0981332128867507, "grad_norm": 3.609375, "gen_len": 184.375}
+{"step": 2495, "reward": 1.0, "skipped": true}
+{"step": 2496, "reward": 1.0, "skipped": true}
+{"step": 2497, "reward": 1.0, "skipped": true}
+{"step": 2498, "reward": 1.0, "skipped": true}
+{"step": 2499, "reward": 1.0, "skipped": true}
+{"step": 2500, "eval_acc": 0.96875}
+{"step": 2500, "reward": 1.0, "skipped": true}
+{"step": 2501, "reward": 1.0, "skipped": true}
+{"step": 2502, "reward": 1.0, "skipped": true}
+{"step": 2503, "reward": 1.0, "skipped": true}
+{"step": 2504, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1222369009628892, "grad_norm": 12.625, "gen_len": 76.0}
+{"step": 2505, "reward": 1.0, "skipped": true}
+{"step": 2506, "reward": 1.0, "skipped": true}
+{"step": 2507, "reward": 1.0, "skipped": true}
+{"step": 2508, "reward": 1.0, "skipped": true}
+{"step": 2509, "reward": 1.0, "skipped": true}
+{"step": 2510, "reward": 1.0, "skipped": true}
+{"step": 2511, "reward": 1.0, "skipped": true}
+{"step": 2512, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.031233465066179633, "grad_norm": 4.40625, "gen_len": 146.875}
+{"step": 2513, "reward": 1.0, "skipped": true}
+{"step": 2514, "reward": 1.0, "skipped": true}
+{"step": 2515, "reward": 1.0, "skipped": true}
+{"step": 2516, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11746352817863226, "grad_norm": 7.3125, "gen_len": 81.0}
+{"step": 2517, "reward": 0.0, "skipped": true}
+{"step": 2518, "reward": 1.0, "skipped": true}
+{"step": 2519, "reward": 1.0, "skipped": true}
+{"step": 2520, "reward": 0.0, "skipped": true}
+{"step": 2521, "reward": 1.0, "skipped": true}
+{"step": 2522, "reward": 1.0, "skipped": true}
+{"step": 2523, "reward": 1.0, "skipped": true}
+{"step": 2524, "reward": 1.0, "skipped": true}
+{"step": 2525, "reward": 1.0, "skipped": true}
+{"step": 2526, "reward": 1.0, "skipped": true}
+{"step": 2527, "reward": 1.0, "skipped": true}
+{"step": 2528, "reward": 1.0, "skipped": true}
+{"step": 2529, "reward": 1.0, "skipped": true}
+{"step": 2530, "reward": 1.0, "skipped": true}
+{"step": 2531, "reward": 1.0, "skipped": true}
+{"step": 2532, "reward": 1.0, "skipped": true}
+{"step": 2533, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10148719511926174, "grad_norm": 17.25, "gen_len": 90.75}
+{"step": 2534, "reward": 1.0, "skipped": true}
+{"step": 2535, "reward": 1.0, "skipped": true}
+{"step": 2536, "reward": 1.0, "skipped": true}
+{"step": 2537, "reward": 1.0, "skipped": true}
+{"step": 2538, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09832949936389923, "grad_norm": 6.75, "gen_len": 99.125}
+{"step": 2539, "reward": 1.0, "skipped": true}
+{"step": 2540, "reward": 1.0, "skipped": true}
+{"step": 2541, "reward": 1.0, "skipped": true}
+{"step": 2542, "reward": 1.0, "skipped": true}
+{"step": 2543, "reward": 1.0, "skipped": true}
+{"step": 2544, "reward": 1.0, "skipped": true}
+{"step": 2545, "reward": 1.0, "skipped": true}
+{"step": 2546, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10956138093024492, "grad_norm": 8.875, "gen_len": 112.625}
+{"step": 2547, "reward": 1.0, "skipped": true}
+{"step": 2548, "reward": 1.0, "skipped": true}
+{"step": 2549, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06642183009535074, "grad_norm": 9.375, "gen_len": 164.25}
+{"step": 2550, "reward": 1.0, "skipped": true}
+{"step": 2551, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10761593747884035, "grad_norm": 7.6875, "gen_len": 166.25}
+{"step": 2552, "reward": 1.0, "skipped": true}
+{"step": 2553, "reward": 1.0, "skipped": true}
+{"step": 2554, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.21267945878207684, "grad_norm": 11.9375, "gen_len": 109.375}
+{"step": 2555, "reward": 1.0, "skipped": true}
+{"step": 2556, "reward": 1.0, "skipped": true}
+{"step": 2557, "reward": 1.0, "skipped": true}
+{"step": 2558, "reward": 1.0, "skipped": true}
+{"step": 2559, "reward": 1.0, "skipped": true}
+{"step": 2560, "reward": 1.0, "skipped": true}
+{"step": 2561, "reward": 1.0, "skipped": true}
+{"step": 2562, "reward": 1.0, "skipped": true}
+{"step": 2563, "reward": 1.0, "skipped": true}
+{"step": 2564, "reward": 1.0, "skipped": true}
+{"step": 2565, "reward": 1.0, "skipped": true}
+{"step": 2566, "reward": 1.0, "skipped": true}
+{"step": 2567, "reward": 1.0, "skipped": true}
+{"step": 2568, "reward": 1.0, "skipped": true}
+{"step": 2569, "reward": 1.0, "skipped": true}
+{"step": 2570, "reward": 1.0, "skipped": true}
+{"step": 2571, "reward": 1.0, "skipped": true}
+{"step": 2572, "reward": 1.0, "skipped": true}
+{"step": 2573, "reward": 1.0, "skipped": true}
+{"step": 2574, "reward": 1.0, "skipped": true}
+{"step": 2575, "reward": 1.0, "skipped": true}
+{"step": 2576, "reward": 1.0, "skipped": true}
+{"step": 2577, "reward": 1.0, "skipped": true}
+{"step": 2578, "reward": 1.0, "skipped": true}
+{"step": 2579, "reward": 1.0, "skipped": true}
+{"step": 2580, "reward": 1.0, "skipped": true}
+{"step": 2581, "reward": 1.0, "skipped": true}
+{"step": 2582, "reward": 1.0, "skipped": true}
+{"step": 2583, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09733403101563454, "grad_norm": 19.5, "gen_len": 76.375}
+{"step": 2584, "reward": 1.0, "skipped": true}
+{"step": 2585, "reward": 1.0, "skipped": true}
+{"step": 2586, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.19757810235023499, "grad_norm": 7.5, "gen_len": 176.875}
+{"step": 2587, "reward": 1.0, "skipped": true}
+{"step": 2588, "reward": 1.0, "skipped": true}
+{"step": 2589, "reward": 1.0, "skipped": true}
+{"step": 2590, "reward": 1.0, "skipped": true}
+{"step": 2591, "reward": 1.0, "skipped": true}
+{"step": 2592, "reward": 1.0, "skipped": true}
+{"step": 2593, "reward": 1.0, "skipped": true}
+{"step": 2594, "reward": 1.0, "skipped": true}
+{"step": 2595, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07680092472583055, "grad_norm": 12.5, "gen_len": 56.5}
+{"step": 2596, "reward": 1.0, "skipped": true}
+{"step": 2597, "reward": 1.0, "skipped": true}
+{"step": 2598, "reward": 1.0, "skipped": true}
+{"step": 2599, "reward": 1.0, "skipped": true}
+{"step": 2600, "eval_acc": 0.96875}
+{"step": 2600, "reward": 1.0, "skipped": true}
+{"step": 2601, "reward": 1.0, "skipped": true}
+{"step": 2602, "reward": 1.0, "skipped": true}
+{"step": 2603, "reward": 1.0, "skipped": true}
+{"step": 2604, "reward": 1.0, "skipped": true}
+{"step": 2605, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06994087668135762, "grad_norm": 7.25, "gen_len": 114.75}
+{"step": 2606, "reward": 1.0, "skipped": true}
+{"step": 2607, "reward": 1.0, "skipped": true}
+{"step": 2608, "reward": 1.0, "skipped": true}
+{"step": 2609, "reward": 1.0, "skipped": true}
+{"step": 2610, "reward": 1.0, "skipped": true}
+{"step": 2611, "reward": 1.0, "skipped": true}
+{"step": 2612, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08344534086063504, "grad_norm": 12.25, "gen_len": 97.75}
+{"step": 2613, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13784707989543676, "grad_norm": 4.4375, "gen_len": 145.125}
+{"step": 2614, "reward": 1.0, "skipped": true}
+{"step": 2615, "reward": 1.0, "skipped": true}
+{"step": 2616, "reward": 1.0, "skipped": true}
+{"step": 2617, "reward": 1.0, "skipped": true}
+{"step": 2618, "reward": 1.0, "skipped": true}
+{"step": 2619, "reward": 1.0, "skipped": true}
+{"step": 2620, "reward": 0.0, "skipped": true}
+{"step": 2621, "reward": 1.0, "skipped": true}
+{"step": 2622, "reward": 1.0, "skipped": true}
+{"step": 2623, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09918062947690487, "grad_norm": 5.8125, "gen_len": 147.25}
+{"step": 2624, "reward": 1.0, "skipped": true}
+{"step": 2625, "reward": 1.0, "skipped": true}
+{"step": 2626, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04845311073586345, "grad_norm": 9.0, "gen_len": 93.75}
+{"step": 2627, "reward": 1.0, "skipped": true}
+{"step": 2628, "reward": 1.0, "skipped": true}
+{"step": 2629, "reward": 1.0, "skipped": true}
+{"step": 2630, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13491062354296446, "grad_norm": 6.71875, "gen_len": 125.375}
+{"step": 2631, "reward": 1.0, "skipped": true}
+{"step": 2632, "reward": 1.0, "skipped": true}
+{"step": 2633, "reward": 1.0, "skipped": true}
+{"step": 2634, "reward": 1.0, "skipped": true}
+{"step": 2635, "reward": 1.0, "skipped": true}
+{"step": 2636, "reward": 1.0, "skipped": true}
+{"step": 2637, "reward": 1.0, "skipped": true}
+{"step": 2638, "reward": 1.0, "skipped": true}
+{"step": 2639, "reward": 1.0, "skipped": true}
+{"step": 2640, "reward": 1.0, "skipped": true}
+{"step": 2641, "reward": 1.0, "skipped": true}
+{"step": 2642, "reward": 1.0, "skipped": true}
+{"step": 2643, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07514091348275542, "grad_norm": 12.3125, "gen_len": 74.625}
+{"step": 2644, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13811921887099743, "grad_norm": 11.0625, "gen_len": 65.625}
+{"step": 2645, "reward": 1.0, "skipped": true}
+{"step": 2646, "reward": 1.0, "skipped": true}
+{"step": 2647, "reward": 1.0, "skipped": true}
+{"step": 2648, "reward": 1.0, "skipped": true}
+{"step": 2649, "reward": 1.0, "skipped": true}
+{"step": 2650, "reward": 1.0, "skipped": true}
+{"step": 2651, "reward": 1.0, "skipped": true}
+{"step": 2652, "reward": 1.0, "skipped": true}
+{"step": 2653, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12482879217714071, "grad_norm": 11.125, "gen_len": 108.125}
+{"step": 2654, "reward": 1.0, "skipped": true}
+{"step": 2655, "reward": 0.0, "skipped": true}
+{"step": 2656, "reward": 1.0, "skipped": true}
+{"step": 2657, "reward": 1.0, "skipped": true}
+{"step": 2658, "reward": 1.0, "skipped": true}
+{"step": 2659, "reward": 1.0, "skipped": true}
+{"step": 2660, "reward": 1.0, "skipped": true}
+{"step": 2661, "reward": 1.0, "skipped": true}
+{"step": 2662, "reward": 1.0, "skipped": true}
+{"step": 2663, "reward": 1.0, "skipped": true}
+{"step": 2664, "reward": 1.0, "skipped": true}
+{"step": 2665, "reward": 1.0, "skipped": true}
+{"step": 2666, "reward": 1.0, "skipped": true}
+{"step": 2667, "reward": 1.0, "skipped": true}
+{"step": 2668, "reward": 1.0, "skipped": true}
+{"step": 2669, "reward": 1.0, "skipped": true}
+{"step": 2670, "reward": 1.0, "skipped": true}
+{"step": 2671, "reward": 1.0, "skipped": true}
+{"step": 2672, "reward": 1.0, "skipped": true}
+{"step": 2673, "reward": 0.0, "skipped": true}
+{"step": 2674, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1399153769016266, "grad_norm": 9.0, "gen_len": 63.875}
+{"step": 2675, "reward": 1.0, "skipped": true}
+{"step": 2676, "reward": 1.0, "skipped": true}
+{"step": 2677, "reward": 1.0, "skipped": true}
+{"step": 2678, "reward": 1.0, "skipped": true}
+{"step": 2679, "reward": 1.0, "skipped": true}
+{"step": 2680, "reward": 1.0, "skipped": true}
+{"step": 2681, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09460034221410751, "grad_norm": 7.8125, "gen_len": 137.625}
+{"step": 2682, "reward": 1.0, "skipped": true}
+{"step": 2683, "reward": 1.0, "skipped": true}
+{"step": 2684, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0497020916081965, "grad_norm": 4.90625, "gen_len": 170.125}
+{"step": 2685, "reward": 1.0, "skipped": true}
+{"step": 2686, "reward": 1.0, "skipped": true}
+{"step": 2687, "reward": 1.0, "skipped": true}
+{"step": 2688, "reward": 1.0, "skipped": true}
+{"step": 2689, "reward": 1.0, "skipped": true}
+{"step": 2690, "reward": 1.0, "skipped": true}
+{"step": 2691, "reward": 1.0, "skipped": true}
+{"step": 2692, "reward": 1.0, "skipped": true}
+{"step": 2693, "reward": 1.0, "skipped": true}
+{"step": 2694, "reward": 1.0, "skipped": true}
+{"step": 2695, "reward": 1.0, "skipped": true}
+{"step": 2696, "reward": 1.0, "skipped": true}
+{"step": 2697, "reward": 1.0, "skipped": true}
+{"step": 2698, "reward": 1.0, "skipped": true}
+{"step": 2699, "reward": 1.0, "skipped": true}
+{"step": 2700, "eval_acc": 0.96875}
+{"step": 2700, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07763935253024101, "grad_norm": 11.9375, "gen_len": 97.875}
+{"step": 2701, "reward": 1.0, "skipped": true}
+{"step": 2702, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0659140613861382, "grad_norm": 5.78125, "gen_len": 87.75}
+{"step": 2703, "reward": 1.0, "skipped": true}
+{"step": 2704, "reward": 1.0, "skipped": true}
+{"step": 2705, "reward": 1.0, "skipped": true}
+{"step": 2706, "reward": 1.0, "skipped": true}
+{"step": 2707, "reward": 1.0, "skipped": true}
+{"step": 2708, "reward": 1.0, "skipped": true}
+{"step": 2709, "reward": 1.0, "skipped": true}
+{"step": 2710, "reward": 1.0, "skipped": true}
+{"step": 2711, "reward": 1.0, "skipped": true}
+{"step": 2712, "reward": 1.0, "skipped": true}
+{"step": 2713, "reward": 1.0, "skipped": true}
+{"step": 2714, "reward": 1.0, "skipped": true}
+{"step": 2715, "reward": 1.0, "skipped": true}
+{"step": 2716, "reward": 1.0, "skipped": true}
+{"step": 2717, "reward": 1.0, "skipped": true}
+{"step": 2718, "reward": 1.0, "skipped": true}
+{"step": 2719, "reward": 1.0, "skipped": true}
+{"step": 2720, "reward": 1.0, "skipped": true}
+{"step": 2721, "reward": 1.0, "skipped": true}
+{"step": 2722, "reward": 1.0, "skipped": true}
+{"step": 2723, "reward": 1.0, "skipped": true}
+{"step": 2724, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.03642707038670778, "grad_norm": 15.6875, "gen_len": 128.625}
+{"step": 2725, "reward": 1.0, "skipped": true}
+{"step": 2726, "reward": 1.0, "skipped": true}
+{"step": 2727, "reward": 1.0, "skipped": true}
+{"step": 2728, "reward": 1.0, "skipped": true}
+{"step": 2729, "reward": 1.0, "skipped": true}
+{"step": 2730, "reward": 1.0, "skipped": true}
+{"step": 2731, "reward": 1.0, "skipped": true}
+{"step": 2732, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10005278326570988, "grad_norm": 42.5, "gen_len": 133.25}
+{"step": 2733, "reward": 1.0, "skipped": true}
+{"step": 2734, "reward": 1.0, "skipped": true}
+{"step": 2735, "reward": 1.0, "skipped": true}
+{"step": 2736, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.11970955040305853, "grad_norm": 9.625, "gen_len": 80.875}
+{"step": 2737, "reward": 1.0, "skipped": true}
+{"step": 2738, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.043321031145751476, "grad_norm": 10.25, "gen_len": 81.375}
+{"step": 2739, "reward": 1.0, "skipped": true}
+{"step": 2740, "reward": 1.0, "skipped": true}
+{"step": 2741, "reward": 1.0, "skipped": true}
+{"step": 2742, "reward": 1.0, "skipped": true}
+{"step": 2743, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07826842600479722, "grad_norm": 9.0, "gen_len": 96.75}
+{"step": 2744, "reward": 1.0, "skipped": true}
+{"step": 2745, "reward": 1.0, "skipped": true}
+{"step": 2746, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08217091509141028, "grad_norm": 4.71875, "gen_len": 178.75}
+{"step": 2747, "reward": 1.0, "skipped": true}
+{"step": 2748, "reward": 1.0, "skipped": true}
+{"step": 2749, "reward": 1.0, "skipped": true}
+{"step": 2750, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12277055345475674, "grad_norm": 4.09375, "gen_len": 199.375}
+{"step": 2751, "reward": 1.0, "skipped": true}
+{"step": 2752, "reward": 1.0, "skipped": true}
+{"step": 2753, "reward": 1.0, "skipped": true}
+{"step": 2754, "reward": 1.0, "skipped": true}
+{"step": 2755, "reward": 1.0, "skipped": true}
+{"step": 2756, "reward": 1.0, "skipped": true}
+{"step": 2757, "reward": 1.0, "skipped": true}
+{"step": 2758, "reward": 1.0, "skipped": true}
+{"step": 2759, "reward": 1.0, "skipped": true}
+{"step": 2760, "reward": 1.0, "skipped": true}
+{"step": 2761, "reward": 1.0, "skipped": true}
+{"step": 2762, "reward": 1.0, "skipped": true}
+{"step": 2763, "reward": 1.0, "skipped": true}
+{"step": 2764, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1368825971148908, "grad_norm": 7.90625, "gen_len": 122.25}
+{"step": 2765, "reward": 0.0, "skipped": true}
+{"step": 2766, "reward": 1.0, "skipped": true}
+{"step": 2767, "reward": 1.0, "skipped": true}
+{"step": 2768, "reward": 1.0, "skipped": true}
+{"step": 2769, "reward": 1.0, "skipped": true}
+{"step": 2770, "reward": 0.0, "skipped": true}
+{"step": 2771, "reward": 1.0, "skipped": true}
+{"step": 2772, "reward": 1.0, "skipped": true}
+{"step": 2773, "reward": 1.0, "skipped": true}
+{"step": 2774, "reward": 1.0, "skipped": true}
+{"step": 2775, "reward": 1.0, "skipped": true}
+{"step": 2776, "reward": 1.0, "skipped": true}
+{"step": 2777, "reward": 1.0, "skipped": true}
+{"step": 2778, "reward": 1.0, "skipped": true}
+{"step": 2779, "reward": 1.0, "skipped": true}
+{"step": 2780, "reward": 1.0, "skipped": true}
+{"step": 2781, "reward": 1.0, "skipped": true}
+{"step": 2782, "reward": 1.0, "skipped": true}
+{"step": 2783, "reward": 1.0, "skipped": true}
+{"step": 2784, "reward": 1.0, "skipped": true}
+{"step": 2785, "reward": 1.0, "skipped": true}
+{"step": 2786, "reward": 1.0, "skipped": true}
+{"step": 2787, "reward": 1.0, "skipped": true}
+{"step": 2788, "reward": 1.0, "skipped": true}
+{"step": 2789, "reward": 1.0, "skipped": true}
+{"step": 2790, "reward": 1.0, "skipped": true}
+{"step": 2791, "reward": 1.0, "skipped": true}
+{"step": 2792, "reward": 1.0, "skipped": true}
+{"step": 2793, "reward": 1.0, "skipped": true}
+{"step": 2794, "reward": 1.0, "skipped": true}
+{"step": 2795, "reward": 1.0, "skipped": true}
+{"step": 2796, "reward": 1.0, "skipped": true}
+{"step": 2797, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0647605643607676, "grad_norm": 7.4375, "gen_len": 104.875}
+{"step": 2798, "reward": 1.0, "skipped": true}
+{"step": 2799, "reward": 1.0, "skipped": true}
+{"step": 2800, "eval_acc": 0.9375}
+{"step": 2800, "reward": 1.0, "skipped": true}
+{"step": 2801, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0475973323918879, "grad_norm": 4.40625, "gen_len": 127.25}
+{"step": 2802, "reward": 1.0, "skipped": true}
+{"step": 2803, "reward": 1.0, "skipped": true}
+{"step": 2804, "reward": 1.0, "skipped": true}
+{"step": 2805, "reward": 1.0, "skipped": true}
+{"step": 2806, "reward": 1.0, "skipped": true}
+{"step": 2807, "reward": 1.0, "skipped": true}
+{"step": 2808, "reward": 1.0, "skipped": true}
+{"step": 2809, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.15326355770230293, "grad_norm": 8.125, "gen_len": 110.0}
+{"step": 2810, "reward": 1.0, "skipped": true}
+{"step": 2811, "reward": 1.0, "skipped": true}
+{"step": 2812, "reward": 1.0, "skipped": true}
+{"step": 2813, "reward": 1.0, "skipped": true}
+{"step": 2814, "reward": 1.0, "skipped": true}
+{"step": 2815, "reward": 1.0, "skipped": true}
+{"step": 2816, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08307138131931424, "grad_norm": 9.875, "gen_len": 116.75}
+{"step": 2817, "reward": 1.0, "skipped": true}
+{"step": 2818, "reward": 1.0, "skipped": true}
+{"step": 2819, "reward": 1.0, "skipped": true}
+{"step": 2820, "reward": 1.0, "skipped": true}
+{"step": 2821, "reward": 1.0, "skipped": true}
+{"step": 2822, "reward": 1.0, "skipped": true}
+{"step": 2823, "reward": 1.0, "skipped": true}
+{"step": 2824, "reward": 1.0, "skipped": true}
+{"step": 2825, "reward": 1.0, "skipped": true}
+{"step": 2826, "reward": 1.0, "skipped": true}
+{"step": 2827, "reward": 1.0, "skipped": true}
+{"step": 2828, "reward": 1.0, "skipped": true}
+{"step": 2829, "reward": 1.0, "skipped": true}
+{"step": 2830, "reward": 0.0, "skipped": true}
+{"step": 2831, "reward": 1.0, "skipped": true}
+{"step": 2832, "reward": 1.0, "skipped": true}
+{"step": 2833, "reward": 1.0, "skipped": true}
+{"step": 2834, "reward": 1.0, "skipped": true}
+{"step": 2835, "reward": 1.0, "skipped": true}
+{"step": 2836, "reward": 1.0, "skipped": true}
+{"step": 2837, "reward": 1.0, "skipped": true}
+{"step": 2838, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.058389381505548954, "grad_norm": 5.78125, "gen_len": 126.375}
+{"step": 2839, "reward": 1.0, "skipped": true}
+{"step": 2840, "reward": 1.0, "skipped": true}
+{"step": 2841, "reward": 1.0, "skipped": true}
+{"step": 2842, "reward": 1.0, "skipped": true}
+{"step": 2843, "reward": 1.0, "skipped": true}
+{"step": 2844, "reward": 1.0, "skipped": true}
+{"step": 2845, "reward": 1.0, "skipped": true}
+{"step": 2846, "reward": 1.0, "skipped": true}
+{"step": 2847, "reward": 1.0, "skipped": true}
+{"step": 2848, "reward": 1.0, "skipped": true}
+{"step": 2849, "reward": 0.0, "skipped": true}
+{"step": 2850, "reward": 1.0, "skipped": true}
+{"step": 2851, "reward": 1.0, "skipped": true}
+{"step": 2852, "reward": 1.0, "skipped": true}
+{"step": 2853, "reward": 1.0, "skipped": true}
+{"step": 2854, "reward": 1.0, "skipped": true}
+{"step": 2855, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06166839599609375, "grad_norm": 6.71875, "gen_len": 142.125}
+{"step": 2856, "reward": 1.0, "skipped": true}
+{"step": 2857, "reward": 1.0, "skipped": true}
+{"step": 2858, "reward": 1.0, "skipped": true}
+{"step": 2859, "reward": 1.0, "skipped": true}
+{"step": 2860, "reward": 1.0, "skipped": true}
+{"step": 2861, "reward": 1.0, "skipped": true}
+{"step": 2862, "reward": 1.0, "skipped": true}
+{"step": 2863, "reward": 1.0, "skipped": true}
+{"step": 2864, "reward": 1.0, "skipped": true}
+{"step": 2865, "reward": 1.0, "skipped": true}
+{"step": 2866, "reward": 1.0, "skipped": true}
+{"step": 2867, "reward": 0.0, "skipped": true}
+{"step": 2868, "reward": 1.0, "skipped": true}
+{"step": 2869, "reward": 1.0, "skipped": true}
+{"step": 2870, "reward": 1.0, "skipped": true}
+{"step": 2871, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.04028009856119752, "grad_norm": 4.96875, "gen_len": 188.125}
+{"step": 2872, "reward": 1.0, "skipped": true}
+{"step": 2873, "reward": 1.0, "skipped": true}
+{"step": 2874, "reward": 1.0, "skipped": true}
+{"step": 2875, "reward": 1.0, "skipped": true}
+{"step": 2876, "reward": 1.0, "skipped": true}
+{"step": 2877, "reward": 1.0, "skipped": true}
+{"step": 2878, "reward": 1.0, "skipped": true}
+{"step": 2879, "reward": 1.0, "skipped": true}
+{"step": 2880, "reward": 1.0, "skipped": true}
+{"step": 2881, "reward": 1.0, "skipped": true}
+{"step": 2882, "reward": 0.0, "skipped": true}
+{"step": 2883, "reward": 1.0, "skipped": true}
+{"step": 2884, "reward": 1.0, "skipped": true}
+{"step": 2885, "reward": 1.0, "skipped": true}
+{"step": 2886, "reward": 1.0, "skipped": true}
+{"step": 2887, "reward": 1.0, "skipped": true}
+{"step": 2888, "reward": 1.0, "skipped": true}
+{"step": 2889, "reward": 1.0, "skipped": true}
+{"step": 2890, "reward": 0.5, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07600061036646366, "grad_norm": 14.4375, "gen_len": 85.125}
+{"step": 2891, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.088618578389287, "grad_norm": 7.125, "gen_len": 119.125}
+{"step": 2892, "reward": 1.0, "skipped": true}
+{"step": 2893, "reward": 1.0, "skipped": true}
+{"step": 2894, "reward": 1.0, "skipped": true}
+{"step": 2895, "reward": 1.0, "skipped": true}
+{"step": 2896, "reward": 1.0, "skipped": true}
+{"step": 2897, "reward": 1.0, "skipped": true}
+{"step": 2898, "reward": 1.0, "skipped": true}
+{"step": 2899, "reward": 0.0, "skipped": true}
+{"step": 2900, "eval_acc": 0.9375}
+{"step": 2900, "reward": 1.0, "skipped": true}
+{"step": 2901, "reward": 1.0, "skipped": true}
+{"step": 2902, "reward": 1.0, "skipped": true}
+{"step": 2903, "reward": 1.0, "skipped": true}
+{"step": 2904, "reward": 1.0, "skipped": true}
+{"step": 2905, "reward": 1.0, "skipped": true}
+{"step": 2906, "reward": 1.0, "skipped": true}
+{"step": 2907, "reward": 1.0, "skipped": true}
+{"step": 2908, "reward": 1.0, "skipped": true}
+{"step": 2909, "reward": 1.0, "skipped": true}
+{"step": 2910, "reward": 1.0, "skipped": true}
+{"step": 2911, "reward": 1.0, "skipped": true}
+{"step": 2912, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07050236966460943, "grad_norm": 4.625, "gen_len": 125.75}
+{"step": 2913, "reward": 1.0, "skipped": true}
+{"step": 2914, "reward": 1.0, "skipped": true}
+{"step": 2915, "reward": 1.0, "skipped": true}
+{"step": 2916, "reward": 1.0, "skipped": true}
+{"step": 2917, "reward": 1.0, "skipped": true}
+{"step": 2918, "reward": 1.0, "skipped": true}
+{"step": 2919, "reward": 1.0, "skipped": true}
+{"step": 2920, "reward": 1.0, "skipped": true}
+{"step": 2921, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.10705312760546803, "grad_norm": 6.34375, "gen_len": 165.375}
+{"step": 2922, "reward": 1.0, "skipped": true}
+{"step": 2923, "reward": 1.0, "skipped": true}
+{"step": 2924, "reward": 1.0, "skipped": true}
+{"step": 2925, "reward": 1.0, "skipped": true}
+{"step": 2926, "reward": 1.0, "skipped": true}
+{"step": 2927, "reward": 1.0, "skipped": true}
+{"step": 2928, "reward": 1.0, "skipped": true}
+{"step": 2929, "reward": 1.0, "skipped": true}
+{"step": 2930, "reward": 1.0, "skipped": true}
+{"step": 2931, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07730741752311587, "grad_norm": 12.4375, "gen_len": 75.0}
+{"step": 2932, "reward": 1.0, "skipped": true}
+{"step": 2933, "reward": 1.0, "skipped": true}
+{"step": 2934, "reward": 1.0, "skipped": true}
+{"step": 2935, "reward": 0.0, "skipped": true}
+{"step": 2936, "reward": 1.0, "skipped": true}
+{"step": 2937, "reward": 0.625, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.08111697435379028, "grad_norm": 6.25, "gen_len": 134.625}
+{"step": 2938, "reward": 1.0, "skipped": true}
+{"step": 2939, "reward": 1.0, "skipped": true}
+{"step": 2940, "reward": 1.0, "skipped": true}
+{"step": 2941, "reward": 1.0, "skipped": true}
+{"step": 2942, "reward": 1.0, "skipped": true}
+{"step": 2943, "reward": 1.0, "skipped": true}
+{"step": 2944, "reward": 1.0, "skipped": true}
+{"step": 2945, "reward": 0.25, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.07041318388655782, "grad_norm": 11.6875, "gen_len": 86.0}
+{"step": 2946, "reward": 1.0, "skipped": true}
+{"step": 2947, "reward": 1.0, "skipped": true}
+{"step": 2948, "reward": 1.0, "skipped": true}
+{"step": 2949, "reward": 1.0, "skipped": true}
+{"step": 2950, "reward": 1.0, "skipped": true}
+{"step": 2951, "reward": 1.0, "skipped": true}
+{"step": 2952, "reward": 1.0, "skipped": true}
+{"step": 2953, "reward": 1.0, "skipped": true}
+{"step": 2954, "reward": 1.0, "skipped": true}
+{"step": 2955, "reward": 1.0, "skipped": true}
+{"step": 2956, "reward": 1.0, "skipped": true}
+{"step": 2957, "reward": 1.0, "skipped": true}
+{"step": 2958, "reward": 1.0, "skipped": true}
+{"step": 2959, "reward": 1.0, "skipped": true}
+{"step": 2960, "reward": 1.0, "skipped": true}
+{"step": 2961, "reward": 1.0, "skipped": true}
+{"step": 2962, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.06363177904859185, "grad_norm": 17.875, "gen_len": 92.0}
+{"step": 2963, "reward": 1.0, "skipped": true}
+{"step": 2964, "reward": 1.0, "skipped": true}
+{"step": 2965, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.13871816731989384, "grad_norm": 8.6875, "gen_len": 152.875}
+{"step": 2966, "reward": 1.0, "skipped": true}
+{"step": 2967, "reward": 1.0, "skipped": true}
+{"step": 2968, "reward": 1.0, "skipped": true}
+{"step": 2969, "reward": 1.0, "skipped": true}
+{"step": 2970, "reward": 1.0, "skipped": true}
+{"step": 2971, "reward": 1.0, "skipped": true}
+{"step": 2972, "reward": 1.0, "skipped": true}
+{"step": 2973, "reward": 1.0, "skipped": true}
+{"step": 2974, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0327989412471652, "grad_norm": 4.96875, "gen_len": 103.375}
+{"step": 2975, "reward": 1.0, "skipped": true}
+{"step": 2976, "reward": 0.75, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.09846675116568804, "grad_norm": 20.25, "gen_len": 59.625}
+{"step": 2977, "reward": 1.0, "skipped": true}
+{"step": 2978, "reward": 1.0, "skipped": true}
+{"step": 2979, "reward": 1.0, "skipped": true}
+{"step": 2980, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12734565697610378, "grad_norm": 12.875, "gen_len": 97.5}
+{"step": 2981, "reward": 1.0, "skipped": true}
+{"step": 2982, "reward": 1.0, "skipped": true}
+{"step": 2983, "reward": 1.0, "skipped": true}
+{"step": 2984, "reward": 1.0, "skipped": true}
+{"step": 2985, "reward": 0.875, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.1202637953683734, "grad_norm": 5.15625, "gen_len": 134.125}
+{"step": 2986, "reward": 1.0, "skipped": true}
+{"step": 2987, "reward": 1.0, "skipped": true}
+{"step": 2988, "reward": 0.125, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.0588364745490253, "grad_norm": 10.5625, "gen_len": 64.0}
+{"step": 2989, "reward": 0.375, "clip_frac": 0.0, "ratio_dev_max": 0.0, "entropy": 0.12574308179318905, "grad_norm": 10.25, "gen_len": 103.625}
+{"step": 2990, "reward": 0.0, "skipped": true}
+{"step": 2991, "reward": 1.0, "skipped": true}
+{"step": 2992, "reward": 1.0, "skipped": true}
+{"step": 2993, "reward": 1.0, "skipped": true}
+{"step": 2994, "reward": 1.0, "skipped": true}
+{"step": 2995, "reward": 1.0, "skipped": true}
+{"step": 2996, "reward": 1.0, "skipped": true}
+{"step": 2997, "reward": 1.0, "skipped": true}
+{"step": 2998, "reward": 1.0, "skipped": true}
+{"step": 2999, "reward": 1.0, "skipped": true}
+{"step": 3000, "eval_acc": 0.96875}
