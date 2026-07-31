@@ -66,6 +66,17 @@ def max_factor_leq_n(m: int, n: int) -> int:
         i += 1
     return max_factor
 
+
+def load_ref_model(model_name, world_size, max_num_pages=16, page_size=4096):
+    """Load a frozen reference model (its own weights + KV cache)."""
+    from models.modeling_qwen3 import Qwen3ForCausalLM
+    m = Qwen3ForCausalLM.from_pretrained(
+        model_name, world_size, max_num_pages=max_num_pages,
+        page_size=page_size).to("cuda")
+    m.eval()
+    return m
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--use-mirage", action="store_true", help="Use Mirage kernels")
@@ -163,6 +174,17 @@ if __name__ == "__main__":
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top_p", type=float, default=1.0)
     parser.add_argument("--top_k", type=int, default=0)
+    parser.add_argument(
+        "--reference", action="store_true",
+        help="Co-compile a reference-model forward into the SAME task graph "
+        "and capture its per-token logprobs (KL-penalty reference pass with "
+        "no second engine). With --reference-model unset the reference "
+        "shares the policy checkpoint, so ref logprobs must equal the "
+        "policy's bit-for-bit -- a correctness check for the second forward.")
+    parser.add_argument(
+        "--reference-model", type=str, default=None,
+        help="HF name/path of the frozen reference model (defaults to the "
+        "policy checkpoint for validation).")
     parser.add_argument("--do-sample", dest="do_sample", action="store_true", help="Enable sampling (default off)")
     parser.add_argument(
         "--save-tokens",
@@ -300,6 +322,11 @@ if __name__ == "__main__":
     input_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
     output_tokens = torch.full((args.max_num_batched_tokens, 1), 0, dtype=torch.long, device="cuda")
     prob_buffer_torch = torch.zeros(
+        (args.max_num_batched_tokens, args.max_seq_length),
+        dtype=torch.float32,
+        device="cuda",
+    )
+    ref_prob_buffer_torch = torch.zeros(
         (args.max_num_batched_tokens, args.max_seq_length),
         dtype=torch.float32,
         device="cuda",
@@ -907,6 +934,181 @@ if __name__ == "__main__":
                 block_dim = (128, 1, 1),
             )
 
+        if args.reference:
+            # ── Reference-model forward, co-compiled into the SAME tGraph ──
+            # A second full forward (embed -> layers -> norm -> lm_head) over
+            # the same input token, with the reference model's weights and
+            # its OWN paged KV cache, feeding a teacher-forcing capture that
+            # gathers P_ref(chosen token) into ref_prob_buffer. No sampling
+            # (the reference only scores). Its tasks share the SMs with the
+            # policy decode -- the KL reference pass with no second engine.
+            ref_model = model if args.reference_model is None else \
+                load_ref_model(args.reference_model, world_size,
+                               args.max_num_pages, args.page_size)
+            # ALWAYS a fresh physical KV cache (same shape / paged metadata):
+            # even when ref shares the policy checkpoint, it must not write
+            # into the policy's cache slots -- that would alias the two
+            # forwards' K/V. Shape mirrors model.model.kv_cache.
+            _pkc, _pvc = model.model.kv_cache
+            ref_kv = (torch.empty_like(_pkc), torch.empty_like(_pvc))
+            def rin(t, name):
+                return mpk.attach_input(torch_tensor=t, name=name)
+            rx = rin(input_tokens, "input_token_ref")
+            ry = mpk.new_tensor(dims=(args.max_num_batched_tokens, hidden_size),
+                                dtype=mi.bfloat16, name="embed_out_ref",
+                                io_category="cuda_tensor")
+            r_rms = mpk.new_tensor(dims=(args.max_num_batched_tokens, hidden_size),
+                                   dtype=mi.bfloat16, name="rmsnorm_out_ref",
+                                   io_category="cuda_tensor")
+            r_attn_in = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, fused_outdim_1 // world_size),
+                dtype=mi.bfloat16, name="attn_in_ref", io_category="cuda_tensor")
+            r_attn_out = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, num_local_q_heads * head_dim),
+                dtype=mi.bfloat16, name="attn_out_ref", io_category="cuda_tensor")
+            r_attn_proj = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, hidden_size),
+                dtype=mi.bfloat16, name="attn_proj_out_ref",
+                io_category="cuda_tensor")
+            r_mlp_mid = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, fused_outdim_2 // world_size),
+                dtype=mi.bfloat16, name="mlp_mid_ref", io_category="cuda_tensor")
+            r_silu = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, intermediate_size // world_size),
+                dtype=mi.bfloat16, name="silu_mul_out_ref",
+                io_category="cuda_tensor")
+            r_logits = mpk.new_tensor(
+                dims=(args.max_num_batched_tokens, vocab_size),
+                dtype=mi.bfloat16, name="argmax_in_ref", io_category="cuda_tensor")
+
+            rw_embed = rin(ref_model.model.embed_tokens.weight, "embed_tokens_ref")
+            mpk.embed_layer(input=rx, weight=rw_embed, output=ry,
+                            grid_dim=(1, 1, 1), block_dim=(128, 1, 1),
+                            input_source=1)
+            rx_h = ry
+            for i, layer in enumerate(ref_model.model.layers):
+                p = f"ref_layer_{i}_"
+                w_norm = rin(layer.input_layernorm.weight, p + "input_ln")
+                w_q = rin(layer.self_attn.q_proj.weight, p + "q_proj")
+                w_k = rin(layer.self_attn.k_proj.weight, p + "k_proj")
+                w_v = rin(layer.self_attn.v_proj.weight, p + "v_proj")
+                w_qkv = mpk.shuffle_tensors(
+                    inputs=[w_q, w_k, w_v], shuffled_dim=0,
+                    num_groups=model.config.num_key_value_heads // world_size,
+                    name=p + "qkv_proj")
+                mpk.rmsnorm_layer(input=rx_h, weight=w_norm, output=r_rms,
+                                  grid_dim=(mpk.max_num_batched_tokens, 1, 1),
+                                  block_dim=(128, 1, 1))
+                mpk.linear_layer(
+                    input=r_rms, weight=w_qkv, output=r_attn_in,
+                    grid_dim=(grid_for_rmsnorm_linear_layer(
+                        w_qkv.dim(0), args.use_cutlass_kernel), 1, 1),
+                    block_dim=(128, 1, 1))
+                w_q_norm = rin(layer.self_attn.q_norm.weight, p + "q_norm")
+                w_k_norm = rin(layer.self_attn.k_norm.weight, p + "k_norm")
+                r_kc = rin(ref_kv[0][i], p + "k_cache")
+                r_vc = rin(ref_kv[1][i], p + "v_cache")
+                mpk.paged_attention_layer(
+                    input=r_attn_in, k_cache=r_kc, v_cache=r_vc,
+                    q_norm=w_q_norm, k_norm=w_k_norm,
+                    cos_pos_embed=cos_pos_embed, sin_pos_embed=sin_pos_embed,
+                    output=r_attn_out,
+                    grid_dim=(mpk.max_num_batched_requests, num_local_kv_heads, 1),
+                    block_dim=(128, 1, 1))
+                w_o = rin(layer.self_attn.o_proj.weight, p + "o_proj")
+                if use_splitk and args.deterministic:
+                    num_splits = 128 * 128 // hidden_size
+                    o_part = mpk.new_tensor(
+                        dims=(num_splits * args.max_num_batched_tokens, hidden_size),
+                        dtype=mi.bfloat16, name=p + "o_partials",
+                        io_category="cuda_tensor")
+                    mpk.splitk_linear_det_layer(
+                        input=r_attn_out, weight=w_o, residual=rx_h,
+                        partials=o_part, output=r_attn_proj,
+                        grid_dim=(hidden_size // 128, num_splits, 1),
+                        block_dim=(256, 1, 1),
+                        reduce_grid_dim=(hidden_size // 128, 1, 1))
+                elif use_splitk:
+                    r_attn_proj = rx_h
+                    mpk.splitk_linear_layer(
+                        input=r_attn_out, weight=w_o, output=r_attn_proj,
+                        grid_dim=(hidden_size // 128, 128 * 128 // hidden_size, 1),
+                        block_dim=(256, 1, 1))
+                else:
+                    mpk.linear_with_residual_layer(
+                        input=r_attn_out, weight=w_o, residual=rx_h,
+                        output=r_attn_proj, grid_dim=(hidden_size // 64, 1, 1),
+                        block_dim=(128, 1, 1))
+                rx_h = r_attn_proj
+                w_pnorm = rin(layer.post_attention_layernorm.weight,
+                              p + "post_ln")
+                w_gate = rin(layer.mlp.gate_proj.weight, p + "gate")
+                w_up = rin(layer.mlp.up_proj.weight, p + "up")
+                n_tasks = grid_for_rmsnorm_linear_layer(
+                    w_gate.dim(0) + w_up.dim(0), args.use_cutlass_kernel)
+                w_gu = mpk.shuffle_tensors(inputs=[w_gate, w_up], shuffled_dim=0,
+                                           num_groups=n_tasks // 2,
+                                           name=p + "gatedup")
+                mpk.rmsnorm_layer(input=rx_h, weight=w_pnorm, output=r_rms,
+                                  grid_dim=(mpk.max_num_batched_tokens, 1, 1),
+                                  block_dim=(128, 1, 1))
+                mpk.linear_layer(input=r_rms, weight=w_gu, output=r_mlp_mid,
+                                 grid_dim=(n_tasks, 1, 1), block_dim=(128, 1, 1))
+                mpk.silu_mul_layer(input=r_mlp_mid, output=r_silu,
+                                   grid_dim=(n_tasks // 2, 1, 1),
+                                   block_dim=(128, 1, 1))
+                w_down = rin(layer.mlp.down_proj.weight, p + "down")
+                if use_splitk and args.deterministic:
+                    num_splits = 128 * 128 // hidden_size
+                    d_part = mpk.new_tensor(
+                        dims=(num_splits * args.max_num_batched_tokens, hidden_size),
+                        dtype=mi.bfloat16, name=p + "down_partials",
+                        io_category="cuda_tensor")
+                    mpk.splitk_linear_det_layer(
+                        input=r_silu, weight=w_down, residual=rx_h,
+                        partials=d_part, output=r_attn_proj,
+                        grid_dim=(hidden_size // 128, num_splits, 1),
+                        block_dim=(256, 1, 1),
+                        reduce_grid_dim=(hidden_size // 128, 1, 1))
+                    rx_h = r_attn_proj
+                elif use_splitk:
+                    mpk.splitk_linear_layer(
+                        input=r_silu, weight=w_down, output=rx_h,
+                        grid_dim=(hidden_size // 128, 128 * 128 // hidden_size, 1),
+                        block_dim=(256, 1, 1))
+                else:
+                    r_mlp_out = mpk.new_tensor(
+                        dims=(args.max_num_batched_tokens, hidden_size),
+                        dtype=mi.bfloat16, name=p + "mlp_out",
+                        io_category="cuda_tensor")
+                    mpk.linear_with_residual_layer(
+                        input=r_silu, weight=w_down, residual=rx_h,
+                        output=r_mlp_out, grid_dim=(hidden_size // 64, 1, 1),
+                        block_dim=(128, 1, 1))
+                    rx_h = r_mlp_out
+            w_fnorm = rin(ref_model.model.norm.weight, "ref_norm")
+            ref_lm_head = torch.cat(
+                (ref_model.lm_head.weight,
+                 torch.full((vocab_size - model.config.vocab_size, hidden_size),
+                            0, device="cuda", dtype=torch.bfloat16)), 0)
+            w_head = rin(ref_lm_head, "ref_lm_head")
+            mpk.rmsnorm_layer(input=rx_h, weight=w_fnorm, output=r_rms,
+                              grid_dim=(mpk.max_num_batched_tokens, 1, 1),
+                              block_dim=(128, 1, 1))
+            mpk.linear_layer(input=r_rms, weight=w_head, output=r_logits,
+                             grid_dim=(mpk.num_workers, 1, 1),
+                             block_dim=(128, 1, 1))
+            ref_prob_buffer = mpk.attach_input(
+                torch_tensor=ref_prob_buffer_torch, name="ref_prob_buffer")
+            mpk.prefill_prob_capture_layer(
+                logits=r_logits,
+                prompt_lengths=mpk.attach_input(
+                    torch_tensor=prompt_lengths, name="prompt_lengths_for_ref"),
+                chosen_tokens=argmax_out,
+                buffer=ref_prob_buffer,
+                page_size=args.page_size,
+                grid_dim=(total_num_requests, 1, 1))
+
         results = mpk.kn_graph.generate_task_graph(num_gpus=world_size, my_gpu_id=rank)
         with open(f"task_graph_{rank}.json", "w") as f:
             f.write(results["json_file"])
@@ -1031,6 +1233,10 @@ if __name__ == "__main__":
                 probs = prob_buffer_torch[0, : step[0].item() + 1]
                 out["prob_bits"] = probs.view(torch.int32).tolist()
                 out["probs"] = probs.tolist()
+            if args.reference:
+                rprobs = ref_prob_buffer_torch[0, : step[0].item() + 1]
+                out["ref_prob_bits"] = rprobs.view(torch.int32).tolist()
+                out["ref_probs"] = rprobs.tolist()
             with open(args.dump_tokens_file, "w") as f:
                 json.dump(out, f)
             print(f"Dumped token ids to {args.dump_tokens_file}")
