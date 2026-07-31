@@ -735,7 +735,7 @@ if __name__ == "__main__":
             mpk.sampling_sm100_layer(
                 logits=argmax_in,
                 output=argmax_out,
-                grid_dim=(1, 1, 1),
+                grid_dim=(total_num_requests, 1, 1),
                 block_dim=(256, 1, 1),
                 seed=args.sampling_seed,
             )

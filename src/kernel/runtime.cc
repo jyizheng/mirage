@@ -338,7 +338,8 @@ void register_mugraph(
                 (TASK_PAGED_ATTENTION_SPLIT_KV_MERGE_SM100) ||
                 (task_type == TASK_PAGED_ATTENTION_SPLIT_KV_HOPPER) ||
                 (task_type == TASK_ATTN_SM100) ||
-                (task_type == TASK_PREFILL_PROB_CAPTURE_SM100)) {
+                (task_type == TASK_PREFILL_PROB_CAPTURE_SM100) ||
+                (task_type == TASK_SAMPLING_SM100)) {
               // Note that we assume grid_dim.x corresponds to
               // the request dimension
               task.task_metadata.request_id = bid.x;

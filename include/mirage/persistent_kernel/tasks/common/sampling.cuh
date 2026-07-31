@@ -237,7 +237,9 @@ template <uint32_t BLOCK_THREADS,
           typename DType,
           typename IdType>
 __device__ __forceinline__ void
-    sampling_from_logits_poskeyed_kernel(DType *logits,
+    sampling_from_logits_poskeyed_kernel(int const my_rid,
+                                         int const num_rid_tasks,
+                                         DType *logits,
                                          IdType *output,
                                          uint32_t d,
                                          uint64_t philox_seed,
@@ -255,7 +257,9 @@ __device__ __forceinline__ void
   extern __shared__ __align__(alignof(SharedMem)) uint8_t smem_sampling_logit[];
   auto &temp_storage = reinterpret_cast<SharedMem &>(smem_sampling_logit);
 
-  for (int rid = 0; rid < num_requests; ++rid) {
+  // Parallel over requests when launched with grid.x > 1 (task_metadata
+  // request_id): disjoint output rows, noise still f(seed, rid, pos).
+  for (int rid = my_rid; rid < num_requests; rid += num_rid_tasks) {
     int const first_token_pos = qo_indptr_buffer_ptr[rid];
     int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
     int const num_tokens = last_token_pos - first_token_pos;

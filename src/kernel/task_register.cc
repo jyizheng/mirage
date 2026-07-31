@@ -2316,8 +2316,11 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   // invariant to batch composition. IdType must be long long: the output
   // token tensor is int64 (a 4-byte IdType corrupts row 0's slot and the
   // next step's embedding reads out of bounds).
+  int grid_x = bgraph.grid_dim.x;
   code.e("kernel::sampling_from_logits_poskeyed_kernel<256, 4, bfloat16, "
          "long long>(");
+  code.e("    task_desc->task_metadata.request_id,");
+  code.e("    $,", grid_x);
   code.e("    static_cast<bfloat16*>(task_desc->input_ptrs[0]),");
   code.e("    static_cast<long long*>(task_desc->output_ptrs[0]),");
   code.e("    $,", vocab_size);
