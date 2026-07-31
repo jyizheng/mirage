@@ -767,7 +767,6 @@ if __name__ == "__main__":
                 chosen_tokens=argmax_out,
                 buffer=prob_buffer,
                 page_size=args.page_size,
-                grid_dim=(total_num_requests, 1, 1),
             )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(
