@@ -2289,7 +2289,8 @@ int TaskRegister::register_argmax_reduce_sm100_task(
 int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
                                                std::vector<int> const &params) {
   // params[0]: seed
-  assert(params.size() == 1);
+  // params[1..3] (optional): temperature*1000, top_k, top_p*1000
+  assert(params.size() == 1 || params.size() == 4);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
   int num_inputs = 1;
@@ -2308,6 +2309,11 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   int batch_size = input_ops[0]->output_tensors[0].dim[0];
   int vocab_size = input_ops[0]->output_tensors[0].dim[1];
   int seed = params[0];
+  // Defaults reproduce plain Gumbel-Max argmax (temp 1, no truncation),
+  // so graphs that pass only [seed] are bitwise-unchanged.
+  int temp_milli = params.size() == 4 ? params[1] : 1000;
+  int top_k = params.size() == 4 ? params[2] : 0;
+  int top_p_milli = params.size() == 4 ? params[3] : 1000;
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
@@ -2332,7 +2338,10 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   code.e("    runtime_config.paged_kv_last_page_len_buffer,");
   code.e("    MPK_MAX_NUM_BATCHED_REQUESTS,");
   code.e("    MPK_PAGE_SIZE,");
-  code.e("    MPK_MAX_SEQ_LENGTH);");
+  code.e("    MPK_MAX_SEQ_LENGTH,");
+  code.e("    1000.0f / $.0f,", temp_milli);
+  code.e("    $,", top_k);
+  code.e("    $);", top_p_milli);
   (void)batch_size;
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }

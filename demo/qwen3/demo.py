@@ -162,6 +162,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-new-tokens", type=int, default=None, help="Decode cap for CI determinism")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top_p", type=float, default=1.0)
+    parser.add_argument("--top_k", type=int, default=0)
     parser.add_argument("--do-sample", dest="do_sample", action="store_true", help="Enable sampling (default off)")
     parser.add_argument(
         "--save-tokens",
@@ -855,6 +856,9 @@ if __name__ == "__main__":
                 grid_dim=(total_num_requests, 1, 1),
                 block_dim=(256, 1, 1),
                 seed=args.sampling_seed,
+                temperature=(args.temperature if args.temperature > 0 else 1.0),
+                top_k=args.top_k,
+                top_p=args.top_p,
             )
         else:
             mpk.argmax_partial_layer(

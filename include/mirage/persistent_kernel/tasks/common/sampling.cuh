@@ -68,6 +68,17 @@ struct sampling_vec_t {
 
 /******************* DataAndIndex Structure *******************/
 
+// Map a bf16 value to a uint16 whose unsigned order matches the float
+// order (larger float => larger key), so "value >= tau" becomes an
+// integer key comparison usable in a deterministic bisection. Standard
+// radix-float transform: flip all bits for negatives, set the sign bit
+// for non-negatives. NaNs are not expected in logits.
+__device__ __forceinline__ uint16_t sampling_bf16_orderkey(type::bfloat16_t v) {
+  uint16_t const u = v.storage;
+  return (u & 0x8000u) ? static_cast<uint16_t>(~u)
+                       : static_cast<uint16_t>(u | 0x8000u);
+}
+
 template <typename DType, typename IdType>
 struct SamplingDataAndIndex {
   DType data;
@@ -249,7 +260,10 @@ __device__ __forceinline__ void
                                          int const *paged_kv_last_page_len_ptr,
                                          int num_requests,
                                          int page_size,
-                                         int max_seq) {
+                                         int max_seq,
+                                         float inv_temperature = 1.0f,
+                                         int top_k = 0,
+                                         int top_p_milli = 1000) {
   uint32_t const tx = threadIdx.x;
 
   using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
@@ -257,6 +271,14 @@ __device__ __forceinline__ void
                                          SAMPLING_REDUCE_ALGO>::TempStorage;
   extern __shared__ __align__(alignof(SharedMem)) uint8_t smem_sampling_logit[];
   auto &temp_storage = reinterpret_cast<SharedMem &>(smem_sampling_logit);
+
+  // Shared scratch for the deterministic threshold search: an integer
+  // counter (top-k, order-independent exact) and a float accumulator
+  // (top-p mass; single block + fixed thread layout => reproducible).
+  __shared__ int smem_thr_count;
+  __shared__ float smem_thr_mass;
+  bool const do_topk = top_k > 0;
+  bool const do_topp = top_p_milli < 1000;
 
   // Parallel over requests when launched with grid.x > 1 (task_metadata
   // request_id): disjoint output rows, noise still f(seed, rid, pos).
@@ -290,11 +312,93 @@ __device__ __forceinline__ void
       SamplingDataAndIndex<DType, IdType> max_data = {
           -cuda::std::numeric_limits<DType>::infinity(), 0};
 
-      for (uint32_t c = 0; c < sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
-           ++c) {
+      uint64_t const row_off = static_cast<uint64_t>(row) * d;
+      uint32_t const n_chunks = sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
+
+      // ---- deterministic top-k / top-p threshold on the ORDERED KEY ----
+      // bf16 bits -> uint16 monotone key (larger float => larger key), so
+      // "keep value >= tau" is an integer key comparison. Temperature (a
+      // positive scale) preserves order, so both thresholds are found by
+      // bisecting the SAME 16-bit key space; the mass sum uses the
+      // temperature-scaled logits. All reductions are integer counts or a
+      // single-block fixed-layout float sum -> reproducible run to run.
+      uint16_t keep_key = 0;  // 0 keeps everything
+      if (do_topk || do_topp) {
+        // top-p needs the normalizer once (full softmax mass, scaled).
+        float total_mass = 1.0f;
+        if (do_topp) {
+          if (tx == 0) { smem_thr_mass = 0.0f; }
+          __syncthreads();
+          float lm = 0.0f;
+          for (uint32_t c = 0; c < n_chunks; ++c) {
+            uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
+            sampling_vec_t<DType, VEC_SIZE> lv;
+            lv.fill(-cuda::std::numeric_limits<DType>::infinity());
+            if (base < d) {
+              lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
+                           tx * VEC_SIZE);
+            }
+#pragma unroll
+            for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+              if (base + j < d) {
+                lm += __expf(static_cast<float>(lv[j]) * inv_temperature);
+              }
+            }
+          }
+          atomicAdd_block(&smem_thr_mass, lm);
+          __syncthreads();
+          total_mass = smem_thr_mass;
+        }
+        float const p_target = static_cast<float>(top_p_milli) * 1e-3f;
+
+        // int math to avoid uint16 overflow at hi-lo+1 == 0x10000.
+        int lo = 0, hi = 0xFFFF;
+        // Invariant: keys in [lo, 0xFFFF] satisfy every active constraint
+        // (>= top_k elements AND >= p mass). Raise lo to the highest such
+        // key. 16 steps pin the exact bf16 boundary.
+        for (int it = 0; it < 16; ++it) {
+          uint16_t const mid = static_cast<uint16_t>(lo + ((hi - lo + 1) >> 1));
+          if (tx == 0) { smem_thr_count = 0; smem_thr_mass = 0.0f; }
+          __syncthreads();
+          int local_cnt = 0;
+          float local_mass = 0.0f;
+          for (uint32_t c = 0; c < n_chunks; ++c) {
+            uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
+            sampling_vec_t<DType, VEC_SIZE> lv;
+            lv.fill(-cuda::std::numeric_limits<DType>::infinity());
+            if (base < d) {
+              lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
+                           tx * VEC_SIZE);
+            }
+#pragma unroll
+            for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+              if (base + j >= d) { continue; }
+              if (sampling_bf16_orderkey(lv[j]) >= mid) {
+                local_cnt += 1;
+                if (do_topp) {
+                  local_mass += __expf(static_cast<float>(lv[j]) *
+                                       inv_temperature);
+                }
+              }
+            }
+          }
+          atomicAdd_block(&smem_thr_count, local_cnt);
+          if (do_topp) { atomicAdd_block(&smem_thr_mass, local_mass); }
+          __syncthreads();
+          bool ok = true;
+          if (do_topk && smem_thr_count < top_k) { ok = false; }
+          if (do_topp && smem_thr_mass < p_target * total_mass) { ok = false; }
+          lo = ok ? mid : lo;
+          hi = ok ? hi : (mid - 1);
+          __syncthreads();
+        }
+        keep_key = static_cast<uint16_t>(lo);
+      }
+
+      for (uint32_t c = 0; c < n_chunks; ++c) {
         logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
         if ((c * BLOCK_THREADS + tx) * VEC_SIZE < d) {
-          logits_vec.cast_load(logits + static_cast<uint64_t>(row) * d +
+          logits_vec.cast_load(logits + row_off +
                                c * BLOCK_THREADS * VEC_SIZE + tx * VEC_SIZE);
         }
 
@@ -309,11 +413,17 @@ __device__ __forceinline__ void
         SamplingDataAndIndex<DType, IdType> cur_data[VEC_SIZE];
 #pragma unroll
         for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+          uint32_t const idx = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
+          bool keep = idx < d;
+          if (keep && (do_topk || do_topp)) {
+            keep = sampling_bf16_orderkey(logits_vec[j]) >= keep_key;
+          }
           cur_data[j].data =
-              (c * BLOCK_THREADS + tx) * VEC_SIZE + j < d
-                  ? logits_vec[j] + gumbel_noise[j]
-                  : -cuda::std::numeric_limits<DType>::infinity();
-          cur_data[j].index = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
+              keep ? static_cast<DType>(static_cast<float>(logits_vec[j]) *
+                                        inv_temperature) +
+                         gumbel_noise[j]
+                   : -cuda::std::numeric_limits<DType>::infinity();
+          cur_data[j].index = idx;
         }
 
         max_data += BlockReduce<SamplingDataAndIndex<DType, IdType>,

@@ -2164,10 +2164,20 @@ class PersistentKernel:
         grid_dim: tuple,
         block_dim: tuple,
         seed: int = 42,
+        temperature: float = 1.0,
+        top_k: int = 0,
+        top_p: float = 1.0,
     ):
-        """Sampling from logits using Gumbel-Max trick for stochastic token generation."""
+        """Sampling from logits using Gumbel-Max for stochastic decoding.
+
+        temperature/top_k/top_p apply a deterministic truncation before the
+        Gumbel-Max draw (top-k via an exact k-th-value key threshold, top-p
+        via a fixed-order nucleus mass threshold). Defaults (T=1, k=0, p=1)
+        reproduce plain argmax-of-Gumbel bit-for-bit.
+        """
         assert logits.num_dims == 2      # (batch_size, vocab_size)
         assert output.num_dims == 2      # (batch_size, 1)
+        assert temperature > 0.0
 
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         # Replicated dmaps (NOT partitioned by grid.x): every task instance
@@ -2180,8 +2190,13 @@ class PersistentKernel:
         tb_graph.new_input(output, (-1, -1, -1), -1, True)
         self.kn_graph.customized([logits, output], tb_graph)
 
-        # Register task with seed parameter
-        self.kn_graph.register_task(tb_graph, "sampling_sm100", [seed])
+        # Params: [seed] keeps the legacy (bitwise-identical) variant;
+        # [seed, temp*1000, top_k, top_p*1000] enables truncation.
+        default = (temperature == 1.0 and top_k == 0 and top_p == 1.0)
+        params = [seed] if default else [
+            seed, int(round(temperature * 1000)), int(top_k),
+            int(round(top_p * 1000))]
+        self.kn_graph.register_task(tb_graph, "sampling_sm100", params)
 
     def find_ngram_partial_layer(
         self, input: DTensor, output: DTensor, grid_dim: tuple, block_dim: tuple, ngram_size: int = 3):
