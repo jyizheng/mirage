@@ -2125,6 +2125,7 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
   code.e("    static_cast<int const *>(task_desc->input_ptrs[1]),");
   code.e("    static_cast<long long const *>(task_desc->input_ptrs[2]),");
   code.e("    task_desc->output_ptrs[0],");
+  code.e("    runtime_config.request_ids,");
   code.e("    runtime_config.qo_indptr_buffer,");
   code.e("    runtime_config.paged_kv_indptr_buffer,");
   code.e("    runtime_config.paged_kv_last_page_len_buffer,");
