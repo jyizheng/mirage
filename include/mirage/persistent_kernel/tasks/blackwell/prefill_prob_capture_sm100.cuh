@@ -57,7 +57,10 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
   int const tid = threadIdx.x;
   int const num_threads = blockDim.x;
 
-  for (int rid = 0; rid < NUM_REQUESTS; ++rid) {
+  // Parallel over requests when launched with grid.x > 1: each block
+  // owns a disjoint set of rids (disjoint buffer rows -> condition (a)
+  // holds; per-row reduction order unchanged -> (b) holds).
+  for (int rid = blockIdx.x; rid < NUM_REQUESTS; rid += gridDim.x) {
     int const first_token_pos = qo_indptr_buffer_ptr[rid];
     int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
     int const num_tokens = last_token_pos - first_token_pos;
