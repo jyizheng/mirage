@@ -261,7 +261,8 @@ class Qwen3Builder(GraphBuilder):
         # reproducible and batch-invariant; the default tma_reduce_add
         # combine is neither).
         use_splitk = (target_cc == 100)
-        deterministic = bool(int(os.environ.get("MPK_DETERMINISTIC", "0")))
+        deterministic = getattr(self, "deterministic", False) or bool(
+            int(os.environ.get("MPK_DETERMINISTIC", "0")))
         for i in range(self.num_layers):
             prefix = f"model.layers.{i}."
             w_norm = self.mpk.attach_input(

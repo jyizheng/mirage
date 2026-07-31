@@ -39,6 +39,10 @@ class RunnerConfig:
     """Power-of-2 capacity for the CPU↔GPU pinned ring buffers."""
 
     capture_logprobs: bool = False
+
+    deterministic: bool = False
+    """Compile the deterministic kernel variants (bitwise reproducible,
+    rescore-consistent rollouts)."""
     """Wire the per-token probability-capture task into the compiled
     graph and expose logprobs through the engine (no recompute pass)."""
 
@@ -95,6 +99,7 @@ class ModelRunner:
             model_config=MirageModelConfig(with_lm_head=True),
             use_cutlass_kernel=config.use_cutlass_kernel,
             capture_logprobs=config.capture_logprobs,
+            deterministic=config.deterministic,
             **self.meta_tensors,
         )
         self.mpk = MPK(mpk_meta)

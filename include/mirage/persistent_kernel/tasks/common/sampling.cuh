@@ -243,6 +243,7 @@ __device__ __forceinline__ void
                                          IdType *output,
                                          uint32_t d,
                                          uint64_t philox_seed,
+                                         int const *request_ids_ptr,
                                          int const *qo_indptr_buffer_ptr,
                                          int const *paged_kv_indptr_buffer_ptr,
                                          int const *paged_kv_last_page_len_ptr,
@@ -274,9 +275,16 @@ __device__ __forceinline__ void
     for (int i = 0; i < num_tokens; ++i) {
       int const row = first_token_pos + i;
       int const pos = seq_len - num_tokens + i;
-      // unique per (request, position); +1 keeps offset 0 unused
+      // unique per (request, position); +1 keeps offset 0 unused.
+      // Key by BUFFER ROW (request_ids[slot]), not batch slot: the slot
+      // can change when the online window re-packs mid-request, while the
+      // row is stable for the request's lifetime. Batch mode maps them
+      // identically, so offline results are unchanged.
+      int const noise_rid =
+          request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
       uint64_t const philox_offset =
-          static_cast<uint64_t>(rid) * static_cast<uint64_t>(max_seq) + pos + 1;
+          static_cast<uint64_t>(noise_rid) * static_cast<uint64_t>(max_seq) +
+          pos + 1;
 
       sampling_vec_t<DType, VEC_SIZE> logits_vec;
       SamplingDataAndIndex<DType, IdType> max_data = {

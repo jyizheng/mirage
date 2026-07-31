@@ -2326,6 +2326,7 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   code.e("    static_cast<long long*>(task_desc->output_ptrs[0]),");
   code.e("    $,", vocab_size);
   code.e("    $,", seed);
+  code.e("    runtime_config.request_ids,");
   code.e("    runtime_config.qo_indptr_buffer,");
   code.e("    runtime_config.paged_kv_indptr_buffer,");
   code.e("    runtime_config.paged_kv_last_page_len_buffer,");

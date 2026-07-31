@@ -76,6 +76,9 @@ class MPKMetadata:
     # capture per-token P(chosen) into a [n_req, max_seq] buffer (adds a
     # capture task after the lm_head; read back by the serving layer)
     capture_logprobs: bool = False
+    # deterministic kernels (det split-K etc.); also honored via the
+    # MPK_DETERMINISTIC env var for backwards compatibility
+    deterministic: bool = False
     
     def check_valid(self):
         if self.weight_from_model:
@@ -282,6 +285,7 @@ class MPK:
         )
 
         self.capture_logprobs = args.capture_logprobs
+        self.deterministic = args.deterministic
         self.is_built = False
         self.task_graph_generated = False
         self.is_compiled = False
@@ -463,6 +467,7 @@ class MPK:
         model_builder_class = get_builder(self.model_name)
         self.model_builder = model_builder_class(self.persistent_kernel)
         self.model_builder.capture_logprobs = self.capture_logprobs
+        self.model_builder.deterministic = self.deterministic
         if self.weight_from_model:
             self.model_builder.build_from_model(model_name=self.model_name)
             self.tokenizer = self.model_builder.tokenizer

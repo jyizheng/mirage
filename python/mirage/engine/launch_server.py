@@ -189,6 +189,8 @@ def main():
     parser.add_argument("--max-num-pages", default=16, type=int)
     parser.add_argument("--page-size", default=4096, type=int)
     parser.add_argument("--output-dir", default=None, help="Output directory for compiled artifacts")
+    parser.add_argument("--deterministic", action="store_true",
+                        help="Compile deterministic kernel variants (bitwise-reproducible, rescore-consistent rollouts)")
     parser.add_argument("--capture-logprobs", action="store_true",
                         help="Compile the probability-capture task into the graph and return per-token logprobs in completions")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
@@ -201,6 +203,7 @@ def main():
         max_num_batched_requests=args.max_num_batched_requests,
         max_num_batched_tokens=args.max_num_batched_tokens,
         capture_logprobs=args.capture_logprobs,
+        deterministic=args.deterministic,
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,
         page_size=args.page_size,
