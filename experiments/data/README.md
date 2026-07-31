@@ -33,7 +33,11 @@ that produced each file and the paper section each backs.
 - `e32_mpk64.jsonl` — same with max_num_batched_tokens=64.
 - `e32_sgl.jsonl` — SGLang arm (`t_gen_s` + miles-style prefill
   rescore `t_rescore_s`).
-- `e33_mpk.jsonl` — after parallelizing the capture (+sampling) tasks.
+- `e33_mpk.jsonl` — after parallelizing the capture (+sampling) tasks
+  (superseded: this run's sampler read wrong logits rows, see 28577d8).
+- `e39_full17b.jsonl`, `e39_full8b.jsonl` — corrected runs after the
+  sampling dmap fix (1.7B and 8B, 20 steps each).
+- `e38_sgl.jsonl` — SGLang arm at Qwen3-8B.
 
 ## Serving-level checks
 - `e35_serving_rescore.log` — online-engine rollout vs teacher-forcing
