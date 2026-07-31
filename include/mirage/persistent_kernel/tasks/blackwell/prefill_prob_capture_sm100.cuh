@@ -48,6 +48,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
     int const *__restrict__ prompt_lengths_ptr,
     long long const *__restrict__ chosen_tokens_ptr,
     void *__restrict__ buffer_ptr,
+    int const *__restrict__ request_ids_ptr,
     int const *__restrict__ qo_indptr_buffer_ptr,
     int const *__restrict__ paged_kv_indptr_buffer_ptr,
     int const *__restrict__ paged_kv_last_page_len_buffer_ptr,
@@ -63,20 +64,26 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
   // task i owns rids {i, i+NUM_RID_TASKS, ...} (disjoint buffer rows, so
   // condition (a) holds; per-row reduction order unchanged, so (b) holds).
   for (int rid = my_rid; rid < NUM_REQUESTS; rid += NUM_RID_TASKS) {
+    // rid indexes BATCH SLOTS (the qo/paged window arrays). Per-request
+    // state (step, prompt_length, tokens, prob buffer) is indexed by
+    // BUFFER ROW; the scheduler maintains the slot->row map in
+    // request_ids. The two coincide in batch mode but not in online
+    // serving, where the row pool is a stack.
     int const first_token_pos = qo_indptr_buffer_ptr[rid];
     int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
     int const num_tokens = last_token_pos - first_token_pos;
     if (num_tokens <= 0) {
       continue;
     }
+    int const row = request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
     // seq_len derivation mirrors multitoken_paged_attention_sm100_task_impl
     int const first_page_pos = paged_kv_indptr_buffer_ptr[rid];
     int const last_page_pos = paged_kv_indptr_buffer_ptr[rid + 1];
     int const num_pages = last_page_pos - first_page_pos;
     int const seq_len =
         (num_pages - 1) * PAGE_SIZE + paged_kv_last_page_len_buffer_ptr[rid];
-    int const prompt_len = prompt_lengths_ptr[rid];
-    int const step_val = step_ptr[rid];
+    int const prompt_len = prompt_lengths_ptr[row];
+    int const step_val = step_ptr[row];
 
     for (int i = 0; i < num_tokens; ++i) {
       int const pos = seq_len - num_tokens + i;
@@ -87,7 +94,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
       long long target;
       if (pos + 1 < prompt_len) {
         // teacher-forcing row: the next token is a given prompt token
-        target = all_tokens_ptr[(long long)rid * MAX_SEQ + pos + 1];
+        target = all_tokens_ptr[(long long)row * MAX_SEQ + pos + 1];
       } else if (i == num_tokens - 1) {
         // generating row: capture P(token chosen this iteration). Reading
         // chosen_tokens through a graph input (not runtime_config) makes
@@ -159,7 +166,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
         float prob = __expf(logit_at_target - global_max) / global_sum;
         int const slot = step_val + i;
         if (slot >= 0 && slot < MAX_SEQ) {
-          buffer[(long long)rid * MAX_SEQ + slot] = prob;
+          buffer[(long long)row * MAX_SEQ + slot] = prob;
         }
       }
       __syncthreads();
