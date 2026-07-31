@@ -2112,12 +2112,15 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
+  int grid_x = bgraph.grid_dim.x;
   code.e("kernel::prefill_prob_capture_task_impl<cute::bfloat16_t, $, $, $, "
-         "$>(",
+         "$, $>(",
          num_requests,
          vocab_size,
          max_seq,
-         page_size);
+         page_size,
+         grid_x);
+  code.e("    task_desc->task_metadata.request_id,");
   code.e("    task_desc->input_ptrs[0],");
   code.e("    static_cast<int const *>(task_desc->input_ptrs[1]),");
   code.e("    static_cast<long long const *>(task_desc->input_ptrs[2]),");

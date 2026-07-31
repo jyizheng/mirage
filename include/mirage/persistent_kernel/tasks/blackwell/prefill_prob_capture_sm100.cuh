@@ -40,8 +40,10 @@ template <typename T,
           int NUM_REQUESTS,
           int VOCAB_SIZE,
           int MAX_SEQ,
-          int PAGE_SIZE>
+          int PAGE_SIZE,
+          int NUM_RID_TASKS = 1>
 __device__ __forceinline__ void prefill_prob_capture_task_impl(
+    int const my_rid,
     void const *__restrict__ logits_ptr,
     int const *__restrict__ prompt_lengths_ptr,
     long long const *__restrict__ chosen_tokens_ptr,
@@ -57,7 +59,10 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
   int const tid = threadIdx.x;
   int const num_threads = blockDim.x;
 
-  for (int rid = 0; rid < NUM_REQUESTS; ++rid) {
+  // Parallel over requests when the layer is launched with grid.x > 1:
+  // task i owns rids {i, i+NUM_RID_TASKS, ...} (disjoint buffer rows, so
+  // condition (a) holds; per-row reduction order unchanged, so (b) holds).
+  for (int rid = my_rid; rid < NUM_REQUESTS; rid += NUM_RID_TASKS) {
     int const first_token_pos = qo_indptr_buffer_ptr[rid];
     int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
     int const num_tokens = last_token_pos - first_token_pos;
