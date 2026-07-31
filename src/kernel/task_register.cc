@@ -2090,9 +2090,12 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
   int page_size = params[0];
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
-  int num_inputs = 3;
+  // 3 inputs (logits, prompt_lengths, chosen) + 1 output (buffer), plus an
+  // OPTIONAL 4th input: an ignored ordering-dependency tensor used by the
+  // co-compiled reference capture to schedule after the policy sampling.
   int num_outputs = 1;
-  assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
+  int num_inputs = (int)bgraph.operators.size() - num_outputs;
+  assert(num_inputs == 3 || num_inputs == 4);
   for (auto const &op : bgraph.operators) {
     assert(op->op_type == mirage::type::TB_INPUT_OP);
     if (input_ops.size() < (size_t)num_inputs) {
@@ -2101,7 +2104,8 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
       output_ops.push_back(static_cast<tb::TBInputOp *>(op));
     }
   }
-  // inputs[0]: logits [max_tokens, vocab]; inputs[1]: prompt_lengths [R]
+  // inputs[0]: logits [max_tokens, vocab]; inputs[1]: prompt_lengths [R];
+  // inputs[2]: chosen; inputs[3] (optional): ignored ordering dep.
   // outputs[0]: prob buffer [R, max_seq]
   int vocab_size = input_ops[0]->output_tensors[0].dim[1];
   // number of requests comes from prompt_lengths [R]; the prob buffer's

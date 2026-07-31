@@ -2395,21 +2395,30 @@ class PersistentKernel:
         page_size: int,
         grid_dim: tuple = (1, 1, 1),
         block_dim: tuple = (256, 1, 1),
+        order_dep: DTensor = None,  # optional: read-only scheduling edge
     ):
         """Teacher-forcing per-position probability capture: for every
         prefill row, buffer[r, step_r + i] = softmax(logits[row])[next
         prompt token]. Same softmax code as softmax_gather, so the values
-        are bitwise-comparable with the decode-side capture."""
+        are bitwise-comparable with the decode-side capture.
+
+        order_dep, if given, is added as an ignored input purely to force
+        this task to schedule AFTER order_dep's producer -- used by the
+        co-compiled reference capture to run after the policy sampling has
+        written the chosen tokens (without forking the sampling task)."""
         assert logits.num_dims == 2
         assert buffer.num_dims == 2
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         tb_graph.new_input(logits, (-1, -1, -1), -1, True)
         tb_graph.new_input(prompt_lengths, (-1, -1, -1), -1, True)
         tb_graph.new_input(chosen_tokens, (-1, -1, -1), -1, True)
+        inputs = [logits, prompt_lengths, chosen_tokens]
+        if order_dep is not None:
+            tb_graph.new_input(order_dep, (-1, -1, -1), -1, True)
+            inputs.append(order_dep)
         tb_graph.new_input(buffer, (-1, -1, -1), -1, True)
-        self.kn_graph.customized(
-            [logits, prompt_lengths, chosen_tokens, buffer], tb_graph
-        )
+        inputs.append(buffer)
+        self.kn_graph.customized(inputs, tb_graph)
         self.kn_graph.register_task(
             tb_graph, "prefill_prob_capture_sm100", [page_size]
         )

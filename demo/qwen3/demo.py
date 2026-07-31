@@ -935,6 +935,7 @@ if __name__ == "__main__":
             )
 
         if args.reference:
+            assert args.capture_probs, "--reference requires --capture-probs"
             # ── Reference-model forward, co-compiled into the SAME tGraph ──
             # A second full forward (embed -> layers -> norm -> lm_head) over
             # the same input token, with the reference model's weights and
@@ -1109,6 +1110,10 @@ if __name__ == "__main__":
             # chosen_tokens, so this input carries no scheduling dependency.
             ref_chosen = mpk.attach_input(
                 torch_tensor=output_tokens, name="ref_chosen")
+            # order_dep = the policy prob_buffer: forces this capture to run
+            # after the policy capture (hence after sampling wrote
+            # output_tokens), so ref_chosen reads the committed chosen tokens
+            # -- without forking the sampling task.
             mpk.prefill_prob_capture_layer(
                 logits=r_logits,
                 prompt_lengths=mpk.attach_input(
@@ -1116,7 +1121,8 @@ if __name__ == "__main__":
                 chosen_tokens=ref_chosen,
                 buffer=ref_prob_buffer,
                 page_size=args.page_size,
-                grid_dim=(total_num_requests, 1, 1))
+                grid_dim=(total_num_requests, 1, 1),
+                order_dep=prob_buffer)
 
         results = mpk.kn_graph.generate_task_graph(num_gpus=world_size, my_gpu_id=rank)
         with open(f"task_graph_{rank}.json", "w") as f:
