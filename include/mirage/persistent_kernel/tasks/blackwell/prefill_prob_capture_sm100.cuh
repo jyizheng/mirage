@@ -75,15 +75,16 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
     if (num_tokens <= 0) {
       continue;
     }
-    int const row = request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
+    int const req_row =
+        request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
     // seq_len derivation mirrors multitoken_paged_attention_sm100_task_impl
     int const first_page_pos = paged_kv_indptr_buffer_ptr[rid];
     int const last_page_pos = paged_kv_indptr_buffer_ptr[rid + 1];
     int const num_pages = last_page_pos - first_page_pos;
     int const seq_len =
         (num_pages - 1) * PAGE_SIZE + paged_kv_last_page_len_buffer_ptr[rid];
-    int const prompt_len = prompt_lengths_ptr[row];
-    int const step_val = step_ptr[row];
+    int const prompt_len = prompt_lengths_ptr[req_row];
+    int const step_val = step_ptr[req_row];
 
     for (int i = 0; i < num_tokens; ++i) {
       int const pos = seq_len - num_tokens + i;
@@ -94,7 +95,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
       long long target;
       if (pos + 1 < prompt_len) {
         // teacher-forcing row: the next token is a given prompt token
-        target = all_tokens_ptr[(long long)row * MAX_SEQ + pos + 1];
+        target = all_tokens_ptr[(long long)req_row * MAX_SEQ + pos + 1];
       } else if (i == num_tokens - 1) {
         // generating row: capture P(token chosen this iteration). Reading
         // chosen_tokens through a graph input (not runtime_config) makes
@@ -166,7 +167,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
         float prob = __expf(logit_at_target - global_max) / global_sum;
         int const slot = step_val + i;
         if (slot >= 0 && slot < MAX_SEQ) {
-          buffer[(long long)row * MAX_SEQ + slot] = prob;
+          buffer[(long long)req_row * MAX_SEQ + slot] = prob;
         }
       }
       __syncthreads();
