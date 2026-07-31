@@ -166,6 +166,7 @@ def run(
     for it, (prompt_ids, gold) in enumerate(data[: args.grpo_steps]):
         t0 = time.time()
         samples = rollout(prompt_ids)
+        t_rollout = time.time() - t0
         rewards = []
         for s in samples:
             text = tokenizer.decode(s["ids"][s["plen"]:],
@@ -174,6 +175,14 @@ def run(
         rw = torch.tensor(rewards, device=dev)
         adv = (rw - rw.mean()) / (rw.std() + 1e-6)
 
+        t1 = time.time()
+        with torch.no_grad():
+            for s_ in samples:
+                if s_["lp_old"]:
+                    trainer_logprobs(s_)
+        t_recompute = time.time() - t1
+
+        t2 = time.time()
         opt.zero_grad(set_to_none=True)
         losses, ratio_devs, clip_hits, n_tok = [], [], 0, 0
         worst = {}
@@ -228,6 +237,10 @@ def run(
             "loss": float(loss.item()) if losses else None,
             "grad_norm": float(gn) if losses else None,
             "gen_lens": [len(s["pos"]) for s in samples],
+            "t_rollout_s": round(t_rollout, 4),
+            "t_recompute_s": round(t_recompute, 4),
+            "t_update_s": round(time.time() - t2, 4),
+            "t_step_s": round(time.time() - t0, 4),
             "sec": time.time() - t0,
         }
         log_f.write(json.dumps(rec) + "\n")
