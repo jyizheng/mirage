@@ -1100,11 +1100,20 @@ if __name__ == "__main__":
                              block_dim=(128, 1, 1))
             ref_prob_buffer = mpk.attach_input(
                 torch_tensor=ref_prob_buffer_torch, name="ref_prob_buffer")
+            # chosen_tokens re-attaches output_tokens as a fresh graph INPUT
+            # ("ref_chosen") rather than reusing the sampling task's output
+            # DTensor. Reusing argmax_out would make the sampling task feed
+            # BOTH captures -- a fork the annotated-graph builder rejects
+            # (a task cannot be both join- and fork-producer). Teacher-forcing
+            # rows (which we validate) read the committed token buffer, not
+            # chosen_tokens, so this input carries no scheduling dependency.
+            ref_chosen = mpk.attach_input(
+                torch_tensor=output_tokens, name="ref_chosen")
             mpk.prefill_prob_capture_layer(
                 logits=r_logits,
                 prompt_lengths=mpk.attach_input(
                     torch_tensor=prompt_lengths, name="prompt_lengths_for_ref"),
-                chosen_tokens=argmax_out,
+                chosen_tokens=ref_chosen,
                 buffer=ref_prob_buffer,
                 page_size=args.page_size,
                 grid_dim=(total_num_requests, 1, 1))
