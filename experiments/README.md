@@ -52,6 +52,21 @@ noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).
   Gumbel sampler (marginal + lag-1 χ²); `-DOLD_SCHEME` reproduces the
   upstream constant-offset failure.
 
+## RL-engine baselines and step-time
+
+- `e32_sgl.py`, `e38_sgl.py` — the recompute-deployment baseline arm:
+  generate a GRPO group on SGLang, then acquire pi_old via the
+  miles-style prefill rescore (`logprob_start_len`). e32 = Qwen3-1.7B,
+  e38 = Qwen3-8B. Paired with the MPK arm (demo `--grpo-*`, see below).
+- `e43_miles_baseline.py` — proves the baseline IS miles' code: imports
+  miles' own `_build_prefill_scoring_payload`, drives it against SGLang,
+  and checks the payload is field-identical to ours (verifier for the
+  paper's baseline claim). Run under the miles source on PYTHONPATH.
+- `runners/e32_run.sh`, `runners/e38_run.sh` — orchestrate both arms
+  (MPK GRPO + SGLang server + baseline) on one pod.
+- `runners/e43_run.sh` — brings up SGLang and runs the miles-baseline
+  verifier.
+
 ## RL experiments (RQ6/RQ7 + dose-response)
 
 - `../demo/qwen3/e19_grpo.py` — GRPO loop with MPK rollouts; arms `mpk`
