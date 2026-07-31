@@ -628,8 +628,16 @@ void Graph::register_task(char const *task_type, std::vector<int> params) {
   } else if (name == "prefill_prob_capture_sm100") {
     int variant_id = task_register->register_prefill_prob_capture_sm100_task(
         customized->bgraph, params);
-    task_config[op] =
-        std::make_tuple(3, 1, TASK_PREFILL_PROB_CAPTURE_SM100, variant_id);
+    // 1 output (buffer); inputs are 3 normally, 4 with an optional ordering
+    // dependency. Derive so both wire correctly in the annotated graph.
+    int n_ops = 0;
+    for (auto const &tbop : customized->bgraph.operators) {
+      if (tbop->op_type == mirage::type::TB_INPUT_OP) {
+        n_ops++;
+      }
+    }
+    task_config[op] = std::make_tuple(
+        n_ops - 1, 1, TASK_PREFILL_PROB_CAPTURE_SM100, variant_id);
   } else if (name == "linear_with_residual_sm100") {
     int variant_id = task_register->register_linear_sm100_task(
         customized->bgraph, params, true /*with_residual*/);
