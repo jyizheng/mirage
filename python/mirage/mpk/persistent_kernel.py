@@ -2170,8 +2170,14 @@ class PersistentKernel:
         assert output.num_dims == 2      # (batch_size, 1)
 
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
-        tb_graph.new_input(logits, (0, -1, -1), -1, True)
-        tb_graph.new_input(output, (0, -1, -1), -1, True)
+        # Replicated dmaps (NOT partitioned by grid.x): every task instance
+        # sees the full logits/output tensors and selects its requests via
+        # task_metadata.request_id + the qo window map. A (0,-1,-1) dmap
+        # would hand each task a one-row slice while the kernel indexes
+        # global window rows -- silent wrong-row sampling (and OOB for
+        # later requests) whenever grid.x > 1.
+        tb_graph.new_input(logits, (-1, -1, -1), -1, True)
+        tb_graph.new_input(output, (-1, -1, -1), -1, True)
         self.kn_graph.customized([logits, output], tb_graph)
 
         # Register task with seed parameter
