@@ -80,6 +80,10 @@ noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).
   against SGLang generation + miles-style rescore. The script warns when
   generated-token totals are not matched; it is an optimization gate, not a
   replacement for the final full-miles wall-clock run.
+- `e50_sglang_miles.py` — matched-token SGLang arm for the E2E gate. It
+  uses the same GSM8K prompts and total sequence cap as MPK, ignores EOS so
+  both arms process exactly the same token count, and invokes miles' own
+  prefill-scoring payload builder for the old-policy rescore phase.
 
 Example with the archived 1.7B data:
 
