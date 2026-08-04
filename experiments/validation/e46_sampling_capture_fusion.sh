@@ -17,7 +17,6 @@ run_one() {
       --model Qwen/Qwen3-1.7B \
       --max-num-batched-requests 8 \
       --max-num-batched-tokens 8 \
-      --max-new-tokens 256 \
       --ignore-eos \
       --deterministic \
       --sampling-seed 42 \
@@ -61,7 +60,9 @@ result = {
     "experiment": "E46 sampled probability-capture fusion",
     "model": "Qwen/Qwen3-1.7B",
     "group_size": 8,
-    "max_new_tokens": 256,
+    "generated_tokens_per_request": (
+        len(reference_tokens) - standalone[0]["prompt_length"]
+    ),
     "runs_per_variant": 3,
     "bitwise_identical": True,
     "standalone_median_ms_per_token": standalone_ms,

@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "tasks/common/online_softmax.cuh"
+
 #include <cub/cub.cuh>
 #include <cuda.h>
 #include <cuda/std/limits>
@@ -321,7 +323,7 @@ __device__ __forceinline__ void
 
       uint64_t const row_off = static_cast<uint64_t>(row) * d;
       uint32_t const n_chunks = sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
-      float capture_local_max = -1e30f;
+      OnlineSoftmaxStats capture_stats = {-1e30f, 0.0f};
 
       // ---- deterministic top-k / top-p threshold on the ORDERED KEY ----
       // bf16 bits -> uint16 monotone key (larger float => larger key), so
@@ -415,8 +417,8 @@ __device__ __forceinline__ void
           for (uint32_t j = 0; j < VEC_SIZE; ++j) {
             uint32_t const idx = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
             if (idx < d) {
-              capture_local_max = fmaxf(
-                  capture_local_max, static_cast<float>(logits_vec[j]));
+              capture_stats = online_softmax_add(
+                  capture_stats, static_cast<float>(logits_vec[j]));
             }
           }
         }
@@ -456,53 +458,12 @@ __device__ __forceinline__ void
       }
 
       if constexpr (CAPTURE_PROBS) {
-        // Reuse sampling's logits read for the softmax max, then perform the
-        // sum with the exact thread-strided reduction order used by the
-        // standalone probability-capture task. This removes one full-vocab
-        // pass while preserving its captured probability bits.
-        for (int mask = 16; mask > 0; mask >>= 1) {
-          capture_local_max = fmaxf(
-              capture_local_max,
-              __shfl_xor_sync(0xffffffff, capture_local_max, mask));
-        }
-        int const warp_id = tx / 32;
-        int const lane_id = tx % 32;
-        if (lane_id == 0) {
-          smem_capture_max[warp_id] = capture_local_max;
-        }
-        __syncthreads();
-        if (tx < 8) {
-          float warp_max = smem_capture_max[tx];
-          for (int mask = 4; mask > 0; mask >>= 1) {
-            warp_max = fmaxf(
-                warp_max, __shfl_xor_sync(0xff, warp_max, mask));
-          }
-          smem_capture_max[0] = warp_max;
-        }
-        __syncthreads();
-        float const global_max = smem_capture_max[0];
-
-        float local_sum = 0.0f;
-        for (uint32_t vocab_idx = tx; vocab_idx < d;
-             vocab_idx += BLOCK_THREADS) {
-          local_sum += __expf(
-              static_cast<float>(logits[row_off + vocab_idx]) - global_max);
-        }
-        for (int mask = 16; mask > 0; mask >>= 1) {
-          local_sum += __shfl_xor_sync(0xffffffff, local_sum, mask);
-        }
-        if (lane_id == 0) {
-          smem_capture_sum[warp_id] = local_sum;
-        }
-        __syncthreads();
-        if (tx < 8) {
-          float warp_sum = smem_capture_sum[tx];
-          for (int mask = 4; mask > 0; mask >>= 1) {
-            warp_sum += __shfl_xor_sync(0xff, warp_sum, mask);
-          }
-          smem_capture_sum[0] = warp_sum;
-        }
-        __syncthreads();
+        // The online (max, sum) state is accumulated while sampling already
+        // has each logit in registers. The shared fixed reduction tree is
+        // also used by standalone capture and softmax-gather.
+        static_assert(BLOCK_THREADS == 256);
+        capture_stats = online_softmax_reduce_256(
+            capture_stats, smem_capture_max, smem_capture_sum);
 
         if (tx == 0) {
           int const req_row =
@@ -523,7 +484,8 @@ __device__ __forceinline__ void
                 static_cast<float>(logits[row_off + target_id]);
             prob_buffer_ptr[
                 static_cast<long long>(req_row) * max_seq + slot] =
-                __expf(target_logit - global_max) / smem_capture_sum[0];
+                __expf(target_logit - capture_stats.max) /
+                capture_stats.sum;
           }
         }
       }

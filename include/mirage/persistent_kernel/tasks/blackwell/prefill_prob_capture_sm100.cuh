@@ -15,6 +15,7 @@
 
 #pragma once
 #include "tasks/common/common_header.cuh"
+#include "tasks/common/online_softmax.cuh"
 
 namespace kernel {
 
@@ -31,9 +32,8 @@ namespace kernel {
 // trajectory is prompt, so every position is captured; in a rollout run
 // this task never overlaps the decode capture's slots.
 //
-// The per-row softmax reduction below is copied VERBATIM from
-// softmax_gather_sm100.cuh so the two capture paths are bitwise-identical
-// for the same logits row.
+// All selected-token softmax paths use the same one-pass online reduction
+// and fixed tree, so they remain bitwise-identical for the same logits row.
 //
 // Grid: (1, 1, 1); one task walks all requests. Block: (256, 1, 1).
 template <typename T,
@@ -58,7 +58,8 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
   float *__restrict__ buffer = static_cast<float *>(buffer_ptr);
 
   int const tid = threadIdx.x;
-  int const num_threads = blockDim.x;
+  __shared__ float smem_max[8];
+  __shared__ float smem_sum[8];
 
   // Parallel over requests when the layer is launched with grid.x > 1:
   // task i owns rids {i, i+NUM_RID_TASKS, ...} (disjoint buffer rows, so
@@ -111,60 +112,27 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
       int const target_id = static_cast<int>(target);
       T const *row = logits + (long long)row_idx * VOCAB_SIZE;
 
-      // ---- softmax + gather, verbatim from softmax_gather_sm100.cuh ----
-      float local_max = -1e30f;
-      for (int v = tid; v < VOCAB_SIZE; v += num_threads) {
-        float val = static_cast<float>(row[v]);
-        local_max = fmaxf(local_max, val);
-      }
-      for (int mask = 16; mask > 0; mask >>= 1) {
-        local_max =
-            fmaxf(local_max, __shfl_xor_sync(0xffffffff, local_max, mask));
-      }
-      __shared__ float smem_max[8]; // max 8 warps
-      int warp_id = tid / 32;
-      int lane_id = tid % 32;
-      if (lane_id == 0) {
-        smem_max[warp_id] = local_max;
-      }
-      __syncthreads();
-      if (tid < 8) {
-        float wmax = smem_max[tid];
-        for (int mask = 4; mask > 0; mask >>= 1) {
-          wmax = fmaxf(wmax, __shfl_xor_sync(0xff, wmax, mask));
+      OnlineSoftmaxStats stats = {-1e30f, 0.0f};
+      constexpr int VEC_SIZE = 4;
+      constexpr int CHUNK_SIZE = 256 * VEC_SIZE;
+      for (int chunk = 0; chunk < (VOCAB_SIZE + CHUNK_SIZE - 1) / CHUNK_SIZE;
+           ++chunk) {
+#pragma unroll
+        for (int j = 0; j < VEC_SIZE; ++j) {
+          int const vocab_idx = (chunk * 256 + tid) * VEC_SIZE + j;
+          if (vocab_idx < VOCAB_SIZE) {
+            stats = online_softmax_add(
+                stats, static_cast<float>(row[vocab_idx]));
+          }
         }
-        smem_max[0] = wmax;
       }
-      __syncthreads();
-      float const global_max = smem_max[0];
-
-      float local_sum = 0.0f;
-      for (int v = tid; v < VOCAB_SIZE; v += num_threads) {
-        local_sum += __expf(static_cast<float>(row[v]) - global_max);
-      }
-      for (int mask = 16; mask > 0; mask >>= 1) {
-        local_sum += __shfl_xor_sync(0xffffffff, local_sum, mask);
-      }
-      __shared__ float smem_sum[8];
-      if (lane_id == 0) {
-        smem_sum[warp_id] = local_sum;
-      }
-      __syncthreads();
-      if (tid < 8) {
-        float wsum = smem_sum[tid];
-        for (int mask = 4; mask > 0; mask >>= 1) {
-          wsum += __shfl_xor_sync(0xff, wsum, mask);
-        }
-        smem_sum[0] = wsum;
-      }
-      __syncthreads();
-      float const global_sum = smem_sum[0];
+      stats = online_softmax_reduce_256(stats, smem_max, smem_sum);
 
       if (tid == 0) {
         float logit_at_target = (target_id >= 0 && target_id < VOCAB_SIZE)
                                     ? static_cast<float>(row[target_id])
                                     : -1e30f;
-        float prob = __expf(logit_at_target - global_max) / global_sum;
+        float prob = __expf(logit_at_target - stats.max) / stats.sum;
         int const slot = step_val + i;
         if (slot >= 0 && slot < MAX_SEQ) {
           buffer[(long long)req_row * MAX_SEQ + slot] = prob;
