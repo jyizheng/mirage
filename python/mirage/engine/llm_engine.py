@@ -215,6 +215,123 @@ class LLMEngine:
             self.runtime.release_request(rid)
             return result
 
+    def submit_group(
+        self,
+        prompt: str,
+        group_size: int,
+        use_template: bool = True,
+        timeout: float = 300.0,
+        poll_interval: float = 1e-4,
+    ):
+        """GRPO-style group rollout with SHARED-PREFIX prefill.
+
+        All ``group_size`` trajectories share one prompt, so the prompt's
+        KV is computed ONCE: member 0 prefills normally; once its prefill
+        completes we copy the prompt-region KV of its page to every other
+        page in the pool (pure copy-engine D2D, safe alongside the
+        persistent kernel), then admit members 1..G-1 with
+        ``initial_step = P-1`` — the runtime's prefix-cache admission path
+        skips the cached positions and live-prefills only the final prompt
+        token, which produces the first generation logits. Because the
+        kernels are deterministic, the copied KV is bitwise what each
+        member would have computed itself, so trajectories are unchanged
+        (greedy) or per-slot reproducible (seeded sampling).
+
+        Requirements: engine idle (no other in-flight requests — asserted),
+        one KV page per request (max_seq_length <= page_size), and
+        group_size <= max_num_pages.
+        """
+        rt = self.runtime
+        assert not rt._completions and rt.waiting_count == 0, \
+            "submit_group requires an idle engine"
+        builder = self.model_runner.mpk.model_builder
+        k_cache, v_cache = builder.k_cache, builder.v_cache
+        meta = self.model_runner.meta_tensors
+        page_size = k_cache.shape[2]
+        n_pages = k_cache.shape[1]
+        assert group_size <= n_pages, "group_size exceeds page pool"
+
+        token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
+        prompt_len = len(token_ids)
+        assert prompt_len >= 2 and prompt_len <= page_size
+        t = torch.tensor(token_ids, dtype=torch.int64)
+
+        # ── member 0: normal submission, prefills the shared prompt ──
+        rid0 = self._next_rid
+        self._next_rid += 1
+        with self._submit_lock:
+            rt.submit(rid0, t)
+        deadline = time.monotonic() + timeout
+        row0 = -1
+        while row0 < 0:
+            row0 = rt.find_row_for_rid(rid0)
+            if time.monotonic() > deadline:
+                raise TimeoutError("submit_group: member-0 admission")
+            time.sleep(poll_interval)
+        while rt.get_current_step_at_row(row0) < prompt_len:
+            if time.monotonic() > deadline:
+                raise TimeoutError("submit_group: member-0 prefill")
+            time.sleep(poll_interval)
+
+        # ── locate member 0's page (stable double-read; engine is idle
+        # apart from member 0, so slot 0 is its batch slot) ──
+        def read_page():
+            return int(meta["paged_kv_indices_buffer"][0].cpu().item())
+        src = read_page()
+        while True:
+            again = read_page()
+            if again == src:
+                break
+            src = again
+
+        # ── replicate the prompt-prefix KV to every other page.
+        # Contiguous slice copies only: copy-engine transfers, safe while
+        # the megakernel occupies the SMs. Prefix is [0, P-1); position
+        # P-1 is live-prefilled by each member to produce its own first
+        # logits row.
+        pfx = prompt_len - 1
+        num_layers = k_cache.shape[0]
+        for layer in range(num_layers):
+            k_src = k_cache[layer, src, :pfx]
+            v_src = v_cache[layer, src, :pfx]
+            for dst in range(n_pages):
+                if dst == src:
+                    continue
+                # per-(layer, page) prefix slices are contiguous, so these
+                # are pure memcpys on the copy engine
+                k_cache[layer, dst, :pfx].copy_(k_src)
+                v_cache[layer, dst, :pfx].copy_(v_src)
+
+        # ── members 1..G-1: prefix-cached admission ──
+        rids = [rid0]
+        for _ in range(group_size - 1):
+            rid = self._next_rid
+            self._next_rid += 1
+            with self._submit_lock:
+                rt.submit(rid, t, initial_step=pfx)
+            rids.append(rid)
+
+        # ── collect ──
+        results = []
+        prob_buffer = getattr(self.model_runner, "prob_buffer", None)
+        for rid in rids:
+            buffer_row, final_step = rt.wait_for_request(
+                rid, max(deadline - time.monotonic(), 1.0), poll_interval)
+            full_tokens = rt.read_tokens_at_row(buffer_row, final_step)
+            output_ids = full_tokens[prompt_len:].tolist()
+            result = {
+                "text": self.tokenizer_manager.decode(output_ids),
+                "token_ids": output_ids,
+            }
+            if prob_buffer is not None:
+                probs = prob_buffer[
+                    buffer_row, prompt_len - 1 : final_step].tolist()
+                result["logprobs"] = [
+                    math.log(p) if p > 0.0 else None for p in probs]
+            rt.release_request(rid)
+            results.append(result)
+        return results
+
     # ── Internal ──────────────────────────────────────────────────────────
 
     def _ensure_kernel_running(self) -> None:

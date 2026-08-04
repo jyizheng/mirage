@@ -176,6 +176,43 @@ async def completions(request: Request):
         }
 
 
+@app.post("/v1/group_completions")
+async def group_completions(request: Request):
+    """GRPO group rollout: one prompt, ``group_size`` trajectories, with
+    shared-prefix prefill (the prompt's KV is computed once and replicated;
+    members admit via the runtime's prefix-cache path). Requires an
+    otherwise-idle engine."""
+    body = await _parse_json(request)
+    prompt = body.get("prompt", "")
+    group_size = int(body.get("group_size", 1))
+    use_template = body.get("use_template", True)
+    timeout = request.app.state.request_timeout
+
+    loop = asyncio.get_running_loop()
+    results = await loop.run_in_executor(
+        None, lambda: request.app.state.engine.submit_group(
+            prompt, group_size, use_template=use_template, timeout=timeout),
+    )
+    choices = []
+    for i, result in enumerate(results):
+        choice = {
+            "index": i,
+            "text": result["text"],
+            "token_ids": result["token_ids"],
+            "finish_reason": "stop",
+        }
+        if "logprobs" in result:
+            choice["logprobs"] = {"token_logprobs": result["logprobs"]}
+        choices.append(choice)
+    return {
+        "id": "cmpl-group-0",
+        "object": "text_completion",
+        "choices": choices,
+        "usage": {"completion_tokens":
+                  sum(len(r["token_ids"]) for r in results)},
+    }
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
