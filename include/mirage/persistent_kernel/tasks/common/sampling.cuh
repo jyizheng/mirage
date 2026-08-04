@@ -167,6 +167,111 @@ constexpr BlockScanAlgorithm SAMPLING_SCAN_ALGO = BLOCK_SCAN_WARP_SCANS;
 constexpr BlockReduceAlgorithm SAMPLING_REDUCE_ALGO =
     BLOCK_REDUCE_WARP_REDUCTIONS;
 
+// First stage of parallel position-keyed Gumbel-Max. Each task owns one
+// contiguous vocabulary shard (the graph dmap offsets logits/partials to that
+// shard) and visits every active row. The existing fixed-layout argmax-reduce
+// task combines the shard winners in increasing shard order.
+template <uint32_t BLOCK_THREADS,
+          uint32_t VEC_SIZE,
+          typename DType,
+          typename IdType,
+          int BATCH_SIZE,
+          int CHUNK_SIZE,
+          int NUM_PARTIAL_TASKS>
+__device__ __forceinline__ void sampling_partial_poskeyed_kernel(
+    int const part_idx,
+    DType const *logits,
+    DType *partial_values,
+    IdType *partial_indices,
+    uint32_t vocab_size,
+    uint64_t philox_seed,
+    int const *request_ids_ptr,
+    int const *qo_indptr_buffer_ptr,
+    int const *paged_kv_indptr_buffer_ptr,
+    int const *paged_kv_last_page_len_ptr,
+    int num_requests,
+    int page_size,
+    int max_seq,
+    int num_active_tokens,
+    float inv_temperature = 1.0f) {
+  uint32_t const tx = threadIdx.x;
+  using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
+                                         BLOCK_THREADS,
+                                         SAMPLING_REDUCE_ALGO>::TempStorage;
+  extern __shared__ __align__(alignof(SharedMem)) uint8_t smem_sampling_logit[];
+  auto &temp_storage = reinterpret_cast<SharedMem &>(smem_sampling_logit);
+
+  for (int row = 0; row < num_active_tokens; ++row) {
+    int rid = 0;
+    while (rid < num_requests && row >= qo_indptr_buffer_ptr[rid + 1]) {
+      ++rid;
+    }
+    if (rid >= num_requests || row < qo_indptr_buffer_ptr[rid]) {
+      continue;
+    }
+
+    int const first_token_pos = qo_indptr_buffer_ptr[rid];
+    int const last_token_pos = qo_indptr_buffer_ptr[rid + 1];
+    int const num_tokens = last_token_pos - first_token_pos;
+    int const num_pages =
+        paged_kv_indptr_buffer_ptr[rid + 1] - paged_kv_indptr_buffer_ptr[rid];
+    int const seq_len =
+        (num_pages - 1) * page_size + paged_kv_last_page_len_ptr[rid];
+    int const pos = seq_len - num_tokens + (row - first_token_pos);
+    int const noise_rid =
+        request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
+    uint64_t const philox_offset =
+        static_cast<uint64_t>(noise_rid) * static_cast<uint64_t>(max_seq) +
+        pos + 1;
+
+    SamplingDataAndIndex<DType, IdType> max_data = {
+        -cuda::std::numeric_limits<DType>::infinity(), 0};
+    uint32_t const n_chunks =
+        sampling_ceil_div(static_cast<uint32_t>(CHUNK_SIZE),
+                          BLOCK_THREADS * VEC_SIZE);
+    uint64_t const row_off =
+        static_cast<uint64_t>(row) * CHUNK_SIZE * NUM_PARTIAL_TASKS;
+    uint32_t const global_part_off = part_idx * CHUNK_SIZE;
+
+    for (uint32_t c = 0; c < n_chunks; ++c) {
+      uint32_t const local_base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
+      sampling_vec_t<DType, VEC_SIZE> logits_vec;
+      logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
+      if (local_base < CHUNK_SIZE && global_part_off + local_base < vocab_size) {
+        logits_vec.cast_load(logits + row_off + local_base);
+      }
+      sampling_vec_t<DType, VEC_SIZE> gumbel_noise =
+          GenerateSamplingGumbelNoise<DType, VEC_SIZE>(
+              philox_seed, philox_offset,
+              static_cast<uint64_t>(global_part_off + local_base));
+
+      SamplingDataAndIndex<DType, IdType> candidates[VEC_SIZE];
+#pragma unroll
+      for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+        uint32_t const local_idx = local_base + j;
+        uint32_t const global_idx = global_part_off + local_idx;
+        candidates[j].data =
+            local_idx < CHUNK_SIZE && global_idx < vocab_size
+                ? static_cast<DType>(static_cast<float>(logits_vec[j]) *
+                                     inv_temperature) +
+                      gumbel_noise[j]
+                : -cuda::std::numeric_limits<DType>::infinity();
+        candidates[j].index = local_idx;
+      }
+      max_data += BlockReduce<SamplingDataAndIndex<DType, IdType>,
+                              BLOCK_THREADS,
+                              SAMPLING_REDUCE_ALGO>(temp_storage)
+                      .template Sum<VEC_SIZE>(candidates);
+    }
+
+    if (tx == 0) {
+      partial_values[row * NUM_PARTIAL_TASKS] = max_data.data;
+      partial_indices[row * NUM_PARTIAL_TASKS] = max_data.index;
+    }
+    __syncthreads();
+  }
+}
+
 template <uint32_t BLOCK_THREADS,
           uint32_t VEC_SIZE,
           typename DType,

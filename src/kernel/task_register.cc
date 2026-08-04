@@ -2361,6 +2361,53 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }
 
+int TaskRegister::register_sampling_partial_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params: num vocabulary shards, seed, temperature * 1000
+  assert(params.size() == 3);
+  std::vector<tb::TBInputOp *> input_ops;
+  std::vector<tb::TBInputOp *> output_ops;
+  assert(bgraph.operators.size() == 3);
+  for (auto const &op : bgraph.operators) {
+    assert(op->op_type == mirage::type::TB_INPUT_OP);
+    if (input_ops.empty()) {
+      input_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    } else {
+      output_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    }
+  }
+  assert(output_ops.size() == 2);
+  int const batch_size = input_ops[0]->output_tensors[0].dim[0];
+  int const chunk_size = input_ops[0]->output_tensors[0].dim[1];
+  int const num_parts = params[0];
+  int const seed = params[1];
+  int const temp_milli = params[2];
+
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::sampling_partial_poskeyed_kernel<256, 4, bfloat16, "
+         "long long, $, $, $>(",
+         batch_size,
+         chunk_size,
+         num_parts);
+  code.e("    task_desc->task_metadata.request_id,");
+  code.e("    static_cast<bfloat16 const*>(task_desc->input_ptrs[0]),");
+  code.e("    static_cast<bfloat16*>(task_desc->output_ptrs[0]),");
+  code.e("    static_cast<long long*>(task_desc->output_ptrs[1]),");
+  code.e("    $u,", chunk_size * num_parts);
+  code.e("    $u,", seed);
+  code.e("    runtime_config.request_ids,");
+  code.e("    runtime_config.qo_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_indptr_buffer,");
+  code.e("    runtime_config.paged_kv_last_page_len_buffer,");
+  code.e("    MPK_MAX_NUM_BATCHED_REQUESTS,");
+  code.e("    MPK_PAGE_SIZE,");
+  code.e("    MPK_MAX_SEQ_LENGTH,");
+  code.e("    runtime_config.qo_indptr_buffer[MPK_MAX_NUM_BATCHED_REQUESTS],");
+  code.e("    1000.0f / $.0f);", temp_milli);
+  return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
+}
+
 int TaskRegister::register_tensor_init_task(threadblock::Graph const &bgraph,
                                             std::vector<int> const &params) {
   assert(params.size() == 0);

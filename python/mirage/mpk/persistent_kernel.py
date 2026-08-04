@@ -2215,6 +2215,38 @@ class PersistentKernel:
             params.append(1)
         self.kn_graph.register_task(tb_graph, "sampling_sm100", params)
 
+    def sampling_partial_sm100_layer(
+        self,
+        logits: DTensor,
+        output: tuple[DTensor, DTensor],
+        grid_dim: tuple,
+        block_dim: tuple,
+        seed: int = 42,
+        temperature: float = 1.0,
+    ):
+        """Parallel first stage for position-keyed Gumbel-Max sampling."""
+        assert logits.num_dims == 2
+        assert len(output) == 2
+        output_value, output_index = output
+        assert output_value.num_dims == 2
+        assert output_index.num_dims == 2
+        assert temperature > 0.0
+        num_tasks = grid_dim[0]
+        assert logits.dim(1) % num_tasks == 0
+        self.argmax_partial_output_size = logits.dim(1) // num_tasks
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(logits, (1, 0, -1), -1, True)
+        tb_graph.new_input(output_value, (1, 0, -1), -1, True)
+        tb_graph.new_input(output_index, (1, 0, -1), -1, True)
+        self.kn_graph.customized(
+            [logits, output_value, output_index], tb_graph
+        )
+        self.kn_graph.register_task(
+            tb_graph,
+            "sampling_partial_sm100",
+            [num_tasks, seed, int(round(temperature * 1000))],
+        )
+
     def find_ngram_partial_layer(
         self, input: DTensor, output: DTensor, grid_dim: tuple, block_dim: tuple, ngram_size: int = 3):
         # Currently assume that input/output

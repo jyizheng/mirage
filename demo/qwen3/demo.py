@@ -167,6 +167,13 @@ if __name__ == "__main__":
         "intended for correctness and performance A/B runs.",
     )
     parser.add_argument(
+        "--no-parallel-sampling",
+        action="store_false",
+        dest="parallel_sampling",
+        default=True,
+        help="Use the single-block vocabulary scan for sampling A/B runs.",
+    )
+    parser.add_argument(
         "--prompt-ids-file",
         type=str,
         default=None,
@@ -902,25 +909,55 @@ if __name__ == "__main__":
                 torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
             )
 
+        sampling_capture_fused = False
         if args.sampling_seed is not None:
             # Gumbel-Max sampling (deterministic given the seed; the philox
             # offset advances with the runtime step so every step draws
             # fresh noise). When logprobs are requested, sampling also reuses
             # this vocab scan for the softmax max and emits the probability;
             # only the fixed-order exp-sum scan remains.
-            fused_capture = args.capture_probs and args.fused_sampling_capture
-            mpk.sampling_sm100_layer(
-                logits=argmax_in,
-                output=argmax_out,
-                grid_dim=(total_num_requests, 1, 1),
-                block_dim=(256, 1, 1),
-                seed=args.sampling_seed,
-                temperature=(args.temperature if args.temperature > 0 else 1.0),
-                top_k=args.top_k,
-                top_p=args.top_p,
-                prompt_lengths=(prompt_lengths_for_prob if fused_capture else None),
-                prob_buffer=(prob_buffer if fused_capture else None),
+            sampling_temperature = (
+                args.temperature if args.temperature > 0 else 1.0
             )
+            use_parallel_sampling = (
+                args.parallel_sampling and args.top_k == 0 and args.top_p == 1.0
+            )
+            if use_parallel_sampling:
+                mpk.sampling_partial_sm100_layer(
+                    logits=argmax_in,
+                    output=(argmax_part_value, argmax_part_index),
+                    grid_dim=(mpk.num_workers, 1, 1),
+                    block_dim=(256, 1, 1),
+                    seed=args.sampling_seed,
+                    temperature=sampling_temperature,
+                )
+                mpk.argmax_reduce_layer(
+                    input=(argmax_part_value, argmax_part_index),
+                    output=argmax_out,
+                    grid_dim=(1, 1, 1),
+                    block_dim=(128, 1, 1),
+                )
+            else:
+                sampling_capture_fused = (
+                    args.capture_probs and args.fused_sampling_capture
+                )
+                mpk.sampling_sm100_layer(
+                    logits=argmax_in,
+                    output=argmax_out,
+                    grid_dim=(total_num_requests, 1, 1),
+                    block_dim=(256, 1, 1),
+                    seed=args.sampling_seed,
+                    temperature=sampling_temperature,
+                    top_k=args.top_k,
+                    top_p=args.top_p,
+                    prompt_lengths=(
+                        prompt_lengths_for_prob
+                        if sampling_capture_fused else None
+                    ),
+                    prob_buffer=(
+                        prob_buffer if sampling_capture_fused else None
+                    ),
+                )
         else:
             mpk.argmax_partial_layer(
                 input=argmax_in,
@@ -934,9 +971,7 @@ if __name__ == "__main__":
                 grid_dim=argmax_reduce_grid_dim,
                 block_dim=(128, 1, 1),
             )
-        if args.capture_probs and (
-            args.sampling_seed is None or not args.fused_sampling_capture
-        ):
+        if args.capture_probs and not sampling_capture_fused:
             # Per-step probability capture for the rescore-consistency
             # harness: P(chosen token) = softmax(logits)[argmax_out],
             # scattered into prob_buffer[0, step]. Only row 0 (request 0,

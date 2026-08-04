@@ -74,7 +74,7 @@ def main() -> int:
                 "top_k": -1,
                 "max_new_tokens": max_new_tokens,
                 "ignore_eos": True,
-                "seed": seed,
+                "sampling_seed": seed,
             },
             "return_logprob": True,
             "logprob_start_len": 0,
