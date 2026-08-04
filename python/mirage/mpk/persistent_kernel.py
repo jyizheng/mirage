@@ -286,9 +286,11 @@ def get_compile_command(
             "-DMIRAGE_GRACE_HOPPER",
             "-DNDEBUG",
         ] + (["-DMIRAGE_ENABLE_PROFILER"] if profiling else [])
-    elif target_cc == 100:
+    elif target_cc in (100, 103):
+        # 100 = B200, 103 = B300/Blackwell Ultra. Arch-specific ("a")
+        # cubins only load on their exact arch, so emit the real one.
         specific_cmd = [
-            "-gencode=arch=compute_100a,code=sm_100a",
+            f"-gencode=arch=compute_{target_cc}a,code=sm_{target_cc}a",
             "-DMPK_ENABLE_TMA",
             "-DMIRAGE_GRACE_BLACKWELL",
         ]
@@ -976,7 +978,7 @@ class PersistentKernel:
         )
         if self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_hopper", params)
-        elif self.target_cc == 100:
+        elif self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "paged_attention_sm100", params)
         else:
             self.kn_graph.register_task(tb_graph, "paged_attention", params)
@@ -1063,7 +1065,7 @@ class PersistentKernel:
             ],
             tb_graph,
         )
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_hopper", params)
@@ -1106,7 +1108,7 @@ class PersistentKernel:
             ],
             tb_graph,
         )
-        if self.target_cc == 100 or self.target_cc == 90:
+        if self.target_cc in (100, 103) or self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_merge_sm100", params)
         else:
             raise ValueError(f"Unsupported target CC: {self.target_cc}")
@@ -1585,7 +1587,7 @@ class PersistentKernel:
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
         self.kn_graph.customized([input, weight, moe_routing_indices, moe_mask, output], tb_graph)
 
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm100")
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm90")
@@ -1632,7 +1634,7 @@ class PersistentKernel:
         self.kn_graph.customized(
             [input_fp8, input_scale, weight_fp8, weight_scale,
              moe_routing_indices, moe_mask, output], tb_graph)
-        assert self.target_cc == 100, "FP8 group GEMM requires SM100 (Blackwell)"
+        assert self.target_cc in (100, 103), "FP8 group GEMM requires SM100 (Blackwell)"
         self.kn_graph.register_task(tb_graph, "moe_w13_fp8_sm100")
 
     def moe_w2_fp8_layer(
@@ -1674,7 +1676,7 @@ class PersistentKernel:
         self.kn_graph.customized(
             [input_fp8, input_scale, weight_fp8, weight_scale,
              moe_routing_indices, moe_mask, output], tb_graph)
-        assert self.target_cc == 100, "FP8 group GEMM requires SM100 (Blackwell)"
+        assert self.target_cc in (100, 103), "FP8 group GEMM requires SM100 (Blackwell)"
         self.kn_graph.register_task(tb_graph, "moe_w2_fp8_sm100")
 
     # === FP8 Dense Layers ===
@@ -1793,7 +1795,7 @@ class PersistentKernel:
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
         self.kn_graph.customized([input, weight, moe_routing_indices, moe_mask, output], tb_graph)
 
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm100")
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm90")
@@ -1851,7 +1853,7 @@ class PersistentKernel:
         tb_graph.new_input(output, (1, -1, -1), -1, True)
         self.kn_graph.customized([input, weight, output], tb_graph)
 
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "splitk_linear_sm100")
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "splitk_linear_swapAB_hopper")
@@ -1931,7 +1933,7 @@ class PersistentKernel:
         tb_graph.new_input(partials, (1, 0, -1), -1, True)
         self.kn_graph.customized([input, weight, partials], tb_graph)
         assert (
-            self.target_cc == 100
+            self.target_cc in (100, 103)
         ), "splitk_linear_det_layer is only implemented for SM100"
         self.kn_graph.register_task(tb_graph, "splitk_partial_linear_sm100")
 
@@ -2125,7 +2127,7 @@ class PersistentKernel:
         tb_graph.new_input(output_value, (1, 0, -1), -1, True)
         tb_graph.new_input(output_index, (1, 0, -1), -1, True)
         self.kn_graph.customized([input, output_value, output_index], tb_graph)
-        if self.target_cc == 100 or self.target_cc == 90:
+        if self.target_cc in (100, 103) or self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "argmax_partial_sm100", [num_tasks])
         else:
             self.kn_graph.register_task(tb_graph, "argmax_partial", [num_tasks])
@@ -2148,7 +2150,7 @@ class PersistentKernel:
         tb_graph.new_input(input_index, (1, 0, -1), -1, True)
         tb_graph.new_input(output, (0, 1, -1), -1, True) #TODO: Make sure the output map is expected
         self.kn_graph.customized([input_value, input_index, output], tb_graph)
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(
                 tb_graph, "argmax_reduce_sm100", [self.argmax_partial_output_size]
             )

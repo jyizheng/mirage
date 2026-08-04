@@ -159,10 +159,10 @@ def get_cc_cmd(
             "-arch=sm_90a",
             "-gencode=arch=compute_90a,code=sm_90a",
         ] + (["-DMIRAGE_ENABLE_PROFILER"] if profiling else [])
-    elif target == 100:
+    elif target in (100, 103):
         specific_cmd = [
-            "-arch=sm_100a",
-            "-gencode=arch=compute_100a,code=sm_100a",
+            f"-arch=sm_{target}a",
+            f"-gencode=arch=compute_{target}a,code=sm_{target}a",
         ] + (["-DMIRAGE_ENABLE_PROFILER"] if profiling else [])
     else:
         specific_cmd = [

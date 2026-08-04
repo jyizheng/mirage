@@ -260,7 +260,7 @@ class Qwen3Builder(GraphBuilder):
         # deterministic partials + fixed-order-reduce path (bitwise
         # reproducible and batch-invariant; the default tma_reduce_add
         # combine is neither).
-        use_splitk = (target_cc == 100)
+        use_splitk = (target_cc in (100, 103))
         deterministic = getattr(self, "deterministic", False) or bool(
             int(os.environ.get("MPK_DETERMINISTIC", "0")))
         for i in range(self.num_layers):

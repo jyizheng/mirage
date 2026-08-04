@@ -15,8 +15,8 @@ def get_shared_memory_capacity(target_cc):
     elif target_cc == 90:
         # H100 GPUs
         return 223 * 1024
-    elif target_cc == 100:
-        # B200 GPUs
+    elif target_cc in (100, 103):
+        # B200 / B300 (Blackwell Ultra) GPUs
         return 227 * 1024
     else:
         assert False, "Unsupported compute capacity: {}".format(target_cc)
