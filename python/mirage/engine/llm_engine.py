@@ -238,8 +238,13 @@ class LLMEngine:
         (greedy) or per-slot reproducible (seeded sampling).
 
         Requirements: engine idle (no other in-flight requests — asserted),
-        one KV page per request (max_seq_length <= page_size), and
-        group_size <= max_num_pages.
+        one KV page per request (max_seq_length <= page_size),
+        group_size <= max_num_pages, and pinned_ring_capacity >
+        group_size: members admitted in the same scheduler step finish in
+        lockstep, and the GPU pushes completions without checking ring
+        fullness — a wave of >= capacity simultaneous completions is lost
+        (observed: 8-at-once with capacity 8 lost 7 of 8; 7-at-once was
+        fine).
         """
         rt = self.runtime
         assert not rt._completions and rt.waiting_count == 0, \
@@ -250,11 +255,21 @@ class LLMEngine:
         page_size = k_cache.shape[2]
         n_pages = k_cache.shape[1]
         assert group_size <= n_pages, "group_size exceeds page pool"
+        assert group_size < rt._cap, \
+            "group_size must be < pinned_ring_capacity (lockstep " \
+            "completions overflow the completion ring and are lost)"
 
         token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
         prompt_len = len(token_ids)
         assert prompt_len >= 2 and prompt_len <= page_size
         t = torch.tensor(token_ids, dtype=torch.int64)
+
+        # The GPU only starts writing a row's pinned step mirror once the
+        # request is batched, so a reused row still shows its PREVIOUS
+        # occupant's final step — which is >= prompt_len and would make the
+        # prefill wait below pass instantly. The engine is idle (asserted),
+        # so no row is being written: clear all mirrors first.
+        rt._pinned_step.fill_(-1)
 
         # ── member 0: normal submission, prefills the shared prompt ──
         rid0 = self._next_rid
@@ -301,6 +316,10 @@ class LLMEngine:
                 # are pure memcpys on the copy engine
                 k_cache[layer, dst, :pfx].copy_(k_src)
                 v_cache[layer, dst, :pfx].copy_(v_src)
+        # The copies are asynchronous and, with the megakernel resident,
+        # can take a long time to be scheduled — members must not admit
+        # before the prefix KV has actually landed.
+        torch.cuda.synchronize()
 
         # ── members 1..G-1: prefix-cached admission ──
         rids = [rid0]
