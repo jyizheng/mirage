@@ -97,4 +97,7 @@ def test_hf_backend_micro_batching_preserves_outputs():
     full_values = full.selected_token_logprobs(samples)
     micro_values = micro.selected_token_logprobs(samples)
     for lhs, rhs in zip(full_values, micro_values):
-        assert torch.equal(lhs, rhs)
+        # Trainer kernels may choose a batch-shape-dependent reduction order.
+        # MPK still owns the forward value through bind_forward_values; this
+        # check only guards the differentiable replay's numerical agreement.
+        torch.testing.assert_close(lhs, rhs, rtol=1e-6, atol=1e-6)
