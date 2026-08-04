@@ -1,3 +1,6 @@
+import sys
+import types
+
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -5,6 +8,7 @@ torch = pytest.importorskip("torch")
 from mirage.mpk.trainer_backend import (
     HuggingFaceTrainerBackend,
     bind_forward_values,
+    create_trainer_backend,
 )
 
 
@@ -101,3 +105,55 @@ def test_hf_backend_micro_batching_preserves_outputs():
         # MPK still owns the forward value through bind_forward_values; this
         # check only guards the differentiable replay's numerical agreement.
         torch.testing.assert_close(lhs, rhs, rtol=1e-6, atol=1e-6)
+
+
+def test_create_trainer_backend_loads_external_factory_lazily():
+    module = types.ModuleType("test_external_trainer")
+    captured = {}
+
+    class ExternalBackend:
+        def selected_token_logprobs(self, samples):
+            return []
+
+        def zero_grad(self):
+            pass
+
+        def backward_and_step(self, loss):
+            return 0.0
+
+        def named_parameters(self):
+            return iter(())
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return ExternalBackend()
+
+    module.create = create
+    sys.modules[module.__name__] = module
+    try:
+        backend = create_trainer_backend(
+            "test_external_trainer:create",
+            model_name="model",
+            tokenizer=_Tokenizer(),
+            learning_rate=3e-6,
+            micro_batch_size=2,
+            factory_kwargs={"mesh": "dp=2"},
+        )
+    finally:
+        del sys.modules[module.__name__]
+
+    assert isinstance(backend, ExternalBackend)
+    assert captured["model_name"] == "model"
+    assert captured["learning_rate"] == 3e-6
+    assert captured["micro_batch_size"] == 2
+    assert captured["mesh"] == "dp=2"
+
+
+def test_create_trainer_backend_rejects_unqualified_external_name():
+    with pytest.raises(ValueError, match="module.*factory"):
+        create_trainer_backend(
+            "megatron",
+            model_name="model",
+            tokenizer=_Tokenizer(),
+            learning_rate=1e-6,
+        )

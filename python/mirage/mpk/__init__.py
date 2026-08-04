@@ -6,6 +6,7 @@ from .trainer_backend import (
     HuggingFaceTrainerBackend,
     TrainerBackend,
     bind_forward_values,
+    create_trainer_backend,
 )
 from .weight_sync import (
     SyncReport,
@@ -25,6 +26,7 @@ __all__ = [
     "TrainerBackend",
     "HuggingFaceTrainerBackend",
     "bind_forward_values",
+    "create_trainer_backend",
     "SyncReport",
     "SyncSpec",
     "WeightSyncPlan",

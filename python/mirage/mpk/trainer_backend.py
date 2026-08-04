@@ -9,6 +9,7 @@ MPK backward implement the same small contract.
 
 from __future__ import annotations
 
+import importlib
 from typing import Mapping, Protocol, Sequence, runtime_checkable
 
 import torch
@@ -161,3 +162,71 @@ class HuggingFaceTrainerBackend:
 
     def named_parameters(self):
         return self.model.named_parameters()
+
+
+def create_trainer_backend(
+    spec: str,
+    *,
+    model_name: str,
+    tokenizer,
+    learning_rate: float,
+    micro_batch_size: int = 0,
+    grad_clip: float = 1.0,
+    device: str = "cuda",
+    factory_kwargs: Mapping[str, object] | None = None,
+) -> TrainerBackend:
+    """Create the selected trainer stack without coupling MPK to it.
+
+    ``hf`` is the built-in, evaluated backend. Any ``module:factory`` entry
+    is loaded lazily and receives the same construction arguments. This is
+    the integration point for TorchTitan, Megatron, or another distributed
+    trainer; those frameworks remain responsible for their model topology,
+    replay schedule, backward, optimizer, and normalized parameter names.
+    """
+
+    common_kwargs = {
+        "model_name": model_name,
+        "tokenizer": tokenizer,
+        "learning_rate": learning_rate,
+        "micro_batch_size": micro_batch_size,
+        "grad_clip": grad_clip,
+        "device": device,
+    }
+    if factory_kwargs:
+        overlap = common_kwargs.keys() & factory_kwargs.keys()
+        if overlap:
+            names = ", ".join(sorted(overlap))
+            raise ValueError(f"factory_kwargs cannot override: {names}")
+        common_kwargs.update(factory_kwargs)
+
+    if spec == "hf":
+        from transformers import AutoModelForCausalLM
+
+        model = AutoModelForCausalLM.from_pretrained(
+            model_name, dtype=torch.bfloat16
+        ).to(device)
+        model.gradient_checkpointing_enable()
+        model.train()
+        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+        return HuggingFaceTrainerBackend(
+            model,
+            tokenizer,
+            optimizer,
+            micro_batch_size=micro_batch_size,
+            grad_clip=grad_clip,
+        )
+
+    if ":" not in spec:
+        raise ValueError(
+            "trainer backend must be 'hf' or '<module>:<factory>', "
+            f"got {spec!r}"
+        )
+    module_name, factory_name = spec.rsplit(":", 1)
+    factory = getattr(importlib.import_module(module_name), factory_name)
+    backend = factory(**common_kwargs)
+    if not isinstance(backend, TrainerBackend):
+        raise TypeError(
+            f"trainer backend factory {spec!r} did not return an object "
+            "implementing TrainerBackend"
+        )
+    return backend

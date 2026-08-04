@@ -24,8 +24,8 @@ import time
 import torch
 
 from mirage.mpk.trainer_backend import (
-    HuggingFaceTrainerBackend,
     bind_forward_values,
+    create_trainer_backend,
 )
 from mirage.mpk.weight_sync import build_name_matching_sync_plan
 
@@ -72,8 +72,6 @@ def run(
     prob_buffer,          # [mbt, max_seq] float32 (attached capture buffer)
     eos_token_id,
 ):
-    from transformers import AutoModelForCausalLM
-
     R = tokens.shape[0]           # group size = request slots
     max_seq = tokens.shape[1]
     dev = "cuda"
@@ -81,27 +79,24 @@ def run(
     out_path = args.grpo_log or f"/tmp/e19_{arm}.jsonl"
     log_f = open(out_path, "w")
 
-    trainer = AutoModelForCausalLM.from_pretrained(
-        args.model, dtype=torch.bfloat16
-    ).cuda()
-    trainer.gradient_checkpointing_enable()
-    trainer.train()
-    opt = torch.optim.AdamW(trainer.parameters(), lr=args.grpo_lr)
-    backend = HuggingFaceTrainerBackend(
-        trainer,
-        tokenizer,
-        opt,
+    backend = create_trainer_backend(
+        args.grpo_trainer_backend,
+        model_name=args.model,
+        tokenizer=tokenizer,
+        learning_rate=args.grpo_lr,
         micro_batch_size=getattr(args, "grpo_trainer_micro_batch_size", 0),
+        factory_kwargs={"engine_args": args}
+        if args.grpo_trainer_backend != "hf" else None,
     )
 
     demo_sd = dict(model_demo.named_parameters())
-    hf_sd = dict(trainer.named_parameters())
+    trainer_sd = dict(backend.named_parameters())
     sync_plan = build_name_matching_sync_plan(
-        hf_sd, demo_sd, tie_lm_head_to_embeddings=True)
+        trainer_sd, demo_sd, tie_lm_head_to_embeddings=True)
     print(f"[e19] weight-sync plan: {len(sync_plan.specs)} tensors")
 
     def sync_weights():
-        report = sync_plan.sync(hf_sd, demo_sd, strict=True)
+        report = sync_plan.sync(trainer_sd, demo_sd, strict=True)
         return report
 
     sync_report = sync_weights()  # start from identical weights on both sides
@@ -110,8 +105,8 @@ def run(
     data = load_gsm8k(tokenizer, args.grpo_steps * 1)
     print(f"[e19] arm={arm} steps={args.grpo_steps} group={R} "
           f"lr={args.grpo_lr} data={len(data)} "
-          f"trainer_backend=hf trainer_micro_batch="
-          f"{backend.micro_batch_size or R}")
+          f"trainer_backend={args.grpo_trainer_backend} trainer_micro_batch="
+          f"{getattr(backend, 'micro_batch_size', 0) or R}")
 
     def rollout(prompt_ids):
         plen = len(prompt_ids)

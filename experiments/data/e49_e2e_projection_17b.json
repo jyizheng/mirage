@@ -1,0 +1,22 @@
+{
+  "experiment": "E45 same-trainer projection",
+  "model": "Qwen3-1.7B-one-pass",
+  "mpk_steps": 20,
+  "baseline_steps": 20,
+  "mpk_step_raw_s": 1.083335,
+  "eliminated_diagnostic_s": 0.0,
+  "mpk_engine_step_s": 1.083335,
+  "mpk_rollout_s": 0.961955,
+  "shared_reward_train_sync_s": 0.12137999999999993,
+  "baseline_generate_s": 0.306775,
+  "baseline_old_rescore_s": 0.01662,
+  "projected_baseline_step_s": 0.444775,
+  "projected_speedup_baseline_over_mpk": 0.41056090682937413,
+  "rollout_gap_s": 0.63856,
+  "mpk_rollout_target_s": 0.32339500000000004,
+  "required_rollout_reduction_s": 0.63856,
+  "mpk_generated_tokens": 25075,
+  "baseline_generated_tokens": 22487,
+  "generated_token_ratio": 1.1150887179259128,
+  "passes_speedup_gate": false
+}

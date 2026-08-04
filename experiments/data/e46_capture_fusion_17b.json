@@ -1,0 +1,21 @@
+{
+  "experiment": "E46 sampled probability-capture fusion",
+  "model": "Qwen/Qwen3-1.7B",
+  "group_size": 8,
+  "generated_tokens_per_request": 473,
+  "runs_per_variant": 3,
+  "bitwise_identical": true,
+  "standalone_ms_per_token": [
+    3.2041985988616943,
+    3.4111075401306152,
+    3.140718936920166
+  ],
+  "fused_ms_per_token": [
+    2.8095827102661133,
+    2.8128466606140137,
+    2.8127036094665527
+  ],
+  "standalone_median_ms_per_token": 3.2041985988616943,
+  "fused_median_ms_per_token": 2.8127036094665527,
+  "speedup": 1.1391881419988619
+}

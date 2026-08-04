@@ -1,0 +1,24 @@
+{
+  "experiment": "E48 one-pass sampled probability capture",
+  "commit": "3524de4e",
+  "model": "Qwen/Qwen3-1.7B",
+  "group_size": 8,
+  "generated_tokens_per_request": 473,
+  "runs_per_variant": 3,
+  "bitwise_identical": true,
+  "reference_prompt_bitwise": "38/38",
+  "reference_generated_bitwise": "296/296",
+  "standalone_ms_per_token": [
+    2.924243927001953,
+    2.9256844520568848,
+    2.922865390777588
+  ],
+  "fused_ms_per_token": [
+    2.8302881717681885,
+    2.8323631286621094,
+    2.833979368209839
+  ],
+  "standalone_median_ms_per_token": 2.924243927001953,
+  "fused_median_ms_per_token": 2.8323631286621094,
+  "speedup": 1.0324396252055592
+}

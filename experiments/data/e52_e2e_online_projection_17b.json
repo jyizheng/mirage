@@ -1,0 +1,18 @@
+{
+  "experiment": "E52 matched online MPK same-trainer projection",
+  "model": "Qwen3-1.7B-group16-matched-online",
+  "mpk_steps": 20,
+  "baseline_steps": 20,
+  "mpk_online_rollout_s": 2.14612645,
+  "shared_reward_train_sync_s": 0.30777,
+  "projected_mpk_step_s": 2.45389645,
+  "baseline_generate_s": 0.7951,
+  "baseline_old_rescore_s": 0.0444407,
+  "projected_baseline_step_s": 1.1473107,
+  "projected_speedup_baseline_over_mpk": 0.4675465099,
+  "mpk_generated_tokens": 135616,
+  "baseline_generated_tokens": 135616,
+  "generated_token_ratio": 1.0,
+  "all_mpk_tokens_have_captured_logprobs": true,
+  "passes_speedup_gate": false
+}

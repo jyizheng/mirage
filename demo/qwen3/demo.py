@@ -139,6 +139,11 @@ if __name__ == "__main__":
         help="Trainer replay micro-batch size; 0 batches the full GRPO group.",
     )
     parser.add_argument(
+        "--grpo-trainer-backend",
+        default="hf",
+        help="Backward backend: 'hf' or a lazy '<module>:<factory>' plugin.",
+    )
+    parser.add_argument(
         "--grpo-measure-old-recompute",
         action="store_true",
         help="Measure the eliminated trainer-side old-logprob recompute pass. "

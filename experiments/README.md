@@ -84,6 +84,19 @@ noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).
   uses the same GSM8K prompts and total sequence cap as MPK, ignores EOS so
   both arms process exactly the same token count, and invokes miles' own
   prefill-scoring payload builder for the old-policy rescore phase.
+- `e52_online_mpk.py` — matched-token MPK serving arm. It submits the same
+  raw token ids through the completion API, requests deterministic sampled
+  rollouts and captured logprobs, ignores EOS, and verifies every response
+  reaches the requested length. Together with E50 it measures the rollout
+  boundary without changing the shared reward/backward/update tail.
+
+The E51/E52 matched artifacts process 135,616 generated tokens in each
+arm. The current B200 result is a negative performance result: the offline
+MPK step is 2.495 s and the online projection is 2.454 s, versus 1.147 s
+for normal SGLang generation plus miles-style prefill rescore and the same
+trainer tail. The zero-TIM path is therefore implemented but does not yet
+win E2E at Qwen3-1.7B/group-16; the remaining gap is MPK decode GEMM
+throughput, not probability capture or serving setup.
 
 Example with the archived 1.7B data:
 
@@ -96,8 +109,10 @@ python experiments/e45_e2e_accounting.py \
 
 ## RL experiments (RQ6/RQ7 + dose-response)
 
-- `../demo/qwen3/e19_grpo.py` — GRPO loop with MPK rollouts; arms `mpk`
-  (autograd-function forward) vs `hf` (recompute).
+- `../demo/qwen3/e19_grpo.py` — GRPO loop with MPK rollouts. The MPK arm
+  uses rollout-captured values in the loss while differentiable trainer
+  logprobs provide the gradient path; the `hf` arm uses trainer recompute
+  values as well as its gradient path.
 - `e23_noise.py` — one-step dose-response: inject the measured empirical
   δt distribution (from e20) into the GRPO ratio at scale f; reports
   clip fraction, ratio tails, gradient cosine.
