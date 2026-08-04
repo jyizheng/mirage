@@ -2167,6 +2167,8 @@ class PersistentKernel:
         temperature: float = 1.0,
         top_k: int = 0,
         top_p: float = 1.0,
+        prompt_lengths: DTensor = None,
+        prob_buffer: DTensor = None,
     ):
         """Sampling from logits using Gumbel-Max for stochastic decoding.
 
@@ -2186,16 +2188,31 @@ class PersistentKernel:
         # would hand each task a one-row slice while the kernel indexes
         # global window rows -- silent wrong-row sampling (and OOB for
         # later requests) whenever grid.x > 1.
+        fused_capture = prob_buffer is not None or prompt_lengths is not None
+        if fused_capture and (prob_buffer is None or prompt_lengths is None):
+            raise ValueError(
+                "prompt_lengths and prob_buffer must be provided together"
+            )
         tb_graph.new_input(logits, (-1, -1, -1), -1, True)
+        tensors = [logits]
+        if fused_capture:
+            tb_graph.new_input(prompt_lengths, (-1, -1, -1), -1, True)
+            tensors.append(prompt_lengths)
         tb_graph.new_input(output, (-1, -1, -1), -1, True)
-        self.kn_graph.customized([logits, output], tb_graph)
+        tensors.append(output)
+        if fused_capture:
+            tb_graph.new_input(prob_buffer, (-1, -1, -1), -1, True)
+            tensors.append(prob_buffer)
+        self.kn_graph.customized(tensors, tb_graph)
 
         # Params: [seed] keeps the legacy (bitwise-identical) variant;
         # [seed, temp*1000, top_k, top_p*1000] enables truncation.
         default = (temperature == 1.0 and top_k == 0 and top_p == 1.0)
-        params = [seed] if default else [
+        params = [seed] if default and not fused_capture else [
             seed, int(round(temperature * 1000)), int(top_k),
             int(round(top_p * 1000))]
+        if fused_capture:
+            params.append(1)
         self.kn_graph.register_task(tb_graph, "sampling_sm100", params)
 
     def find_ngram_partial_layer(

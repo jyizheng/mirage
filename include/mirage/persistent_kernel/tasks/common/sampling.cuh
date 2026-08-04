@@ -246,7 +246,8 @@ __device__ __forceinline__ void
 template <uint32_t BLOCK_THREADS,
           uint32_t VEC_SIZE,
           typename DType,
-          typename IdType>
+          typename IdType,
+          bool CAPTURE_PROBS = false>
 __device__ __forceinline__ void
     sampling_from_logits_poskeyed_kernel(int const my_rid,
                                          int const num_rid_tasks,
@@ -263,7 +264,11 @@ __device__ __forceinline__ void
                                          int max_seq,
                                          float inv_temperature = 1.0f,
                                          int top_k = 0,
-                                         int top_p_milli = 1000) {
+                                         int top_p_milli = 1000,
+                                         float *prob_buffer_ptr = nullptr,
+                                         int const *prompt_lengths_ptr = nullptr,
+                                         long long const *all_tokens_ptr = nullptr,
+                                         int const *step_ptr = nullptr) {
   uint32_t const tx = threadIdx.x;
 
   using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
@@ -277,6 +282,8 @@ __device__ __forceinline__ void
   // (top-p mass; single block + fixed thread layout => reproducible).
   __shared__ int smem_thr_count;
   __shared__ float smem_thr_mass;
+  __shared__ float smem_capture_max[8];
+  __shared__ float smem_capture_sum[8];
   bool const do_topk = top_k > 0;
   bool const do_topp = top_p_milli < 1000;
 
@@ -314,6 +321,7 @@ __device__ __forceinline__ void
 
       uint64_t const row_off = static_cast<uint64_t>(row) * d;
       uint32_t const n_chunks = sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
+      float capture_local_max = -1e30f;
 
       // ---- deterministic top-k / top-p threshold on the ORDERED KEY ----
       // bf16 bits -> uint16 monotone key (larger float => larger key), so
@@ -402,6 +410,17 @@ __device__ __forceinline__ void
                                c * BLOCK_THREADS * VEC_SIZE + tx * VEC_SIZE);
         }
 
+        if constexpr (CAPTURE_PROBS) {
+#pragma unroll
+          for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+            uint32_t const idx = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
+            if (idx < d) {
+              capture_local_max = fmaxf(
+                  capture_local_max, static_cast<float>(logits_vec[j]));
+            }
+          }
+        }
+
         // noise subsequence is the vocab element index only; the
         // (request, position) identity lives in philox_offset
         sampling_vec_t<DType, VEC_SIZE> gumbel_noise =
@@ -434,6 +453,79 @@ __device__ __forceinline__ void
 
       if (tx == 0) {
         output[row] = max_data.index;
+      }
+
+      if constexpr (CAPTURE_PROBS) {
+        // Reuse sampling's logits read for the softmax max, then perform the
+        // sum with the exact thread-strided reduction order used by the
+        // standalone probability-capture task. This removes one full-vocab
+        // pass while preserving its captured probability bits.
+        for (int mask = 16; mask > 0; mask >>= 1) {
+          capture_local_max = fmaxf(
+              capture_local_max,
+              __shfl_xor_sync(0xffffffff, capture_local_max, mask));
+        }
+        int const warp_id = tx / 32;
+        int const lane_id = tx % 32;
+        if (lane_id == 0) {
+          smem_capture_max[warp_id] = capture_local_max;
+        }
+        __syncthreads();
+        if (tx < 8) {
+          float warp_max = smem_capture_max[tx];
+          for (int mask = 4; mask > 0; mask >>= 1) {
+            warp_max = fmaxf(
+                warp_max, __shfl_xor_sync(0xff, warp_max, mask));
+          }
+          smem_capture_max[0] = warp_max;
+        }
+        __syncthreads();
+        float const global_max = smem_capture_max[0];
+
+        float local_sum = 0.0f;
+        for (uint32_t vocab_idx = tx; vocab_idx < d;
+             vocab_idx += BLOCK_THREADS) {
+          local_sum += __expf(
+              static_cast<float>(logits[row_off + vocab_idx]) - global_max);
+        }
+        for (int mask = 16; mask > 0; mask >>= 1) {
+          local_sum += __shfl_xor_sync(0xffffffff, local_sum, mask);
+        }
+        if (lane_id == 0) {
+          smem_capture_sum[warp_id] = local_sum;
+        }
+        __syncthreads();
+        if (tx < 8) {
+          float warp_sum = smem_capture_sum[tx];
+          for (int mask = 4; mask > 0; mask >>= 1) {
+            warp_sum += __shfl_xor_sync(0xff, warp_sum, mask);
+          }
+          smem_capture_sum[0] = warp_sum;
+        }
+        __syncthreads();
+
+        if (tx == 0) {
+          int const req_row =
+              request_ids_ptr[rid] < 0 ? rid : request_ids_ptr[rid];
+          int const prompt_len = prompt_lengths_ptr[req_row];
+          long long target = -1;
+          if (pos + 1 < prompt_len) {
+            target = all_tokens_ptr[
+                static_cast<long long>(req_row) * max_seq + pos + 1];
+          } else if (i == num_tokens - 1) {
+            target = max_data.index;
+          }
+          int const target_id = static_cast<int>(target);
+          int const slot = step_ptr[req_row] + i;
+          if (target_id >= 0 && target_id < static_cast<int>(d) &&
+              slot >= 0 && slot < max_seq) {
+            float const target_logit =
+                static_cast<float>(logits[row_off + target_id]);
+            prob_buffer_ptr[
+                static_cast<long long>(req_row) * max_seq + slot] =
+                __expf(target_logit - global_max) / smem_capture_sum[0];
+          }
+        }
       }
       __syncthreads();
     }

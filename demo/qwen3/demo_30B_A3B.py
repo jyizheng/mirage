@@ -104,6 +104,11 @@ if __name__ == "__main__":
         help="Capture P(chosen token) at every step into a per-position "
         "buffer and include it in --dump-tokens-file output.")
     parser.add_argument(
+        "--no-fused-sampling-capture", action="store_false",
+        dest="fused_sampling_capture", default=True,
+        help="Use the standalone probability-capture task after sampling; "
+        "intended for correctness and performance A/B runs.")
+    parser.add_argument(
         "--prompt-ids-file", type=str, default=None,
         help="JSON file with a list of prompt token ids; bypasses the chat "
         "template (rescore-consistency harness).")
@@ -729,15 +734,28 @@ if __name__ == "__main__":
         else:
             argmax_partial_grid_dim = (mpk.num_workers, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
+        prob_buffer = None
+        prompt_lengths_for_prob = None
+        if args.capture_probs:
+            prob_buffer = mpk.attach_input(
+                torch_tensor=prob_buffer_torch, name="prob_buffer"
+            )
+            prompt_lengths_for_prob = mpk.attach_input(
+                torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
+            )
+
         if args.sampling_seed is not None:
             # Gumbel-Max sampling: deterministic given the seed, noise keyed
             # by (request, position) -- replaces the argmax pair.
+            fused_capture = args.capture_probs and args.fused_sampling_capture
             mpk.sampling_sm100_layer(
                 logits=argmax_in,
                 output=argmax_out,
                 grid_dim=(total_num_requests, 1, 1),
                 block_dim=(256, 1, 1),
                 seed=args.sampling_seed,
+                prompt_lengths=(prompt_lengths_for_prob if fused_capture else None),
+                prob_buffer=(prob_buffer if fused_capture else None),
             )
         else:
             mpk.argmax_partial_layer(
@@ -752,18 +770,15 @@ if __name__ == "__main__":
                 grid_dim=argmax_reduce_grid_dim,
                 block_dim=(256, 1, 1),
             )
-        if args.capture_probs:
+        if args.capture_probs and (
+            args.sampling_seed is None or not args.fused_sampling_capture
+        ):
             # Unified per-token probability capture (teacher-forcing rows +
             # generating row, qo-derived row->request mapping), same wiring
             # as the dense demo.
-            prob_buffer = mpk.attach_input(
-                torch_tensor=prob_buffer_torch, name="prob_buffer"
-            )
             mpk.prefill_prob_capture_layer(
                 logits=argmax_in,
-                prompt_lengths=mpk.attach_input(
-                    torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
-                ),
+                prompt_lengths=prompt_lengths_for_prob,
                 chosen_tokens=argmax_out,
                 buffer=prob_buffer,
                 page_size=args.page_size,

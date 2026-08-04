@@ -74,6 +74,21 @@ noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).
 - `runners/e44_run.sh` — runs synthetic and real-MPK weight-sync
   benchmarks; this is the bridge experiment toward the disaggregated
   miles-class comparison.
+- `e45_e2e_accounting.py` — same-trainer E2E projection and speedup gate.
+  It removes E19's optional old-logprob diagnostic from MPK wall-clock,
+  holds reward/trainer/optimizer/sync time fixed, and swaps only MPK rollout
+  against SGLang generation + miles-style rescore. The script warns when
+  generated-token totals are not matched; it is an optimization gate, not a
+  replacement for the final full-miles wall-clock run.
+
+Example with the archived 1.7B data:
+
+```bash
+python experiments/e45_e2e_accounting.py \
+  --model Qwen3-1.7B \
+  --mpk-log experiments/data/e39_full17b.jsonl \
+  --baseline-log experiments/data/e32_sgl.jsonl
+```
 
 ## RL experiments (RQ6/RQ7 + dose-response)
 

@@ -133,6 +133,18 @@ if __name__ == "__main__":
     parser.add_argument("--grpo-lr", type=float, default=2e-6)
     parser.add_argument("--grpo-log", type=str, default=None)
     parser.add_argument(
+        "--grpo-trainer-micro-batch-size",
+        type=int,
+        default=0,
+        help="Trainer replay micro-batch size; 0 batches the full GRPO group.",
+    )
+    parser.add_argument(
+        "--grpo-measure-old-recompute",
+        action="store_true",
+        help="Measure the eliminated trainer-side old-logprob recompute pass. "
+        "Disabled by default so it is not charged to E2E engine time.",
+    )
+    parser.add_argument(
         "--sampling-seed",
         type=int,
         default=None,
@@ -145,6 +157,14 @@ if __name__ == "__main__":
         help="Capture P(chosen token) at every step into a per-position "
         "buffer (softmax_gather + prob_scatter) and include it in "
         "--dump-tokens-file output.",
+    )
+    parser.add_argument(
+        "--no-fused-sampling-capture",
+        action="store_false",
+        dest="fused_sampling_capture",
+        default=True,
+        help="Use the standalone probability-capture task after sampling; "
+        "intended for correctness and performance A/B runs.",
     )
     parser.add_argument(
         "--prompt-ids-file",
@@ -872,11 +892,23 @@ if __name__ == "__main__":
         else:
             argmax_partial_grid_dim = (mpk.num_workers, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
+        prob_buffer = None
+        prompt_lengths_for_prob = None
+        if args.capture_probs:
+            prob_buffer = mpk.attach_input(
+                torch_tensor=prob_buffer_torch, name="prob_buffer"
+            )
+            prompt_lengths_for_prob = mpk.attach_input(
+                torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
+            )
+
         if args.sampling_seed is not None:
             # Gumbel-Max sampling (deterministic given the seed; the philox
             # offset advances with the runtime step so every step draws
-            # fresh noise). Replaces the argmax pair; the capture path below
-            # is unchanged since it gathers whatever token was chosen.
+            # fresh noise). When logprobs are requested, sampling also reuses
+            # this vocab scan for the softmax max and emits the probability;
+            # only the fixed-order exp-sum scan remains.
+            fused_capture = args.capture_probs and args.fused_sampling_capture
             mpk.sampling_sm100_layer(
                 logits=argmax_in,
                 output=argmax_out,
@@ -886,6 +918,8 @@ if __name__ == "__main__":
                 temperature=(args.temperature if args.temperature > 0 else 1.0),
                 top_k=args.top_k,
                 top_p=args.top_p,
+                prompt_lengths=(prompt_lengths_for_prob if fused_capture else None),
+                prob_buffer=(prob_buffer if fused_capture else None),
             )
         else:
             mpk.argmax_partial_layer(
@@ -900,15 +934,14 @@ if __name__ == "__main__":
                 grid_dim=argmax_reduce_grid_dim,
                 block_dim=(128, 1, 1),
             )
-        if args.capture_probs:
+        if args.capture_probs and (
+            args.sampling_seed is None or not args.fused_sampling_capture
+        ):
             # Per-step probability capture for the rescore-consistency
             # harness: P(chosen token) = softmax(logits)[argmax_out],
             # scattered into prob_buffer[0, step]. Only row 0 (request 0,
             # single-token decode) is meaningful; prefill-chunk iterations
             # write don't-care values at prefill positions.
-            prob_buffer = mpk.attach_input(
-                torch_tensor=prob_buffer_torch, name="prob_buffer"
-            )
             # unified per-token probability capture: teacher-forcing rows
             # (prefill/rescore) and the generating row (decode) in ONE task
             # with qo-derived row->request mapping. Replaces the earlier
@@ -917,9 +950,7 @@ if __name__ == "__main__":
             # times and the decode window re-packed.
             mpk.prefill_prob_capture_layer(
                 logits=argmax_in,
-                prompt_lengths=mpk.attach_input(
-                    torch_tensor=prompt_lengths, name="prompt_lengths_for_prob"
-                ),
+                prompt_lengths=prompt_lengths_for_prob,
                 chosen_tokens=argmax_out,
                 buffer=prob_buffer,
                 page_size=args.page_size,
@@ -1242,6 +1273,7 @@ if __name__ == "__main__":
             out = {
                 "prompt_length": prompt_lengths[0].item(),
                 "token_ids": tokens[0, : step[0].item() + 1].tolist(),
+                "latency_ms_per_token": per_tok_ms,
             }
             if args.capture_probs:
                 # raw float32 bit patterns so the harness can compare bitwise

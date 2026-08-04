@@ -1,10 +1,9 @@
 # E19: scaled-down GRPO stability experiment (TIM-paper replication shape).
 #
 # Two arms differing ONLY in where the trainer's logprob VALUES come from:
-#   arm "mpk": theta-logprobs enter the loss through an autograd.Function
-#              whose forward returns the MPK rescore values (bit-exact w.r.t.
-#              the rollout engine) and whose backward recomputes them
-#              differentiably on the trainer stack (design doc §5.3).
+#   arm "mpk": theta-logprob values come from MPK (bit-exact w.r.t. the
+#              rollout engine), while a selectable trainer backend supplies
+#              the differentiable replay and backward (design doc §5.3).
 #              On-policy, ratio == 1 bitwise -> clipping never spuriously
 #              activates.
 #   arm "hf":  theta-logprobs are the trainer-stack (HF) forward values —
@@ -24,6 +23,10 @@ import time
 
 import torch
 
+from mirage.mpk.trainer_backend import (
+    HuggingFaceTrainerBackend,
+    bind_forward_values,
+)
 from mirage.mpk.weight_sync import build_name_matching_sync_plan
 
 
@@ -84,6 +87,12 @@ def run(
     trainer.gradient_checkpointing_enable()
     trainer.train()
     opt = torch.optim.AdamW(trainer.parameters(), lr=args.grpo_lr)
+    backend = HuggingFaceTrainerBackend(
+        trainer,
+        tokenizer,
+        opt,
+        micro_batch_size=getattr(args, "grpo_trainer_micro_batch_size", 0),
+    )
 
     demo_sd = dict(model_demo.named_parameters())
     hf_sd = dict(trainer.named_parameters())
@@ -100,7 +109,9 @@ def run(
           f"{sync_report.gib:.2f} GiB")
     data = load_gsm8k(tokenizer, args.grpo_steps * 1)
     print(f"[e19] arm={arm} steps={args.grpo_steps} group={R} "
-          f"lr={args.grpo_lr} data={len(data)}")
+          f"lr={args.grpo_lr} data={len(data)} "
+          f"trainer_backend=hf trainer_micro_batch="
+          f"{backend.micro_batch_size or R}")
 
     def rollout(prompt_ids):
         plen = len(prompt_ids)
@@ -133,35 +144,14 @@ def run(
             outs.append({"ids": ids, "plen": plen, "pos": pos, "lp_old": lp})
         return outs
 
-    def trainer_logprobs(sample):
-        ids = torch.tensor([sample["ids"]], dtype=torch.long, device=dev)
-        rows = torch.tensor([t - 1 for t in sample["pos"]], device=dev)
-        tg = torch.tensor([sample["ids"][t] for t in sample["pos"]], device=dev)
-        logits = trainer(input_ids=ids).logits[0]
-        lp = torch.log_softmax(logits[rows].float(), dim=-1)
-        return lp.gather(-1, tg.unsqueeze(-1)).squeeze(-1)
-
-    class MPKForward(torch.autograd.Function):
-        @staticmethod
-        def forward(ctx, anchor, sample_idx):
-            s = samples[sample_idx]
-            ctx.sample_idx = sample_idx
-            return torch.tensor(s["lp_old"], dtype=torch.float32, device=dev)
-
-        @staticmethod
-        def backward(ctx, grad_out):
-            with torch.enable_grad():
-                lp = trainer_logprobs(samples[ctx.sample_idx])
-                lp.backward(grad_out)
-            return None, None
-
-    anchor = torch.zeros(1, requires_grad=True, device=dev)
     clip_eps = 0.2
+    measure_old_recompute = getattr(args, "grpo_measure_old_recompute", False)
 
     for it, (prompt_ids, gold) in enumerate(data[: args.grpo_steps]):
-        t0 = time.time()
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
         samples = rollout(prompt_ids)
-        t_rollout = time.time() - t0
+        t_rollout = time.perf_counter() - t0
         rewards = []
         for s in samples:
             text = tokenizer.decode(s["ids"][s["plen"]:],
@@ -170,25 +160,39 @@ def run(
         rw = torch.tensor(rewards, device=dev)
         adv = (rw - rw.mean()) / (rw.std() + 1e-6)
 
-        t1 = time.time()
-        with torch.no_grad():
-            for s_ in samples:
-                if s_["lp_old"]:
-                    trainer_logprobs(s_)
-        t_recompute = time.time() - t1
+        # This pass is a counterfactual baseline, not part of the zero-TIM
+        # engine.  Keep it opt-in so E2E timing does not charge MPK for work
+        # that the design eliminates.
+        t_old_recompute = 0.0
+        if measure_old_recompute:
+            old_recompute_samples = [s for s in samples if s["lp_old"]]
+            torch.cuda.synchronize()
+            t1 = time.perf_counter()
+            with torch.no_grad():
+                backend.selected_token_logprobs(old_recompute_samples)
+            torch.cuda.synchronize()
+            t_old_recompute = time.perf_counter() - t1
 
-        t2 = time.time()
-        opt.zero_grad(set_to_none=True)
+        torch.cuda.synchronize()
+        t2 = time.perf_counter()
+        backend.zero_grad()
         losses, ratio_devs, clip_hits, n_tok = [], [], 0, 0
         worst = {}
-        for i, s in enumerate(samples):
-            if not s["lp_old"] or adv[i].abs() < 1e-8:
-                continue
+        active = [
+            i for i, s in enumerate(samples)
+            if s["lp_old"] and float(adv[i].abs()) >= 1e-8
+        ]
+        trainer_lps = backend.selected_token_logprobs(
+            [samples[i] for i in active]
+        )
+        for active_idx, i in enumerate(active):
+            s = samples[i]
             lp_old = torch.tensor(s["lp_old"], dtype=torch.float32, device=dev)
+            lp_trainer = trainer_lps[active_idx]
             if arm == "mpk":
-                lp_theta = MPKForward.apply(anchor, i)
+                lp_theta = bind_forward_values(lp_old, lp_trainer)
             else:
-                lp_theta = trainer_logprobs(s)
+                lp_theta = lp_trainer
             ratio = torch.exp(lp_theta - lp_old)
             ratio_devs.append((ratio - 1).abs().max().item())
             with torch.no_grad():
@@ -218,11 +222,18 @@ def run(
             losses.append(-torch.minimum(un, cl).mean())
         if losses:
             loss = torch.stack(losses).mean()
-            loss.backward()
-            gn = torch.nn.utils.clip_grad_norm_(trainer.parameters(), 1.0)
-            opt.step()
+            gn = backend.backward_and_step(loss)
+            torch.cuda.synchronize()
             # sync trainer -> rollout weights (MPK reads them next rollout)
+            t_sync_start = time.perf_counter()
             sync_report = sync_weights()
+            torch.cuda.synchronize()
+            t_sync = time.perf_counter() - t_sync_start
+        else:
+            t_sync = 0.0
+        torch.cuda.synchronize()
+        t_train = time.perf_counter() - t2
+        t_step = time.perf_counter() - t0
         rec = {
             "step": it,
             "reward_mean": float(rw.mean()),
@@ -233,13 +244,16 @@ def run(
             "grad_norm": float(gn) if losses else None,
             "gen_lens": [len(s["pos"]) for s in samples],
             "t_rollout_s": round(t_rollout, 4),
-            "t_recompute_s": round(t_recompute, 4),
-            "t_update_s": round(time.time() - t2, 4),
+            "t_old_recompute_s": round(t_old_recompute, 4),
+            # Deprecated alias retained for existing analysis scripts.
+            "t_recompute_s": round(t_old_recompute, 4),
+            "t_train_s": round(t_train, 4),
+            "t_update_s": round(t_train, 4),
             "sync_tensors": sync_report.tensors if losses else 0,
             "sync_bytes": sync_report.bytes if losses else 0,
-            "t_sync_s": round(sync_report.elapsed_s, 6) if losses else 0.0,
-            "t_step_s": round(time.time() - t0, 4),
-            "sec": time.time() - t0,
+            "t_sync_s": round(t_sync, 6),
+            "t_step_s": round(t_step, 4),
+            "sec": t_step,
         }
         log_f.write(json.dumps(rec) + "\n")
         log_f.flush()

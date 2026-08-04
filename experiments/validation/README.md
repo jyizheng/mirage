@@ -24,6 +24,11 @@ bitwise results cited in the paper's §7 / RQ2 / Table 3.
   policy's bit-for-bit. Result: 334/334 (38 teacher-forced prompt + 296
   decoded). Raw dump archived at `../data/reference_cocompile_ref.json`.
 
+- `e46_sampling_capture_fusion.sh` — sampled rollout probability-capture
+  fusion A/B. Runs the standalone and fused paths three times each with a
+  matched group-8 token trace, requires bitwise-identical token/probability
+  dumps, and reports median end-to-end MPK latency.
+
 Note: `../e43_miles_baseline.py` (proves the recompute baseline is miles'
 own `_build_prefill_scoring_payload`) and the paper-figure experiments
 live one level up in `experiments/`.

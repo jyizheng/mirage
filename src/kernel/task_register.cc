@@ -2294,11 +2294,13 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
                                                std::vector<int> const &params) {
   // params[0]: seed
   // params[1..3] (optional): temperature*1000, top_k, top_p*1000
-  assert(params.size() == 1 || params.size() == 4);
+  // params[4] (optional): fuse selected-token probability capture
+  assert(params.size() == 1 || params.size() == 4 || params.size() == 5);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
-  int num_inputs = 1;
-  int num_outputs = 1;
+  bool const capture_probs = params.size() == 5;
+  int num_inputs = capture_probs ? 2 : 1;
+  int num_outputs = capture_probs ? 2 : 1;
 
   assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
   for (auto const &op : bgraph.operators) {
@@ -2315,9 +2317,9 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   int seed = params[0];
   // Defaults reproduce plain Gumbel-Max argmax (temp 1, no truncation),
   // so graphs that pass only [seed] are bitwise-unchanged.
-  int temp_milli = params.size() == 4 ? params[1] : 1000;
-  int top_k = params.size() == 4 ? params[2] : 0;
-  int top_p_milli = params.size() == 4 ? params[3] : 1000;
+  int temp_milli = params.size() >= 4 ? params[1] : 1000;
+  int top_k = params.size() >= 4 ? params[2] : 0;
+  int top_p_milli = params.size() >= 4 ? params[3] : 1000;
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
@@ -2329,7 +2331,8 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   // next step's embedding reads out of bounds).
   int grid_x = bgraph.grid_dim.x;
   code.e("kernel::sampling_from_logits_poskeyed_kernel<256, 4, bfloat16, "
-         "long long>(");
+         "long long, $>(",
+         capture_probs ? "true" : "false");
   code.e("    task_desc->task_metadata.request_id,");
   code.e("    $,", grid_x);
   code.e("    static_cast<bfloat16*>(task_desc->input_ptrs[0]),");
@@ -2345,7 +2348,15 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   code.e("    MPK_MAX_SEQ_LENGTH,");
   code.e("    1000.0f / $.0f,", temp_milli);
   code.e("    $,", top_k);
-  code.e("    $);", top_p_milli);
+  if (capture_probs) {
+    code.e("    $,", top_p_milli);
+    code.e("    static_cast<float*>(task_desc->output_ptrs[1]),");
+    code.e("    static_cast<int const*>(task_desc->input_ptrs[1]),");
+    code.e("    runtime_config.tokens,");
+    code.e("    runtime_config.step);");
+  } else {
+    code.e("    $);", top_p_milli);
+  }
   (void)batch_size;
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }
