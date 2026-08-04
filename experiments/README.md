@@ -113,12 +113,44 @@ python experiments/e45_e2e_accounting.py \
   uses rollout-captured values in the loss while differentiable trainer
   logprobs provide the gradient path; the `hf` arm uses trainer recompute
   values as well as its gradient path.
+- `--grpo-trainer-backend` selects `hf`, `torchtitan`, `megatron`, or a
+  project-specific `<module>:<factory>`. The built-in TorchTitan path loads
+  TorchTitan's native Qwen3 model, maps HF weights/names with its state-dict
+  adapter, and uses TorchTitan gradient clipping and optimizer containers.
+  The built-in Megatron path uses Megatron Bridge for Qwen3 conversion,
+  gathers TP logits for selected-token log-softmax, finalizes distributed
+  gradients, and steps the Megatron optimizer. Both adapters accept one
+  non-pipeline model part: prebuilt TorchTitan stacks may carry TP/FSDP2,
+  while the Megatron builder configures TP/DDP and its distributed optimizer.
+  PP is rejected until the RL loss is hosted inside the framework's coupled
+  pipeline forward/backward schedule.
 - `e23_noise.py` — one-step dose-response: inject the measured empirical
   δt distribution (from e20) into the GRPO ratio at scale f; reports
   clip fraction, ratio tails, gradient cosine.
 - `e25_train.py` — 300-step training version (Qwen3-1.7B).
 - `e26_train.py` — at-scale version (Qwen3-8B, thousands of steps,
   held-out greedy eval every 100 steps).
+
+Install optional stacks with `pip install -e '.[torchtitan]'` or
+`pip install -e '.[megatron]'`. The Megatron extra is pinned to the
+Megatron Bridge 0.3/Core 0.16 line compatible with this repository's
+Transformers 4.x dependency. A single-node TorchTitan run is selected by:
+
+```bash
+python demo/qwen3/demo.py --use-mirage --model Qwen/Qwen3-1.7B \
+  --deterministic --sampling-seed 42 --capture-probs \
+  --grpo-steps 1 --grpo-trainer-backend torchtitan
+```
+
+The built-in Megatron path initializes a single-process NCCL/model-parallel
+runtime when needed and reuses an existing distributed runtime when launched
+under `torchrun`. Distributed launchers can alternatively pass prebuilt model
+chunks/optimizers through a `<module>:<factory>` integration.
+
+The archived B200/Qwen3-1.7B runs are `e54` (TorchTitan), `e55`
+(Megatron), and `e56` (Megatron with the eliminated old-policy replay timed
+as a paired counterfactual). They use TorchTitan 0.2.0 and Megatron-Core
+0.16.1 + Megatron Bridge 0.3.1, respectively.
 
 ## TP crash repro (RQ4)
 

@@ -4,6 +4,8 @@ from .persistent_kernel import PersistentKernel
 from .online_pinned_runtime import OnlinePinnedRuntime
 from .trainer_backend import (
     HuggingFaceTrainerBackend,
+    MegatronTrainerBackend,
+    TorchTitanTrainerBackend,
     TrainerBackend,
     bind_forward_values,
     create_trainer_backend,
@@ -25,6 +27,8 @@ __all__ = [
     "OnlinePinnedRuntime",
     "TrainerBackend",
     "HuggingFaceTrainerBackend",
+    "TorchTitanTrainerBackend",
+    "MegatronTrainerBackend",
     "bind_forward_values",
     "create_trainer_backend",
     "SyncReport",

@@ -311,6 +311,18 @@ with copy_include() as copied:
         description="Mirage: A Multi-Level Superoptimizer for Tensor Algebra",
         zip_safe=False,
         install_requires=requirements,
+        extras_require={
+            "torchtitan": ["torchtitan>=0.2,<0.3"],
+            "megatron": [
+                "megatron-core>=0.16,<0.17",
+                "megatron-bridge>=0.3.1,<0.4",
+            ],
+            "trainer-backends": [
+                "torchtitan>=0.2,<0.3",
+                "megatron-core>=0.16,<0.17",
+                "megatron-bridge>=0.3.1,<0.4",
+            ],
+        },
         packages=find_packages(where="python"),
         package_dir={"": "python"},
         package_data={"mirage": ["lib/*.so"]},

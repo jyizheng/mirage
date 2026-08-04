@@ -141,7 +141,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--grpo-trainer-backend",
         default="hf",
-        help="Backward backend: 'hf' or a lazy '<module>:<factory>' plugin.",
+        help="Backward backend: 'hf', 'torchtitan', 'megatron', or a "
+        "lazy '<module>:<factory>' plugin.",
     )
     parser.add_argument(
         "--grpo-measure-old-recompute",

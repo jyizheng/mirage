@@ -16,6 +16,7 @@
 # tensors in scope. Single GPU; group sampling uses the batch's request
 # slots (position-keyed Gumbel noise differs per request slot, so a group
 # on the same prompt yields distinct trajectories).
+import atexit
 import json
 import math
 import re
@@ -88,18 +89,27 @@ def run(
         factory_kwargs={"engine_args": args}
         if args.grpo_trainer_backend != "hf" else None,
     )
+    close_backend = getattr(backend, "close", None)
+    if close_backend is not None:
+        atexit.register(close_backend)
 
     demo_sd = dict(model_demo.named_parameters())
-    trainer_sd = dict(backend.named_parameters())
-    sync_plan = build_name_matching_sync_plan(
-        trainer_sd, demo_sd, tie_lm_head_to_embeddings=True)
-    print(f"[e19] weight-sync plan: {len(sync_plan.specs)} tensors")
+    sync_plan = None
+    sync_source_ids = None
 
     def sync_weights():
+        nonlocal sync_plan, sync_source_ids
+        trainer_sd = dict(backend.named_parameters())
+        source_ids = tuple((name, id(value)) for name, value in trainer_sd.items())
+        if sync_plan is None or source_ids != sync_source_ids:
+            sync_plan = build_name_matching_sync_plan(
+                trainer_sd, demo_sd, tie_lm_head_to_embeddings=True)
+            sync_source_ids = source_ids
         report = sync_plan.sync(trainer_sd, demo_sd, strict=True)
         return report
 
     sync_report = sync_weights()  # start from identical weights on both sides
+    print(f"[e19] weight-sync plan: {len(sync_plan.specs)} tensors")
     print(f"[e19] initial weight-sync: {sync_report.tensors} tensors, "
           f"{sync_report.gib:.2f} GiB")
     data = load_gsm8k(tokenizer, args.grpo_steps * 1)
@@ -247,12 +257,20 @@ def run(
             "sync_tensors": sync_report.tensors if losses else 0,
             "sync_bytes": sync_report.bytes if losses else 0,
             "t_sync_s": round(t_sync, 6),
+            "t_zero_tim_step_s": round(t_step - t_old_recompute, 4),
+            "old_recompute_overhead_frac": (
+                t_old_recompute / t_step if t_step else 0.0
+            ),
             "t_step_s": round(t_step, 4),
             "sec": t_step,
+            "trainer_backend": args.grpo_trainer_backend,
         }
         log_f.write(json.dumps(rec) + "\n")
         log_f.flush()
         if it % 5 == 0:
             print(f"[e19] {rec}")
     log_f.close()
+    if close_backend is not None:
+        close_backend()
+        atexit.unregister(close_backend)
     print(f"[e19] DONE arm={arm} log={out_path}")

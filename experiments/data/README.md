@@ -63,6 +63,15 @@ that produced each file and the paper section each backs.
   `e52_e2e_online_projection_17b.json` — the same workload through the
   OpenAI-compatible completion server, including captured logprobs. This
   isolates offline episode setup from the persistent online path.
+- `e54_torchtitan_grpo_17b.jsonl` — one full MPK rollout + TorchTitan-native
+  Qwen3-1.7B backward/update/sync smoke step: ratio deviation and clip
+  fraction are zero; all 310 rollout tensors are synchronized.
+- `e55_megatron_grpo_17b.jsonl` — the corresponding MPK + Megatron-Core
+  replay/backward/distributed-optimizer/sync step.
+- `e56_megatron_old_recompute_17b.jsonl` — paired E2E accounting with the
+  eliminated trainer-side old-policy replay enabled only for timing.
+- `e57_megatron_grpo_17b_final.jsonl` — final regression after explicit
+  logit-layout handling and owned NCCL/model-parallel cleanup.
 
 ## Serving-level checks
 - `e35_serving_rescore.log` — online-engine rollout vs teacher-forcing
