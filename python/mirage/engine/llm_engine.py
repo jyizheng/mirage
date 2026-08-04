@@ -316,10 +316,14 @@ class LLMEngine:
                 # are pure memcpys on the copy engine
                 k_cache[layer, dst, :pfx].copy_(k_src)
                 v_cache[layer, dst, :pfx].copy_(v_src)
-        # The copies are asynchronous and, with the megakernel resident,
-        # can take a long time to be scheduled — members must not admit
-        # before the prefix KV has actually landed.
-        torch.cuda.synchronize()
+        # The copies are asynchronous — members must not admit before the
+        # prefix KV has actually landed. Wait for the copies ONLY, via an
+        # event on their stream: a full torch.cuda.synchronize() is
+        # cudaDeviceSynchronize, which also waits on the resident
+        # megakernel's stream and therefore never returns.
+        copies_done = torch.cuda.Event()
+        copies_done.record()
+        copies_done.synchronize()
 
         # ── members 1..G-1: prefix-cached admission ──
         rids = [rid0]
