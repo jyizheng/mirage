@@ -155,13 +155,15 @@ async def completions(request: Request):
         )
     else:
         loop = asyncio.get_running_loop()
+        use_template = body.get("use_template", True)
         result = await loop.run_in_executor(
             None, lambda: request.app.state.engine.submit(
-                prompt, timeout=timeout),
+                prompt, use_template=use_template, timeout=timeout),
         )
         choice = {
             "index": 0,
             "text": result["text"],
+            "token_ids": result["token_ids"],
             "finish_reason": "stop",
         }
         if "logprobs" in result:
@@ -188,6 +190,7 @@ def main():
     parser.add_argument("--max-seq-length", default=512, type=int)
     parser.add_argument("--max-num-pages", default=16, type=int)
     parser.add_argument("--page-size", default=4096, type=int)
+    parser.add_argument("--pinned-ring-capacity", default=8, type=int)
     parser.add_argument("--output-dir", default=None, help="Output directory for compiled artifacts")
     parser.add_argument("--deterministic", action="store_true",
                         help="Compile deterministic kernel variants (bitwise-reproducible, rescore-consistent rollouts)")
@@ -213,6 +216,7 @@ def main():
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,
         page_size=args.page_size,
+        pinned_ring_capacity=args.pinned_ring_capacity,
         output_dir=args.output_dir,
     )
     app.state.runner_config = config
