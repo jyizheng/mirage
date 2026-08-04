@@ -24,6 +24,8 @@ import time
 
 import torch
 
+from mirage.mpk.weight_sync import build_name_matching_sync_plan
+
 
 def extract_answer(text):
     m = re.findall(r"-?\d+\.?\d*", text.replace(",", ""))
@@ -83,26 +85,19 @@ def run(
     trainer.train()
     opt = torch.optim.AdamW(trainer.parameters(), lr=args.grpo_lr)
 
-    # weight sync map: demo model param names match HF checkpoint names
     demo_sd = dict(model_demo.named_parameters())
     hf_sd = dict(trainer.named_parameters())
-    sync_keys = [k for k in hf_sd if k in demo_sd]
-    # tied embeddings: HF exposes no lm_head.weight param; the demo model
-    # holds a separate lm_head tensor that MPK reads -- sync it from the
-    # (tied) embedding or the rollout policy's head goes stale
-    tied_head = ("lm_head.weight" not in hf_sd and "lm_head.weight" in demo_sd)
-    print(f"[e19] weight-sync keys: {len(sync_keys)}/{len(hf_sd)} "
-          f"tied_head={tied_head}")
+    sync_plan = build_name_matching_sync_plan(
+        hf_sd, demo_sd, tie_lm_head_to_embeddings=True)
+    print(f"[e19] weight-sync plan: {len(sync_plan.specs)} tensors")
 
     def sync_weights():
-        with torch.no_grad():
-            for k in sync_keys:
-                demo_sd[k].copy_(hf_sd[k])
-            if tied_head:
-                demo_sd["lm_head.weight"].copy_(
-                    hf_sd["model.embed_tokens.weight"])
+        report = sync_plan.sync(hf_sd, demo_sd, strict=True)
+        return report
 
-    sync_weights()  # start from identical weights on both sides
+    sync_report = sync_weights()  # start from identical weights on both sides
+    print(f"[e19] initial weight-sync: {sync_report.tensors} tensors, "
+          f"{sync_report.gib:.2f} GiB")
     data = load_gsm8k(tokenizer, args.grpo_steps * 1)
     print(f"[e19] arm={arm} steps={args.grpo_steps} group={R} "
           f"lr={args.grpo_lr} data={len(data)}")
@@ -227,7 +222,7 @@ def run(
             gn = torch.nn.utils.clip_grad_norm_(trainer.parameters(), 1.0)
             opt.step()
             # sync trainer -> rollout weights (MPK reads them next rollout)
-            sync_weights()
+            sync_report = sync_weights()
         rec = {
             "step": it,
             "reward_mean": float(rw.mean()),
@@ -240,6 +235,9 @@ def run(
             "t_rollout_s": round(t_rollout, 4),
             "t_recompute_s": round(t_recompute, 4),
             "t_update_s": round(time.time() - t2, 4),
+            "sync_tensors": sync_report.tensors if losses else 0,
+            "sync_bytes": sync_report.bytes if losses else 0,
+            "t_sync_s": round(sync_report.elapsed_s, 6) if losses else 0.0,
             "t_step_s": round(time.time() - t0, 4),
             "sec": time.time() - t0,
         }

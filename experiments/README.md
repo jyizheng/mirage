@@ -62,10 +62,18 @@ noted. SGLang baselines use a dedicated venv (`sglang.launch_server`).
   miles' own `_build_prefill_scoring_payload`, drives it against SGLang,
   and checks the payload is field-identical to ours (verifier for the
   paper's baseline claim). Run under the miles source on PYTHONPATH.
+- `e44_weight_sync_bench.py` — trainer→rollout synchronization benchmark
+  for the reusable `mirage.mpk.weight_sync` plan. `--target synthetic`
+  sanity-checks padding and TP slicing without model download;
+  `--target mpk` loads a real MPK rollout target and reports per-step
+  sync bytes, latency, and effective bandwidth.
 - `runners/e32_run.sh`, `runners/e38_run.sh` — orchestrate both arms
   (MPK GRPO + SGLang server + baseline) on one pod.
 - `runners/e43_run.sh` — brings up SGLang and runs the miles-baseline
   verifier.
+- `runners/e44_run.sh` — runs synthetic and real-MPK weight-sync
+  benchmarks; this is the bridge experiment toward the disaggregated
+  miles-class comparison.
 
 ## RL experiments (RQ6/RQ7 + dose-response)
 
