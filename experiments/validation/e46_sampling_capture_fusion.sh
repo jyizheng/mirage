@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-cd /workspace/mirage-det
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+cd "$repo_root"
 
 python -m pip install -e . --no-build-isolation \
   > /tmp/e46_build.log 2>&1
@@ -10,7 +11,7 @@ run_one() {
   local variant=$1
   local repetition=$2
   shift 2
-  PYTHONPATH=/workspace/mirage-det/python CUDA_VISIBLE_DEVICES=7 \
+  PYTHONPATH="$repo_root/python" CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-7}" \
     python demo/qwen3/demo.py \
       --use-mirage \
       --model Qwen/Qwen3-1.7B \
