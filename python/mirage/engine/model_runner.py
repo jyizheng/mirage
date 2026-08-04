@@ -39,12 +39,17 @@ class RunnerConfig:
     """Power-of-2 capacity for the CPU↔GPU pinned ring buffers."""
 
     capture_logprobs: bool = False
+    """Wire probability capture into the graph and expose logprobs."""
 
     deterministic: bool = False
     """Compile the deterministic kernel variants (bitwise reproducible,
     rescore-consistent rollouts)."""
-    """Wire the per-token probability-capture task into the compiled
-    graph and expose logprobs through the engine (no recompute pass)."""
+
+    sampling_seed: Optional[int] = None
+    """Enable position-keyed stochastic sampling when set."""
+
+    ignore_eos: bool = False
+    """Generate to ``max_seq_length`` for matched-token measurements."""
 
     tensor_parallel_size: int = 1
     """Number of GPUs for tensor parallelism (matches ``mpirun -n`` count)."""
@@ -100,6 +105,8 @@ class ModelRunner:
             use_cutlass_kernel=config.use_cutlass_kernel,
             capture_logprobs=config.capture_logprobs,
             deterministic=config.deterministic,
+            sampling_seed=config.sampling_seed,
+            ignore_eos=config.ignore_eos,
             **self.meta_tensors,
         )
         self.mpk = MPK(mpk_meta)

@@ -79,6 +79,10 @@ class MPKMetadata:
     # deterministic kernels (det split-K etc.); also honored via the
     # MPK_DETERMINISTIC env var for backwards compatibility
     deterministic: bool = False
+    # Position-keyed stochastic sampling; None keeps greedy argmax.
+    sampling_seed: Optional[int] = None
+    # Run every request to max_seq_length for matched-token benchmarks.
+    ignore_eos: bool = False
     
     def check_valid(self):
         if self.weight_from_model:
@@ -286,6 +290,8 @@ class MPK:
 
         self.capture_logprobs = args.capture_logprobs
         self.deterministic = args.deterministic
+        self.sampling_seed = args.sampling_seed
+        self.ignore_eos = args.ignore_eos
         self.is_built = False
         self.task_graph_generated = False
         self.is_compiled = False
@@ -468,11 +474,14 @@ class MPK:
         self.model_builder = model_builder_class(self.persistent_kernel)
         self.model_builder.capture_logprobs = self.capture_logprobs
         self.model_builder.deterministic = self.deterministic
+        self.model_builder.sampling_seed = self.sampling_seed
         if self.weight_from_model:
             self.model_builder.build_from_model(model_name=self.model_name)
             self.tokenizer = self.model_builder.tokenizer
         else:
             self.model_builder.build_from_config(self.model_config)
+        if self.ignore_eos:
+            self.model_builder.eos_token_id = -1
         
         self.is_built = True
         

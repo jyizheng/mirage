@@ -49,6 +49,7 @@ class GraphBuilder(abc.ABC):
         # P(chosen) capture wired after the lm_head.
         self.capture_logprobs = False
         self.deterministic = False
+        self.sampling_seed = None
 
     @abc.abstractmethod
     def build_from_model(self, model_path: str | None = None):

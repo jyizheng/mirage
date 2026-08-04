@@ -193,6 +193,10 @@ def main():
                         help="Compile deterministic kernel variants (bitwise-reproducible, rescore-consistent rollouts)")
     parser.add_argument("--capture-logprobs", action="store_true",
                         help="Compile the probability-capture task into the graph and return per-token logprobs in completions")
+    parser.add_argument("--sampling-seed", type=int, default=None,
+                        help="Enable position-keyed stochastic sampling.")
+    parser.add_argument("--ignore-eos", action="store_true",
+                        help="Generate every request to max sequence length.")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
                         help="Per-request timeout in seconds (default: 7200)")
     args = parser.parse_args()
@@ -204,6 +208,8 @@ def main():
         max_num_batched_tokens=args.max_num_batched_tokens,
         capture_logprobs=args.capture_logprobs,
         deterministic=args.deterministic,
+        sampling_seed=args.sampling_seed,
+        ignore_eos=args.ignore_eos,
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,
         page_size=args.page_size,

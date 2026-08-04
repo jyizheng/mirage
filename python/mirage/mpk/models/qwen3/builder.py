@@ -661,12 +661,21 @@ class Qwen3Builder(GraphBuilder):
             # else:
             argmax_partial_grid_dim = (self.mpk.num_workers, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
-            self.mpk.argmax_partial_layer(
-                input=self.argmax_in,
-                output=(self.argmax_part_value, self.argmax_part_index),
-                grid_dim=argmax_partial_grid_dim,
-                block_dim=(128, 1, 1),
-            )
+            if self.sampling_seed is None:
+                self.mpk.argmax_partial_layer(
+                    input=self.argmax_in,
+                    output=(self.argmax_part_value, self.argmax_part_index),
+                    grid_dim=argmax_partial_grid_dim,
+                    block_dim=(128, 1, 1),
+                )
+            else:
+                self.mpk.sampling_partial_sm100_layer(
+                    logits=self.argmax_in,
+                    output=(self.argmax_part_value, self.argmax_part_index),
+                    grid_dim=argmax_partial_grid_dim,
+                    block_dim=(256, 1, 1),
+                    seed=self.sampling_seed,
+                )
             self.mpk.argmax_reduce_layer(
                 input=(self.argmax_part_value, self.argmax_part_index),
                 output=argmax_out,
