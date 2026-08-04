@@ -1,0 +1,95 @@
+{
+  "experiment": "E58 MPK fast-path versus RL-path diagnostic",
+  "date": "2026-08-04",
+  "model": "Qwen/Qwen3-1.7B",
+  "gpu": "NVIDIA B200",
+  "code_revision": "b85760ad",
+  "scratch_changes": [
+    "accept configured KV-cache page count and page size"
+  ],
+  "common": {
+    "max_num_batched_requests": 16,
+    "max_seq_length": 512,
+    "prompt_length": 39,
+    "generated_length_per_request": 473,
+    "ignore_eos": true,
+    "page_size": 512,
+    "max_num_pages": 16,
+    "runs_per_cell": 1
+  },
+  "cells": [
+    {
+      "name": "paper_style_fast_path",
+      "max_num_batched_tokens": 16,
+      "deterministic": false,
+      "sampling_seed": null,
+      "capture_probs": false,
+      "latency_ms_per_iteration": 2.806,
+      "total_kernel_s": 1.436672
+    },
+    {
+      "name": "deterministic_greedy",
+      "max_num_batched_tokens": 16,
+      "deterministic": true,
+      "sampling_seed": null,
+      "capture_probs": false,
+      "latency_ms_per_iteration": 3.151,
+      "total_kernel_s": 1.613312
+    },
+    {
+      "name": "sampled_capture_nondeterministic",
+      "max_num_batched_tokens": 16,
+      "deterministic": false,
+      "sampling_seed": 1234,
+      "capture_probs": true,
+      "latency_ms_per_iteration": 2.956,
+      "total_kernel_s": 1.513472
+    },
+    {
+      "name": "full_rl_path",
+      "max_num_batched_tokens": 16,
+      "deterministic": true,
+      "sampling_seed": 1234,
+      "capture_probs": true,
+      "latency_ms_per_iteration": 3.345,
+      "total_kernel_s": 1.71264
+    },
+    {
+      "name": "full_rl_path_token_capacity_8",
+      "max_num_batched_tokens": 8,
+      "deterministic": true,
+      "sampling_seed": 1234,
+      "capture_probs": true,
+      "latency_ms_per_iteration": 5.152,
+      "total_kernel_s": 2.637824
+    }
+  ],
+  "paper_shape_cell": {
+    "name": "paper_style_fast_path_64_plus_1024",
+    "max_num_batched_requests": 16,
+    "max_num_batched_tokens": 16,
+    "max_seq_length": 1088,
+    "prompt_length": 64,
+    "generated_length_per_request": 1024,
+    "page_size": 2048,
+    "max_num_pages": 16,
+    "deterministic": false,
+    "sampling_seed": null,
+    "capture_probs": false,
+    "latency_ms_per_iteration": 3.012,
+    "total_kernel_s": 3.277056
+  },
+  "derived": {
+    "token_capacity_8_to_16_speedup_full_rl": 1.54021,
+    "deterministic_overhead_fraction": 0.122951,
+    "sampling_capture_overhead_fraction": 0.053457,
+    "full_rl_overhead_fraction": 0.192089
+  },
+  "limitations": [
+    "single run per cell",
+    "GPU memory was shared with other pods",
+    "KV page size was reduced to fit available memory",
+    "no same-session SGLang control"
+  ],
+  "status": "diagnostic_only"
+}

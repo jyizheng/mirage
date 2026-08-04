@@ -75,6 +75,12 @@ def run(
 ):
     R = tokens.shape[0]           # group size = request slots
     max_seq = tokens.shape[1]
+    if args.max_num_batched_tokens < R:
+        raise ValueError(
+            "fixed-group GRPO requires --max-num-batched-tokens >= "
+            f"--max-num-batched-requests ({args.max_num_batched_tokens} < {R}); "
+            "otherwise the rollout group is silently split into request waves"
+        )
     dev = "cuda"
     arm = args.grpo_arm
     out_path = args.grpo_log or f"/tmp/e19_{arm}.jsonl"
@@ -264,6 +270,13 @@ def run(
             "t_step_s": round(t_step, 4),
             "sec": t_step,
             "trainer_backend": args.grpo_trainer_backend,
+            "model": args.model,
+            "max_num_batched_requests": R,
+            "max_num_batched_tokens": args.max_num_batched_tokens,
+            "max_seq_length": max_seq,
+            "deterministic": args.deterministic,
+            "sampling_seed": args.sampling_seed,
+            "capture_probs": args.capture_probs,
         }
         log_f.write(json.dumps(rec) + "\n")
         log_f.flush()

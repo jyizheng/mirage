@@ -63,6 +63,10 @@ that produced each file and the paper section each backs.
   `e52_e2e_online_projection_17b.json` — the same workload through the
   OpenAI-compatible completion server, including captured logprobs. This
   isolates offline episode setup from the persistent online path.
+- `e58_mpk_fastpath_diagnostic_17b.json` — single-run localization of
+  request-token capacity, deterministic split-K, sampling, and logprob
+  capture at request batch 16. Full provenance and limitations are embedded;
+  this is diagnostic-only and must not replace repeated paper measurements.
 - `e54_torchtitan_grpo_17b.jsonl` — one full MPK rollout + TorchTitan-native
   Qwen3-1.7B backward/update/sync smoke step: ratio deviation and clip
   fraction are zero; all 310 rollout tensors are synchronized.
