@@ -59,6 +59,12 @@ class RunnerConfig:
 
     use_cutlass_kernel: bool = True
 
+    num_workers: int = -1
+    """Worker CTA count; -1 auto-probes from the GPU (utils.py table)."""
+
+    num_schedulers: int = -1
+    """Scheduler warp count; -1 auto-probes (4 warps per non-worker SM)."""
+
 
 # ── ModelRunner ───────────────────────────────────────────────────────────────
 
@@ -107,6 +113,8 @@ class ModelRunner:
             deterministic=config.deterministic,
             sampling_seed=config.sampling_seed,
             ignore_eos=config.ignore_eos,
+            num_workers=config.num_workers,
+            num_schedulers=config.num_schedulers,
             **self.meta_tensors,
         )
         self.mpk = MPK(mpk_meta)

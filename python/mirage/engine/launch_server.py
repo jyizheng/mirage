@@ -239,6 +239,10 @@ def main():
                         help="Generate every request to max sequence length.")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
                         help="Per-request timeout in seconds (default: 7200)")
+    parser.add_argument("--num-workers", default=-1, type=int,
+                        help="Worker CTA count (-1 = auto-probe)")
+    parser.add_argument("--num-schedulers", default=-1, type=int,
+                        help="Scheduler warp count (-1 = auto-probe)")
     args = parser.parse_args()
 
     config = RunnerConfig(
@@ -255,6 +259,8 @@ def main():
         page_size=args.page_size,
         pinned_ring_capacity=args.pinned_ring_capacity,
         output_dir=args.output_dir,
+        num_workers=args.num_workers,
+        num_schedulers=args.num_schedulers,
     )
     app.state.runner_config = config
     app.state.request_timeout = args.request_timeout
