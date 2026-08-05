@@ -1,0 +1,22 @@
+{
+  "experiment": "E45 same-trainer projection",
+  "model": "Qwen3-1.7B-group16-sharedprefix-mbt16-B300",
+  "mpk_steps": 20,
+  "baseline_steps": 20,
+  "mpk_step_raw_s": 1.5520018,
+  "eliminated_diagnostic_s": 0.0,
+  "mpk_engine_step_s": 1.5520018,
+  "mpk_rollout_s": 1.2442318,
+  "shared_reward_train_sync_s": 0.3077699999999999,
+  "baseline_generate_s": 0.7950999999999999,
+  "baseline_old_rescore_s": 0.0444407,
+  "projected_baseline_step_s": 1.1473106999999998,
+  "projected_speedup_baseline_over_mpk": 0.7392457276789239,
+  "rollout_gap_s": 0.4046911000000002,
+  "mpk_rollout_target_s": 0.8395406999999999,
+  "required_rollout_reduction_s": 0.4046911000000002,
+  "mpk_generated_tokens": 135616,
+  "baseline_generated_tokens": 135616,
+  "generated_token_ratio": 1.0,
+  "passes_speedup_gate": false
+}
