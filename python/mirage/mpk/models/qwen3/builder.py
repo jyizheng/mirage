@@ -3,7 +3,7 @@ import os
 from safetensors.torch import load_model
 import torch
 
-from ..utils import grid_for_rmsnorm_linear_layer, shuffle_tensors, inplace_shuffle_tensors
+from ..utils import grid_for_rmsnorm_linear_layer, max_factor_leq_n, shuffle_tensors, inplace_shuffle_tensors
 from ..graph_builder import GraphBuilder, MirageModelConfig
 from ...persistent_kernel import PersistentKernel
 from ...model_registry import register_model_builder
@@ -659,7 +659,12 @@ class Qwen3Builder(GraphBuilder):
             #                                1)
             #     argmax_reduce_grid_dim = (1, spec_decode_config.spec_length + 1, 1)
             # else:
-            argmax_partial_grid_dim = (self.mpk.num_workers, 1, 1)
+            # The sampling/argmax partition count must divide the padded
+            # vocab; decouple it from the worker count (e.g. 144 workers
+            # with vocab 153600 -> 128 partition tasks).
+            argmax_partial_grid_dim = (
+                max_factor_leq_n(self.padded_vocab_size, self.mpk.num_workers),
+                1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
             if self.sampling_seed is None:
                 self.mpk.argmax_partial_layer(
