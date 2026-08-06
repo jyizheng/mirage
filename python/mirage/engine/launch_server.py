@@ -235,6 +235,19 @@ def main():
                         help="Compile the probability-capture task into the graph and return per-token logprobs in completions")
     parser.add_argument("--sampling-seed", type=int, default=None,
                         help="Enable position-keyed stochastic sampling.")
+    parser.add_argument("--frequency-penalty", type=float, default=0.0,
+                        help="OpenAI-style frequency penalty over generated "
+                             "tokens. Compile-time engine default baked into "
+                             "the sampling kernel (requires --sampling-seed); "
+                             "per-request overrides are not supported.")
+    parser.add_argument("--presence-penalty", type=float, default=0.0,
+                        help="OpenAI-style presence penalty over generated "
+                             "tokens (compile-time; requires "
+                             "--sampling-seed).")
+    parser.add_argument("--repetition-penalty", type=float, default=1.0,
+                        help="HF-style repetition penalty over generated "
+                             "tokens (compile-time; requires "
+                             "--sampling-seed).")
     parser.add_argument("--ignore-eos", action="store_true",
                         help="Generate every request to max sequence length.")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
@@ -253,6 +266,9 @@ def main():
         capture_logprobs=args.capture_logprobs,
         deterministic=args.deterministic,
         sampling_seed=args.sampling_seed,
+        frequency_penalty=args.frequency_penalty,
+        presence_penalty=args.presence_penalty,
+        repetition_penalty=args.repetition_penalty,
         ignore_eos=args.ignore_eos,
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,

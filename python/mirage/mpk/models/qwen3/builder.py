@@ -680,6 +680,9 @@ class Qwen3Builder(GraphBuilder):
                     grid_dim=argmax_partial_grid_dim,
                     block_dim=(256, 1, 1),
                     seed=self.sampling_seed,
+                    frequency_penalty=self.frequency_penalty,
+                    presence_penalty=self.presence_penalty,
+                    repetition_penalty=self.repetition_penalty,
                 )
             self.mpk.argmax_reduce_layer(
                 input=(self.argmax_part_value, self.argmax_part_index),

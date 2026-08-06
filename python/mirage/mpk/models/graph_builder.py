@@ -50,6 +50,11 @@ class GraphBuilder(abc.ABC):
         self.capture_logprobs = False
         self.deterministic = False
         self.sampling_seed = None
+        # Compile-time sampling penalties (require sampling_seed); the
+        # defaults keep the emitted sampling task byte-identical.
+        self.frequency_penalty = 0.0
+        self.presence_penalty = 0.0
+        self.repetition_penalty = 1.0
 
     @abc.abstractmethod
     def build_from_model(self, model_path: str | None = None):

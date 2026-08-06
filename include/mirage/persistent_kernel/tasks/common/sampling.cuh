@@ -193,8 +193,21 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
     int page_size,
     int max_seq,
     int num_active_tokens,
-    float inv_temperature = 1.0f) {
+    float inv_temperature = 1.0f,
+    float frequency_penalty = 0.0f,
+    float presence_penalty = 0.0f,
+    float repetition_penalty = 1.0f,
+    long long const *all_tokens_ptr = nullptr,
+    int const *prompt_lengths_ptr = nullptr) {
   uint32_t const tx = threadIdx.x;
+  // Stateless history-scan penalties (OpenAI frequency/presence + HF
+  // repetition). Uniform branch: at the no-op defaults (0/0/1) — including
+  // the legacy 3-arg codegen form that relies on these default arguments —
+  // the whole scan folds away and the emitted arithmetic below is exactly
+  // the pre-penalty expression, keeping existing bitwise gates valid.
+  bool const do_penalties = (frequency_penalty != 0.0f) ||
+                            (presence_penalty != 0.0f) ||
+                            (repetition_penalty != 1.0f);
   using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
                                          BLOCK_THREADS,
                                          SAMPLING_REDUCE_ALGO>::TempStorage;
@@ -224,6 +237,18 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
         static_cast<uint64_t>(noise_rid) * static_cast<uint64_t>(max_seq) +
         pos + 1;
 
+    // Generated-token history for this request: tokens[] holds
+    // prompt + generated at their absolute positions (keyed by the stable
+    // buffer row, same as the noise), so the completion-so-far is
+    // [prompt_len, pos]. Empty for prefill rows (pos + 1 <= prompt_len),
+    // so prompt processing is untouched.
+    int pen_hist_begin = 0;
+    int pen_hist_end = 0;
+    if (do_penalties) {
+      pen_hist_begin = prompt_lengths_ptr[noise_rid];
+      pen_hist_end = pos + 1;
+    }
+
     SamplingDataAndIndex<DType, IdType> max_data = {
         -cuda::std::numeric_limits<DType>::infinity(), 0};
     uint32_t const n_chunks =
@@ -245,15 +270,50 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
               philox_seed, philox_offset,
               static_cast<uint64_t>(global_part_off + local_base));
 
+      // Per-element occurrence counts of this thread's vocab ids in the
+      // generated history. Fixed sequential scan order, per-thread register
+      // counters, no atomics -> deterministic and bitwise-reproducible.
+      int pen_count[VEC_SIZE];
+#pragma unroll
+      for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+        pen_count[j] = 0;
+      }
+      if (do_penalties) {
+        long long const hist_base =
+            static_cast<long long>(noise_rid) * max_seq;
+        for (int t = pen_hist_begin; t < pen_hist_end; ++t) {
+          long long const tok = all_tokens_ptr[hist_base + t];
+#pragma unroll
+          for (uint32_t j = 0; j < VEC_SIZE; ++j) {
+            if (tok == static_cast<long long>(global_part_off + local_base +
+                                              j)) {
+              ++pen_count[j];
+            }
+          }
+        }
+      }
+
       SamplingDataAndIndex<DType, IdType> candidates[VEC_SIZE];
 #pragma unroll
       for (uint32_t j = 0; j < VEC_SIZE; ++j) {
         uint32_t const local_idx = local_base + j;
         uint32_t const global_idx = global_part_off + local_idx;
+        // Penalties act on the raw fp32 logit BEFORE temperature scaling
+        // and the Gumbel draw. HF repetition first (logit>0 ? l/rp : l*rp),
+        // then the OpenAI subtraction:
+        //   logit -= presence*(count>0) + frequency*count.
+        float logit_f = static_cast<float>(logits_vec[j]);
+        if (do_penalties && pen_count[j] > 0) {
+          if (repetition_penalty != 1.0f) {
+            logit_f = logit_f > 0.0f ? logit_f / repetition_penalty
+                                     : logit_f * repetition_penalty;
+          }
+          logit_f -= presence_penalty +
+                     frequency_penalty * static_cast<float>(pen_count[j]);
+        }
         candidates[j].data =
             local_idx < CHUNK_SIZE && global_idx < vocab_size
-                ? static_cast<DType>(static_cast<float>(logits_vec[j]) *
-                                     inv_temperature) +
+                ? static_cast<DType>(logit_f * inv_temperature) +
                       gumbel_noise[j]
                 : -cuda::std::numeric_limits<DType>::infinity();
         candidates[j].index = local_idx;

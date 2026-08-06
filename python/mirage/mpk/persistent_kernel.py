@@ -2225,14 +2225,26 @@ class PersistentKernel:
         block_dim: tuple,
         seed: int = 42,
         temperature: float = 1.0,
+        frequency_penalty: float = 0.0,
+        presence_penalty: float = 0.0,
+        repetition_penalty: float = 1.0,
     ):
-        """Parallel first stage for position-keyed Gumbel-Max sampling."""
+        """Parallel first stage for position-keyed Gumbel-Max sampling.
+
+        frequency/presence (OpenAI-style subtraction) and repetition
+        (HF-style divide/multiply) penalties are applied to the raw fp32
+        logit before temperature scaling and the Gumbel draw, from a
+        fixed-order scan of the request's generated tokens. Defaults
+        (0/0/1) emit the legacy 3-param task -- byte-identical kernel code,
+        so penalty-free graphs stay bitwise-unchanged.
+        """
         assert logits.num_dims == 2
         assert len(output) == 2
         output_value, output_index = output
         assert output_value.num_dims == 2
         assert output_index.num_dims == 2
         assert temperature > 0.0
+        assert repetition_penalty > 0.0
         num_tasks = grid_dim[0]
         assert logits.dim(1) % num_tasks == 0
         self.argmax_partial_output_size = logits.dim(1) // num_tasks
@@ -2243,10 +2255,16 @@ class PersistentKernel:
         self.kn_graph.customized(
             [logits, output_value, output_index], tb_graph
         )
+        params = [num_tasks, seed, int(round(temperature * 1000))]
+        if (frequency_penalty != 0.0 or presence_penalty != 0.0
+                or repetition_penalty != 1.0):
+            params += [
+                int(round(frequency_penalty * 1000)),
+                int(round(presence_penalty * 1000)),
+                int(round(repetition_penalty * 1000)),
+            ]
         self.kn_graph.register_task(
-            tb_graph,
-            "sampling_partial_sm100",
-            [num_tasks, seed, int(round(temperature * 1000))],
+            tb_graph, "sampling_partial_sm100", params
         )
 
     def find_ngram_partial_layer(

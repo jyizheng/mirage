@@ -81,6 +81,13 @@ class MPKMetadata:
     deterministic: bool = False
     # Position-keyed stochastic sampling; None keeps greedy argmax.
     sampling_seed: Optional[int] = None
+    # Compile-time sampling penalties over the request's generated tokens
+    # (OpenAI-style frequency/presence subtraction, HF-style repetition
+    # divide/multiply), applied pre-temperature inside the sampling task.
+    # Require sampling_seed; defaults are a bitwise no-op.
+    frequency_penalty: float = 0.0
+    presence_penalty: float = 0.0
+    repetition_penalty: float = 1.0
     # Run every request to max_seq_length for matched-token benchmarks.
     ignore_eos: bool = False
     
@@ -291,6 +298,15 @@ class MPK:
         self.capture_logprobs = args.capture_logprobs
         self.deterministic = args.deterministic
         self.sampling_seed = args.sampling_seed
+        self.frequency_penalty = args.frequency_penalty
+        self.presence_penalty = args.presence_penalty
+        self.repetition_penalty = args.repetition_penalty
+        if (self.frequency_penalty != 0.0 or self.presence_penalty != 0.0
+                or self.repetition_penalty != 1.0) and \
+                self.sampling_seed is None:
+            raise ValueError(
+                "frequency/presence/repetition penalties require "
+                "sampling_seed (the greedy argmax path does not apply them)")
         self.ignore_eos = args.ignore_eos
         self.is_built = False
         self.task_graph_generated = False
@@ -475,6 +491,9 @@ class MPK:
         self.model_builder.capture_logprobs = self.capture_logprobs
         self.model_builder.deterministic = self.deterministic
         self.model_builder.sampling_seed = self.sampling_seed
+        self.model_builder.frequency_penalty = self.frequency_penalty
+        self.model_builder.presence_penalty = self.presence_penalty
+        self.model_builder.repetition_penalty = self.repetition_penalty
         if self.weight_from_model:
             self.model_builder.build_from_model(model_name=self.model_name)
             self.tokenizer = self.model_builder.tokenizer

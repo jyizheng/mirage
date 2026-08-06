@@ -2364,7 +2364,12 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
 int TaskRegister::register_sampling_partial_sm100_task(
     threadblock::Graph const &bgraph, std::vector<int> const &params) {
   // params: num vocabulary shards, seed, temperature * 1000
-  assert(params.size() == 3);
+  // params[3..5] (optional): frequency_penalty * 1000,
+  //   presence_penalty * 1000, repetition_penalty * 1000. The 3-param form
+  //   emits the legacy code string byte-for-byte (penalty defaults are
+  //   supplied by the kernel's default arguments), so graphs without
+  //   penalties stay bitwise-unchanged.
+  assert(params.size() == 3 || params.size() == 6);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
   assert(bgraph.operators.size() == 3);
@@ -2404,7 +2409,17 @@ int TaskRegister::register_sampling_partial_sm100_task(
   code.e("    MPK_PAGE_SIZE,");
   code.e("    MPK_MAX_SEQ_LENGTH,");
   code.e("    runtime_config.qo_indptr_buffer[MPK_MAX_NUM_BATCHED_REQUESTS],");
-  code.e("    1000.0f / $.0f);", temp_milli);
+  if (params.size() == 6) {
+    code.e("    1000.0f / $.0f,", temp_milli);
+    // milli-int -> float; penalties act pre-temperature in the kernel.
+    code.e("    ($.0f) * 1e-3f,", params[3]);
+    code.e("    ($.0f) * 1e-3f,", params[4]);
+    code.e("    ($.0f) * 1e-3f,", params[5]);
+    code.e("    runtime_config.tokens,");
+    code.e("    runtime_config.prompt_length);");
+  } else {
+    code.e("    1000.0f / $.0f);", temp_milli);
+  }
   return register_task_variant(TASK_SAMPLING_SM100, code.to_string());
 }
 

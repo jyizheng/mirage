@@ -48,6 +48,19 @@ class RunnerConfig:
     sampling_seed: Optional[int] = None
     """Enable position-keyed stochastic sampling when set."""
 
+    frequency_penalty: float = 0.0
+    """OpenAI-style frequency penalty over the request's generated tokens.
+    Compile-time engine default (baked into the sampling kernel); requires
+    ``sampling_seed``. Per-request overrides are not supported."""
+
+    presence_penalty: float = 0.0
+    """OpenAI-style presence penalty; same constraints as
+    ``frequency_penalty``."""
+
+    repetition_penalty: float = 1.0
+    """HF-style repetition penalty (logit>0 ? logit/rp : logit*rp) over the
+    request's generated tokens; same constraints as ``frequency_penalty``."""
+
     ignore_eos: bool = False
     """Generate to ``max_seq_length`` for matched-token measurements."""
 
@@ -112,6 +125,9 @@ class ModelRunner:
             capture_logprobs=config.capture_logprobs,
             deterministic=config.deterministic,
             sampling_seed=config.sampling_seed,
+            frequency_penalty=config.frequency_penalty,
+            presence_penalty=config.presence_penalty,
+            repetition_penalty=config.repetition_penalty,
             ignore_eos=config.ignore_eos,
             num_workers=config.num_workers,
             num_schedulers=config.num_schedulers,
