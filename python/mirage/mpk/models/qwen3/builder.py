@@ -385,7 +385,7 @@ class Qwen3Builder(GraphBuilder):
                 torch_tensor=state_dict[f"{prefix}self_attn.o_proj.weight"], name=f"layer_{i}_o_proj"
             )
             if use_splitk and deterministic:
-                num_splits = 128 * 128 // self.hidden_size
+                num_splits = int(os.environ.get("MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
                 o_proj_partials = self.mpk.new_tensor(
                     dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
                     dtype=bfloat16,
@@ -518,7 +518,7 @@ class Qwen3Builder(GraphBuilder):
                 torch_tensor=state_dict[f"{prefix}mlp.down_proj.weight"], name=f"layer_{i}_down_proj"
             )
             if use_splitk and deterministic:
-                num_splits = 128 * 128 // self.hidden_size
+                num_splits = int(os.environ.get("MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
                 down_proj_partials = self.mpk.new_tensor(
                     dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
                     dtype=bfloat16,
