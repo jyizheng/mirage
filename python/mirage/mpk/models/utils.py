@@ -1,6 +1,15 @@
+import os
 import torch
 
 def grid_for_rmsnorm_linear_layer(size):
+    # Per-layer task-count override for grid sweeps (E61): fewer, bigger
+    # tasks cut scheduler/event overhead; per-element K accumulation order
+    # is unchanged, so outputs stay bitwise-identical.
+    override = os.environ.get(f"MPK_LINEAR_TASKS_{size}")
+    if override:
+        tasks = int(override)
+        assert size % tasks == 0, f"{size} % {tasks} != 0"
+        return tasks
     # 96 and 64 are enough to cover all Qwen3 model? Please update the method
     # if you meet any incompatibility.
     if size / 96 > 400:
