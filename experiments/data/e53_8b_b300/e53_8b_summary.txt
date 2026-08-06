@@ -1,0 +1,5 @@
+r2 mbt8: e52 rc=0 e53 rc=0
+mbt8 rollout/step: individual 5.989s  shared-prefix 4.544s  speedup 1.32x
+r2 mbt16: e52 rc=0 e53 rc=0
+mbt16 rollout/step: individual 4.636s  shared-prefix 3.026s  speedup 1.53x
+GREEDY SHARED-PREFIX: tokens identical across 16 members+ref: True; logprobs bitwise: True
