@@ -1,0 +1,9 @@
+e60 s1 rc=0
+e60 s2 rc=0
+e60 s4 rc=0
+e60 s16 rc=0
+E60 sweep (rollout s/step, 20-step mean; default s8 = 1.2450):
+  splits=1: 1.3372s
+  splits=2: 1.2485s
+  splits=4: 1.2059s
+  splits=16: 1.3713s
