@@ -1,0 +1,7 @@
+e61 qkv32 rc=0
+e61 lmh300 rc=0
+e61 all3 rc=0
+E61 grid sweep (rollout s/step, 20-step; baseline splits4 = 1.2059):
+  qkv32: 1.2155s
+  lmh300: 1.2121s
+  all3: 1.2807s
