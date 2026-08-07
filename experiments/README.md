@@ -113,6 +113,17 @@ python experiments/e45_e2e_accounting.py \
   uses rollout-captured values in the loss while differentiable trainer
   logprobs provide the gradient path; the `hf` arm uses trainer recompute
   values as well as its gradient path.
+- `--inner-epochs N` (default 1 = on-policy home case) enables off-policy
+  inner-epoch reuse: one rollout per outer step with pi_old logprobs and
+  advantages frozen from the capture, then N clipped updates. Before each
+  epoch after the first, the frozen trajectories are teacher-forced through
+  the MPK engine (full trajectory as prompt; prefill probability capture)
+  under the just-synced weights to get current pi_theta values in ONE
+  batched pass. Rescore == rollout is bitwise on this engine, so epoch-1
+  ratios are exactly 1 (asserted) and later epochs' ratios reflect only
+  real parameter drift. Per-epoch ratio/clip/rescore-time stats are logged
+  under `"epochs"` in the jsonl. Requires the standalone capture task
+  (default parallel sampling, or `--no-fused-sampling-capture`).
 - `--grpo-trainer-backend` selects `hf`, `torchtitan`, `megatron`, or a
   project-specific `<module>:<factory>`. The built-in TorchTitan path loads
   TorchTitan's native Qwen3 model, maps HF weights/names with its state-dict

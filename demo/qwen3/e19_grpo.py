@@ -191,16 +191,18 @@ def run(
         with torch.no_grad():
             tokens.zero_()
             prob_buffer.zero_()
+            lengths = []
             for r, s in enumerate(samples):
-                length = len(s["ids"])
-                if length >= max_seq:
-                    raise ValueError(
-                        f"trajectory {r} fills the sequence buffer "
-                        f"({length} >= {max_seq}); rescore-as-prefill needs "
-                        "at least one free decode slot — raise "
-                        "--max-seq-length"
-                    )
-                tokens[r, :length] = torch.tensor(s["ids"], device=dev)
+                # A trajectory that fills the sequence buffer (no eos before
+                # the cap) cannot be fully teacher-forced: prefill needs one
+                # free decode slot. Truncate the resubmitted prompt by one
+                # token; the uncovered final position falls back to the
+                # frozen lp_old below (its ratio contribution is exactly 1,
+                # so no bias enters the surrogate).
+                length = min(len(s["ids"]), max_seq - 1)
+                lengths.append(length)
+                tokens[r, :length] = torch.tensor(s["ids"][:length],
+                                                  device=dev)
                 prompt_lengths[r] = length
             step.zero_()
             num_new_tokens.fill_(1)
@@ -209,16 +211,21 @@ def run(
         torch.cuda.synchronize()
         lps = []
         for r, s in enumerate(samples):
+            # prefill capture covers P(token_t | prefix) for t in
+            # [1, lengths[r]); positions beyond keep their frozen value
             lp = []
-            for t in s["pos"]:
-                p = float(prob_buffer[r, t - 1].item())
-                if p <= 0.0:
-                    raise RuntimeError(
-                        f"rescore capture missing at request {r} slot "
-                        f"{t - 1} (prob={p}); prefill probability capture "
-                        "did not cover the teacher-forced region"
-                    )
-                lp.append(math.log(p))
+            for k, t in enumerate(s["pos"]):
+                if t < lengths[r]:
+                    p = float(prob_buffer[r, t - 1].item())
+                    if p <= 0.0:
+                        raise RuntimeError(
+                            f"rescore capture missing at request {r} slot "
+                            f"{t - 1} (prob={p}); prefill probability "
+                            "capture did not cover the teacher-forced region"
+                        )
+                    lp.append(math.log(p))
+                else:
+                    lp.append(s["lp_old"][k])
             lps.append(torch.tensor(lp, dtype=torch.float32, device=dev))
         return lps
 
