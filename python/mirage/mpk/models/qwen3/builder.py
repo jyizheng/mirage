@@ -119,6 +119,17 @@ class Qwen3Builder(GraphBuilder):
         else:
             fixed_tensor = False
         self.max_num_batched_tokens = self.mpk.max_num_batched_tokens
+        # Number of vocab partitions for the argmax/sampling partial stage.
+        # The partial and reduce kernels address the part buffers as
+        # [mbt, num_parts] (row stride == partial task count), so the buffer
+        # width MUST equal the partial grid size. It must also divide the
+        # padded vocab. With >128 workers (e.g. 144) the largest valid
+        # factor is 128; sizing these buffers with num_workers instead
+        # desynchronizes the write stride (num_parts) from the read stride
+        # (buffer width) and leaves columns [num_parts, num_workers) as
+        # garbage that the reduce stage can pick as the winning token.
+        self.num_sampling_parts = max_factor_leq_n(
+            self.padded_vocab_size, self.mpk.num_workers)
         if fixed_tensor:
             self.y_tensor = torch.zeros(self.max_num_batched_tokens, self.hidden_size, dtype=torch.bfloat16, device="cuda")
             self.y = self.mpk.attach_input(torch_tensor=self.y_tensor, name="embed_out")
@@ -158,10 +169,10 @@ class Qwen3Builder(GraphBuilder):
                 self.argmax_in_tensor = torch.zeros(self.max_num_batched_tokens, self.padded_vocab_size, dtype=torch.bfloat16, device="cuda")
                 self.argmax_in = self.mpk.attach_input(torch_tensor=self.argmax_in_tensor, name="argmax_in")
                 
-                self.argmax_part_value_tensor = torch.zeros(self.max_num_batched_tokens, self.mpk.num_workers, dtype=torch.bfloat16, device="cuda")
+                self.argmax_part_value_tensor = torch.zeros(self.max_num_batched_tokens, self.num_sampling_parts, dtype=torch.bfloat16, device="cuda")
                 self.argmax_part_value = self.mpk.attach_input(torch_tensor=self.argmax_part_value_tensor, name="argmax_part_value")
                 
-                self.argmax_part_index_tensor = torch.zeros(self.max_num_batched_tokens, self.mpk.num_workers, dtype=torch.int64, device="cuda")
+                self.argmax_part_index_tensor = torch.zeros(self.max_num_batched_tokens, self.num_sampling_parts, dtype=torch.int64, device="cuda")
                 self.argmax_part_index = self.mpk.attach_input(torch_tensor=self.argmax_part_index_tensor, name="argmax_part_index")
 
         else:
@@ -239,13 +250,13 @@ class Qwen3Builder(GraphBuilder):
                     io_category="cuda_tensor",
                 )
                 self.argmax_part_value = self.mpk.new_tensor(
-                    dims=(self.max_num_batched_tokens, self.mpk.num_workers),
+                    dims=(self.max_num_batched_tokens, self.num_sampling_parts),
                     dtype=bfloat16,
                     name="argmax_part_value",
                     io_category="cuda_tensor",
                 )
                 self.argmax_part_index = self.mpk.new_tensor(
-                    dims=(self.max_num_batched_tokens, self.mpk.num_workers),
+                    dims=(self.max_num_batched_tokens, self.num_sampling_parts),
                     dtype=int64,
                     name="argmax_part_index",
                     io_category="cuda_tensor",
@@ -661,10 +672,10 @@ class Qwen3Builder(GraphBuilder):
             # else:
             # The sampling/argmax partition count must divide the padded
             # vocab; decouple it from the worker count (e.g. 144 workers
-            # with vocab 153600 -> 128 partition tasks).
-            argmax_partial_grid_dim = (
-                max_factor_leq_n(self.padded_vocab_size, self.mpk.num_workers),
-                1, 1)
+            # with vocab 153600 -> 128 partition tasks). Single source of
+            # truth: num_sampling_parts also sizes the part buffers above —
+            # the partial/reduce kernels require buffer width == grid size.
+            argmax_partial_grid_dim = (self.num_sampling_parts, 1, 1)
             argmax_reduce_grid_dim = (1, 1, 1)
             if self.sampling_seed is None:
                 self.mpk.argmax_partial_layer(
