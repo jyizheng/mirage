@@ -1,0 +1,63 @@
+# Lightweight CI for the deterministic-decode fork.
+#
+# Runs on GitHub-hosted runners with NO GPU and NO CUDA toolkit, so it
+# deliberately never builds the C++ core (mirage.core / lib*.so). It only
+# gates things that can regress silently without a build:
+#   - Python syntax (compileall over python/ and experiments/)
+#   - determinism-critical tripwires (see helpers/det_tripwires.py)
+#   - shell syntax of the experiment runner scripts
+#
+# Import-safety gate: intentionally SKIPPED. python/mirage/__init__.py
+# preloads libz3.so and the compiled native libraries via ctypes at import
+# time and raises ImportError when they are absent, so *every*
+# `import mirage.<anything>` (model_runner, launch_server, mpk.speculative,
+# mpk.models.utils, ...) requires the built .so even on CPU. Stubbing the
+# package init in sys.modules would test the stub, not the code, and
+# building the core in CI is out of scope. Syntax coverage of those files
+# is still provided by the compileall gate. Because nothing is imported,
+# no pip installs (torch/transformers) are needed and the job stays well
+# under a minute.
+
+name: Lightweight CI
+
+on:
+  push:
+    branches:
+      - fix-deterministic-decode
+  pull_request:
+    branches:
+      - fix-deterministic-decode
+  workflow_dispatch:
+
+jobs:
+  cpu-gates:
+    name: Syntax + determinism tripwires (CPU-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python syntax gate (compileall)
+        run: python -m compileall -q python/ experiments/
+
+      - name: Determinism tripwires
+        run: python .github/workflows/helpers/det_tripwires.py
+
+      - name: Shell syntax gate (experiment runners)
+        run: |
+          status=0
+          for f in experiments/runners/*.sh; do
+            if ! bash -n "$f"; then
+              echo "bash -n failed: $f"
+              status=1
+            fi
+          done
+          exit $status
