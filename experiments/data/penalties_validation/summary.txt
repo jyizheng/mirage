@@ -1,0 +1,44 @@
+Frequency/presence/repetition penalty validation (commit 06e4308b)
+GPU: ali-apse7 pod, GPU 5 (B300/sm_103a). Model Qwen/Qwen3-1.7B.
+Server: launch_server --deterministic --capture-logprobs --sampling-seed 42
+        --max-num-batched-tokens 16 --pinned-ring-capacity 32
+
+1) No-op default bitwise gate (no penalty flags) vs unmodified parent
+   (8c8351f), /v1/completions "The capital of France is":
+     tokens_equal: True   logprobs_bitwise_equal: True   (507 tokens)
+   Repetition prompt reqB also bitwise-equal to a fresh parent build
+   (tokens+logprobs, 503 tokens). Patched binary additionally verified
+   bitwise-stable across a full server restart on both prompts.
+   NOTE: the *first* parent-build server instance produced an anomalous
+   reqB (picked tokens with capture-logprobs -32.3/-15.2/-16.7 nats at
+   steps 62/65/66 -- statistically impossible under Gumbel sampling);
+   a rebuilt parent did not reproduce it and instead matched the patched
+   output bitwise. One-off transient in that instance, pre-existing /
+   unrelated to this commit; not reproduced in 6 subsequent server runs.
+
+2) Penalty behavioral test, --frequency-penalty 1.5,
+   prompt "Repeat the word hello forever: hello hello hello":
+     no-penalty run:  hello x503/503 tokens, repeated-token rate 0.998
+     freq=1.5 run:    hello x2/503,          repeated-token rate 0.233
+   (max any-token count 6; output diversifies after ~2 repeats, matching
+   logit -= 1.5*count.)
+
+3) Determinism with penalties on: same request twice ->
+     tokens: True   logprobs bitwise: True   (503 tokens each)
+
+Penalty layer: raw fp32 logit, PRE-temperature, before the Gumbel draw.
+Formulas: HF repetition first (logit>0 ? logit/rp : logit*rp), then
+OpenAI subtraction logit -= presence*(count>0) + frequency*count; counts
+from a fixed-order scan of the request's generated tokens only
+(tokens[] positions [prompt_len, pos]); prompt tokens not penalized.
+
+Limitations:
+- Penalties are compile-time engine defaults (like seed/temperature);
+  per-request JSON overrides need a runtime task-param path (none exists).
+- Require --sampling-seed; greedy argmax path does not apply them
+  (launch_server/MPK raises ValueError if penalties set without seed).
+- capture-logprobs prob_buffer reports P(chosen) under the RAW
+  (unpenalized) logits: the capture task reads logits independently of
+  the sampling task's in-register penalization.
+- Full-vocab sampling_sm100 task (not used by the qwen3 builder path)
+  did not get penalty params.
