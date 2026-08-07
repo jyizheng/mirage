@@ -130,6 +130,19 @@ if __name__ == "__main__":
     parser.add_argument("--grpo-steps", type=int, default=0,
                         help="Run the E19 GRPO loop for this many steps.")
     parser.add_argument("--grpo-arm", choices=["mpk", "hf"], default="mpk")
+    parser.add_argument(
+        "--inner-epochs",
+        type=int,
+        default=1,
+        help="Off-policy inner epochs per GRPO outer step. 1 (default) is "
+        "the on-policy home case (exact current behavior). For N>1 the "
+        "rollout is done once (pi_old logprobs frozen from the rollout "
+        "capture, advantages frozen from the rollout rewards) and N "
+        "clipped updates are taken; before each epoch after the first, "
+        "the frozen trajectories are rescored through the MPK engine to "
+        "get the current pi_theta logprobs, so epoch-1 ratios are exactly "
+        "1 and later ratios reflect only real parameter drift.",
+    )
     parser.add_argument("--grpo-lr", type=float, default=2e-6)
     parser.add_argument("--grpo-log", type=str, default=None)
     parser.add_argument(
@@ -1282,6 +1295,7 @@ if __name__ == "__main__":
             num_new_tokens,
             prob_buffer_torch,
             model.config.eos_token_id,
+            sampling_capture_fused=sampling_capture_fused,
         )
         import sys
 
