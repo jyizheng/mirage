@@ -33,6 +33,25 @@ class Qwen3Builder(GraphBuilder):
         from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
         return Qwen3ForCausalLM
 
+    def _det_num_splits(self, k_dim: int) -> int:
+        """Split count for the deterministic split-K path.
+
+        The split-K TMA tiles require every K chunk to be a 64-element
+        multiple (mirage #700), i.e. the split count must divide
+        k_dim/64.  Take MPK_DET_NUM_SPLITS (default 128*128/hidden) as
+        the target and clamp down to the largest valid count — a no-op
+        for Qwen3 hidden sizes (2048/4096), and e.g. 5 -> 4 for
+        Llama-3.2-3B (hidden 3072, K 3072/8192).
+        """
+        target = int(os.environ.get(
+            "MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
+        assert k_dim % 64 == 0, f"split-K dim {k_dim} not a 64 multiple"
+        chunks64 = k_dim // 64
+        n = max(1, min(target, chunks64))
+        while n > 1 and chunks64 % n != 0:
+            n -= 1
+        return n
+
     @staticmethod
     def _padded_vocab_size(vocab_size: int) -> int:
         # Pad to a multiple of 2048 to facilitate task-graph creation.
@@ -433,7 +452,8 @@ class Qwen3Builder(GraphBuilder):
                 torch_tensor=state_dict[f"{prefix}self_attn.o_proj.weight"], name=f"layer_{i}_o_proj"
             )
             if use_splitk and deterministic:
-                num_splits = int(os.environ.get("MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
+                num_splits = self._det_num_splits(
+                    self.num_local_q_heads * self.head_dim)
                 o_proj_partials = self.mpk.new_tensor(
                     dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
                     dtype=bfloat16,
@@ -566,7 +586,8 @@ class Qwen3Builder(GraphBuilder):
                 torch_tensor=state_dict[f"{prefix}mlp.down_proj.weight"], name=f"layer_{i}_down_proj"
             )
             if use_splitk and deterministic:
-                num_splits = int(os.environ.get("MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
+                num_splits = self._det_num_splits(
+                    self.intermediate_size // self.world_size)
                 down_proj_partials = self.mpk.new_tensor(
                     dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
                     dtype=bfloat16,
