@@ -144,9 +144,32 @@ async def chat_completions(request: Request):
 @app.post("/v1/completions")
 async def completions(request: Request):
     body = await _parse_json(request)
-    prompt = body.get("prompt", "")
+    prompt = body.get("prompt")
+    prompt_token_ids = body.get("prompt_token_ids")
     stream = body.get("stream", False)
     timeout = request.app.state.request_timeout
+
+    # `prompt_token_ids` (list of ints) bypasses tokenization entirely —
+    # partial-rollout resume submits prompt tokens + the partial generation
+    # here and the engine continues decoding.  Mutually exclusive with
+    # `prompt`.
+    if prompt_token_ids is not None:
+        if prompt is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="`prompt` and `prompt_token_ids` are mutually "
+                       "exclusive")
+        if stream:
+            raise HTTPException(
+                status_code=400,
+                detail="`prompt_token_ids` does not support stream=true")
+        if (not isinstance(prompt_token_ids, list) or not prompt_token_ids
+                or not all(isinstance(t, int) for t in prompt_token_ids)):
+            raise HTTPException(
+                status_code=400,
+                detail="`prompt_token_ids` must be a non-empty list of ints")
+    elif prompt is None:
+        prompt = ""
 
     if stream:
         return StreamingResponse(
@@ -156,14 +179,21 @@ async def completions(request: Request):
     else:
         loop = asyncio.get_running_loop()
         use_template = body.get("use_template", True)
+        max_new_tokens = body.get("max_new_tokens")
         result = await loop.run_in_executor(
             None, lambda: request.app.state.engine.submit(
-                prompt, use_template=use_template, timeout=timeout),
+                prompt,
+                use_template=use_template,
+                timeout=timeout,
+                prompt_token_ids=prompt_token_ids,
+                max_new_tokens=max_new_tokens),
         )
         choice = {
             "index": 0,
             "text": result["text"],
             "token_ids": result["token_ids"],
+            "prompt_token_ids": result["prompt_token_ids"],
+            "buffer_row": result["buffer_row"],
             "finish_reason": "stop",
         }
         if "logprobs" in result:

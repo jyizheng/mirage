@@ -160,30 +160,77 @@ class LLMEngine:
 
     def submit(
         self,
-        prompt: str,
+        prompt: str | None = None,
         use_template: bool = True,
         timeout: float = 120.0,
         poll_interval: float = 1e-4,
         stream: bool = False,
+        prompt_token_ids: list[int] | None = None,
+        max_new_tokens: int | None = None,
     ):
         """Submit a single prompt for generation.
 
         Safe to call concurrently — each invocation gets a unique rid and
         serialises the ring-buffer write under an internal lock.
 
+        Partial-rollout resume: an interrupted rollout can be resumed by
+        re-submitting ``prompt_token_ids = original prompt tokens + the
+        partial generation`` — the engine prefills them and continues
+        decoding.  With seeded position-keyed sampling the continuation is
+        BITWISE identical (tokens and logprobs) to the uninterrupted
+        trajectory iff (a) the same ``--sampling-seed``, (b) the request
+        lands on the same token-buffer ROW (Gumbel noise is keyed by
+        ``row * max_seq + position``; single requests on an idle engine —
+        including a freshly restarted one — deterministically reuse the
+        top-of-stack row), (c) the same ``max_seq_length``/engine build,
+        and (d) frequency/presence/repetition penalties at their no-op
+        defaults (the penalty history window is keyed off the per-row
+        prompt length, which resume changes).  If a concurrently loaded
+        engine assigns a different row the continuation is a different —
+        but still self-consistent, correctly-logprobed — sample.
+
         Args:
-            prompt:        String prompt.
+            prompt:        String prompt (mutually exclusive with
+                           ``prompt_token_ids``).
             use_template:  Apply chat template before tokenizing.
             timeout:       Seconds to wait before raising :exc:`TimeoutError`.
             poll_interval: Seconds between completion-ring polls.
             stream:        If True, returns a generator yielding ``(text,
                            is_final)`` tuples. Otherwise returns a dict.
+            prompt_token_ids: Pre-tokenized prompt — bypasses tokenization
+                           and the chat template entirely.  Used for
+                           partial-rollout resume.
+            max_new_tokens: CLIENT-SIDE truncation of the returned
+                           generation (tokens/text/logprobs).  The kernel's
+                           completion condition is the compile-time
+                           ``max_seq_length`` (or EOS) — a per-request
+                           server-side cap would need per-row plumbing in
+                           the persistent kernel, so the GPU still decodes
+                           to the global bound; budget cuts are client-side
+                           by construction.  Not supported with
+                           ``stream=True``.
 
         Returns:
-            When stream=False: ``{"text": str, "token_ids": list[int]}``
+            When stream=False: ``{"text": str, "token_ids": list[int],
+                "prompt_token_ids": list[int], "buffer_row": int}``
+                (+ ``"logprobs"`` when the engine captures them)
             When stream=True:  generator yielding ``(text, is_final)``
         """
-        token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
+        if (prompt is None) == (prompt_token_ids is None):
+            raise ValueError(
+                "provide exactly one of `prompt` or `prompt_token_ids`")
+        if max_new_tokens is not None:
+            if stream:
+                raise ValueError(
+                    "max_new_tokens is not supported with stream=True")
+            if max_new_tokens < 1:
+                raise ValueError("max_new_tokens must be >= 1")
+        if prompt_token_ids is not None:
+            token_ids = [int(t) for t in prompt_token_ids]
+            if len(token_ids) == 0:
+                raise ValueError("prompt_token_ids must be non-empty")
+        else:
+            token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
         prompt_len = len(token_ids)
 
         rid = self._next_rid
@@ -200,16 +247,22 @@ class LLMEngine:
                 rid, timeout, poll_interval)
             full_tokens = self.runtime.read_tokens_at_row(buffer_row, final_step)
             output_ids = full_tokens[prompt_len:].tolist()
+            if max_new_tokens is not None:
+                output_ids = output_ids[:max_new_tokens]
             result = {
                 "text": self.tokenizer_manager.decode(output_ids),
                 "token_ids": output_ids,
+                "prompt_token_ids": token_ids,
+                "buffer_row": buffer_row,
             }
             prob_buffer = getattr(self.model_runner, "prob_buffer", None)
             if prob_buffer is not None:
                 # P(chosen token at position t) sits at buffer[row, t-1];
                 # generated tokens occupy t in [prompt_len, final_step].
                 probs = prob_buffer[
-                    buffer_row, prompt_len - 1 : final_step].tolist()
+                    buffer_row,
+                    prompt_len - 1 : prompt_len - 1 + len(output_ids),
+                ].tolist()
                 result["logprobs"] = [
                     math.log(p) if p > 0.0 else None for p in probs]
             self.runtime.release_request(rid)
