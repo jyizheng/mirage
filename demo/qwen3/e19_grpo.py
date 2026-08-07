@@ -191,19 +191,27 @@ def run(
         with torch.no_grad():
             tokens.zero_()
             prob_buffer.zero_()
-            lengths = []
+            # A trajectory that fills the sequence buffer (no eos before
+            # the cap) cannot be fully teacher-forced: prefill needs one
+            # free decode slot. Truncate the resubmitted prompt by one
+            # token; the uncovered final position falls back to the frozen
+            # lp_old below (its ratio contribution is exactly 1, so no bias
+            # enters the surrogate).
+            lengths = [min(len(s["ids"]), max_seq - 1) for s in samples]
+            # Uniform prompt length across the group: pad shorter rows by
+            # repeating their final token. Padding sits at positions >= the
+            # row's own trajectory end, so causal attention cannot let it
+            # change the captured P(token_t | prefix) for t < lengths[r].
+            # This keeps the rescore prefill the same uniform-shape
+            # workload as the rollout prefill; a ragged 16-way prompt batch
+            # (mixed chunked-prefill/decode schedule) was observed to
+            # deadlock the demo-mode megakernel.
+            lmax = max(lengths)
             for r, s in enumerate(samples):
-                # A trajectory that fills the sequence buffer (no eos before
-                # the cap) cannot be fully teacher-forced: prefill needs one
-                # free decode slot. Truncate the resubmitted prompt by one
-                # token; the uncovered final position falls back to the
-                # frozen lp_old below (its ratio contribution is exactly 1,
-                # so no bias enters the surrogate).
-                length = min(len(s["ids"]), max_seq - 1)
-                lengths.append(length)
-                tokens[r, :length] = torch.tensor(s["ids"][:length],
-                                                  device=dev)
-                prompt_lengths[r] = length
+                ids = s["ids"][: lengths[r]]
+                ids = ids + [ids[-1]] * (lmax - len(ids))
+                tokens[r, :lmax] = torch.tensor(ids, device=dev)
+            prompt_lengths.fill_(lmax)
             step.zero_()
             num_new_tokens.fill_(1)
         mpk.init_request_func()
