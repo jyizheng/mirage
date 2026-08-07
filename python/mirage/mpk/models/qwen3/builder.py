@@ -27,7 +27,22 @@ class Qwen3Builder(GraphBuilder):
         self.rank = mpk.mpi_rank
         self.eos_token_id = 151645 # default eos token id for Qwen3
 
-    def build_from_config(self, 
+    # ── Architecture hooks (overridden by thin subclasses, e.g. Llama3) ──
+    @staticmethod
+    def _hf_model_class():
+        from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
+        return Qwen3ForCausalLM
+
+    @staticmethod
+    def _padded_vocab_size(vocab_size: int) -> int:
+        # Pad to a multiple of 2048 to facilitate task-graph creation.
+        # Reproduces the historical 153600 for Qwen3 (vocab 151936) and
+        # yields 129024 for Llama-3 (vocab 128256); both satisfy the
+        # grid_for_rmsnorm_linear_layer %256 constraint and admit a
+        # power-of-2 num_sampling_parts factor <= 128.
+        return ((vocab_size + 2047) // 2048) * 2048
+
+    def build_from_config(self,
                               model_config: MirageModelConfig):
         self.position_embeddings = model_config.position_embeddings
         
@@ -38,7 +53,7 @@ class Qwen3Builder(GraphBuilder):
         self.intermediate_size = model_config.intermediate_size
         
         self.vocab_size = model_config.vocab_size
-        self.padded_vocab_size = 153600 #TODO: A better way to decide?
+        self.padded_vocab_size = self._padded_vocab_size(self.vocab_size)
         self.num_local_q_heads = model_config.local_num_q_heads
         self.num_local_kv_heads = model_config.local_num_kv_heads
         self.head_dim = model_config.head_dim
@@ -49,23 +64,28 @@ class Qwen3Builder(GraphBuilder):
         self.build_from_dict(model_config.state_dict, model_config.with_lm_head)
 
     def build_from_model(self, model_name: str, model_path: str | None = None):
-        from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
         from transformers import AutoTokenizer, AutoConfig
+        model_cls = self._hf_model_class()
         with torch.device("cuda"):
             if model_path is not None:
                 self.model_path = model_path
                 print(f"Loading model from model path: {model_path}")
                 self.config = AutoConfig.from_pretrained(model_path)
-                self.model = Qwen3ForCausalLM(self.config)
+                self.model = model_cls(self.config)
                 load_model(self.model, f"{model_path}/model{self.rank}-mp{self.world_size}.safetensors")
                 self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             elif model_name is not None:
                 self.model_name = model_name
-                self.model = Qwen3ForCausalLM.from_pretrained(self.model_name).to("cuda")
+                self.model = model_cls.from_pretrained(self.model_name).to("cuda")
                 self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             else:
                 raise ValueError("model_name or model_path is required")
-            
+
+        if self.tokenizer is not None and self.tokenizer.eos_token_id is not None:
+            # Matches the 151645 default for Qwen3 instruct tokenizers and
+            # picks the right id for other architectures (e.g. Llama-3).
+            self.eos_token_id = self.tokenizer.eos_token_id
+
         dummy_x = torch.empty(0, dtype=torch.bfloat16, device="cuda")
         
         self.positions = torch.arange(32768).unsqueeze(0).to(self.model.device)
@@ -75,12 +95,13 @@ class Qwen3Builder(GraphBuilder):
         self.intermediate_size = self.model.config.intermediate_size
         
         self.vocab_size = self.model.config.vocab_size
-        self.padded_vocab_size = 153600
+        self.padded_vocab_size = self._padded_vocab_size(self.vocab_size)
         self.num_q_heads = self.model.config.num_attention_heads
         self.num_kv_heads = self.model.config.num_key_value_heads
         self.num_local_q_heads = self.num_q_heads // self.world_size
         self.num_local_kv_heads = self.num_kv_heads // self.world_size
-        self.head_dim = self.model.config.head_dim
+        self.head_dim = (getattr(self.model.config, "head_dim", None)
+                         or self.hidden_size // self.num_q_heads)
         self.fused_outdim_1 = (self.num_local_q_heads + 2 * self.num_local_kv_heads) * self.head_dim
         self.fused_outdim_2 = 2 * self.intermediate_size
         
@@ -350,12 +371,27 @@ class Qwen3Builder(GraphBuilder):
             )
 
             # add attention
-            w_q_norm = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}self_attn.q_norm.weight"], name=f"layer_{i}_q_norm"
-            )
-            w_k_norm = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}self_attn.k_norm.weight"], name=f"layer_{i}_k_norm"
-            )
+            # Architectures without q/k-norm (e.g. Llama-3) get a shared
+            # dummy (head_dim,) tensor + enable_qk_norm=False — the
+            # attention task requires valid DTensor slots either way
+            # (same pattern as the Eagle3 builder).
+            has_qk_norm = f"{prefix}self_attn.q_norm.weight" in state_dict
+            if has_qk_norm:
+                w_q_norm = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}self_attn.q_norm.weight"], name=f"layer_{i}_q_norm"
+                )
+                w_k_norm = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}self_attn.k_norm.weight"], name=f"layer_{i}_k_norm"
+                )
+            else:
+                if not hasattr(self, "_dummy_qk_norm"):
+                    self._dummy_qk_norm_buf = torch.zeros(
+                        self.head_dim, dtype=torch.bfloat16, device="cuda")
+                    self._dummy_qk_norm = self.mpk.attach_input(
+                        torch_tensor=self._dummy_qk_norm_buf,
+                        name="dummy_qk_norm")
+                w_q_norm = self._dummy_qk_norm
+                w_k_norm = self._dummy_qk_norm
             # TODO: KV cache handling
             k_cache = self.mpk.attach_input(
                 torch_tensor=self.k_cache[i], name=f"layer_{i}_k_cache"
@@ -390,6 +426,7 @@ class Qwen3Builder(GraphBuilder):
                 output=self.attn_out,
                 grid_dim=(self.mpk.max_num_batched_requests, self.num_local_kv_heads, 1),
                 block_dim=(128, 1, 1),
+                enable_qk_norm=has_qk_norm,
             )
             # add linear w/ residual
             self.w = self.mpk.attach_input(
@@ -582,9 +619,14 @@ class Qwen3Builder(GraphBuilder):
                         ):
         # pad vocab_size to facilitate task graph creation
         if with_lm_head:
+            # Tied-embedding checkpoints (e.g. Llama-3.2) may not carry a
+            # separate lm_head.weight; fall back to embed_tokens.
+            lm_head_src = state_dict.get("lm_head.weight")
+            if lm_head_src is None:
+                lm_head_src = state_dict["model.embed_tokens.weight"]
             self.lm_head_weight = torch.cat(
                 (
-                    state_dict["lm_head.weight"],
+                    lm_head_src,
                     torch.full(
                         (self.padded_vocab_size - self.vocab_size, self.hidden_size), 0, device="cuda"
                     ),
