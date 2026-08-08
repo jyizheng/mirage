@@ -28,9 +28,29 @@ Usage::
 import collections
 import time
 import threading
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Sequence, Tuple
 
 import torch
+
+
+# ── Per-request sampling record (shared lane layout) ──────────────────────────
+# One SP_LANES-wide int32 record per ring slot (pinned_req_sampling) and per
+# buffer row (sampling_params); the scheduler copies the record verbatim
+# ring-slot -> row at admission.  Keep in sync with the SamplingParamLane enum
+# in include/mirage/persistent_kernel/runtime_header.h and the reader in
+# tasks/common/sampling.cuh.
+SP_LANES = 12
+SP_LANE_FLAGS = 0           # 0 = all-defaults fast path; bit0 = custom
+                            # params present; bit1 = per-request seed present
+SP_LANE_TEMP_MILLI = 1      # temperature*1000; 0 sentinel = engine default
+SP_LANE_TOP_K = 2           # 0 = off (v1: must be 0 on the parallel engine)
+SP_LANE_TOP_P_MILLI = 3     # 1000 = off (v1: must be 1000)
+SP_LANE_SEED_LO = 4         # per-request philox seed, int64 split (low  32)
+SP_LANE_SEED_HI = 5         # per-request philox seed, int64 split (high 32)
+SP_LANE_FREQ_PEN_MILLI = 6  # frequency_penalty*1000, 0 = off
+SP_LANE_PRES_PEN_MILLI = 7  # presence_penalty*1000, 0 = off
+SP_LANE_REP_PEN_MILLI = 8   # repetition_penalty*1000, 1000 = off
+# lanes 9..11 reserved (min_p / per-request max_new_tokens)
 
 
 class OnlinePinnedRuntime:
@@ -58,6 +78,7 @@ class OnlinePinnedRuntime:
         self._pinned_step       = mpk.pinned_step             # int32[max_batched], pinned
         self._inbox_tokens      = mpk.pinned_inbox_tokens     # int64[cap, max_seq_len], pinned
         self._pinned_rid_at_row = mpk.pinned_rid_at_row       # int32[max_batched], pinned
+        self._req_sampling      = mpk.pinned_req_sampling     # int32[cap, SP_LANES], pinned
 
         # CPU-private ring cursors.
         self._cpu_req_tail  = 0  # next ring slot to write
@@ -91,7 +112,13 @@ class OnlinePinnedRuntime:
 
     # ── Public API ────────────────────────────────────────────────────────
 
-    def submit(self, rid: int, token_ids: torch.Tensor, initial_step: int = 0) -> bool:
+    def submit(
+        self,
+        rid: int,
+        token_ids: torch.Tensor,
+        initial_step: int = 0,
+        sampling_lanes: Optional[Sequence[int]] = None,
+    ) -> bool:
         """Stage prompt tokens and write a request into the CPU→GPU ring.
 
         Writes tokens to the slot-specific inbox so concurrent requests never
@@ -103,6 +130,10 @@ class OnlinePinnedRuntime:
         rid          : unique request identifier (never repeats)
         token_ids    : 1-D int64 tensor of token IDs (CPU or CUDA)
         initial_step : starting decode step (0 unless prefix-cache is used)
+        sampling_lanes : optional SP_LANES-long int record of per-request
+                       sampling params (see SP_LANE_* above).  None writes
+                       the all-zero record (flags==0 -> engine defaults,
+                       compiled-constant fast path in the kernel).
 
         Returns
         -------
@@ -118,7 +149,8 @@ class OnlinePinnedRuntime:
             if self._req_ready[slot].item() != 0:
                 # Ring full — enqueue to CPU-side waiting.
                 with self._waiting_lock:
-                    self._waiting.append((rid, token_ids.clone(), initial_step))
+                    self._waiting.append(
+                        (rid, token_ids.clone(), initial_step, sampling_lanes))
                 return False
             self._cpu_req_tail += 1  # reserve slot
 
@@ -127,12 +159,29 @@ class OnlinePinnedRuntime:
             self._inbox_tokens[slot, :prompt_len].copy_(token_ids, non_blocking=True)
         self._write_stream.synchronize()
 
-        # Publish ring entry.
+        # Publish ring entry.  Sampling lanes are written BEFORE ready=1 so
+        # the GPU's acquire-load of ready observes a complete record (same
+        # ordering contract as prompt_len / the inbox tokens).
+        self._write_sampling_lanes(slot, sampling_lanes)
         self._req_request_id[slot]   = rid
         self._req_prompt_len[slot]   = prompt_len
         self._req_initial_step[slot] = initial_step
         self._req_ready[slot] = 1
         return True
+
+    def _write_sampling_lanes(
+        self, slot: int, sampling_lanes: Optional[Sequence[int]],
+    ) -> None:
+        """Write a slot's per-request sampling record (all 12 lanes, always —
+        ring slots are reused, so a stale record must never survive)."""
+        if sampling_lanes is None:
+            self._req_sampling[slot].zero_()
+            return
+        assert len(sampling_lanes) == SP_LANES, (
+            f"sampling_lanes must have {SP_LANES} lanes, "
+            f"got {len(sampling_lanes)}")
+        self._req_sampling[slot] = torch.tensor(
+            list(sampling_lanes), dtype=torch.int32)
 
     def flush_waiting(self) -> int:
         """Move one waiting request from the CPU deque into the ring, if possible.
@@ -156,13 +205,15 @@ class OnlinePinnedRuntime:
             with self._waiting_lock:
                 if not self._waiting:
                     return 0
-                rid, token_ids, initial_step = self._waiting.popleft()
+                rid, token_ids, initial_step, sampling_lanes = \
+                    self._waiting.popleft()
             self._cpu_req_tail += 1  # slot is ours; hole-free by construction
 
         prompt_len = token_ids.shape[0]
         with torch.cuda.stream(self._write_stream):
             self._inbox_tokens[slot, :prompt_len].copy_(token_ids, non_blocking=True)
         self._write_stream.synchronize()
+        self._write_sampling_lanes(slot, sampling_lanes)
         self._req_request_id[slot]   = rid
         self._req_prompt_len[slot]   = prompt_len
         self._req_initial_step[slot] = initial_step
@@ -291,4 +342,5 @@ class OnlinePinnedRuntime:
         self._comp_ready.zero_()
         self._req_ready.zero_()
         self._req_request_id.zero_()
+        self._req_sampling.zero_()
         self._pinned_rid_at_row.fill_(-1)

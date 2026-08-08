@@ -322,6 +322,29 @@ struct alignas(16) TaskDesc {
   FullTaskDesc::TaskMetadata task_metadata;
 };
 
+// Per-request sampling record: SP_NUM_LANES int32 lanes, identical layout in
+// the pinned ring (pinned_req_sampling, one record per ring slot) and the
+// per-row device table (sampling_params, one record per buffer row).
+// Writer: OnlinePinnedRuntime.submit (all lanes written before ready=1).
+// Copier: the scheduler's Step-4 admission drain (verbatim, next to
+// prompt_length[row]).  Reader: sampling_partial_poskeyed_kernel
+// (tasks/common/sampling.cuh, which hard-codes the lane indices — keep in
+// sync).  Python mirror: online_pinned_runtime.py::SP_LANE_*.
+enum SamplingParamLane : int32_t {
+  SP_LANE_FLAGS = 0,       // 0 = all-defaults fast path; bit0 = custom
+                           // params present; bit1 = per-request seed present
+  SP_LANE_TEMP_MILLI = 1,  // temperature*1000; 0 sentinel = engine default
+  SP_LANE_TOP_K = 2,       // 0 = off (v1: must be 0 on the parallel engine)
+  SP_LANE_TOP_P_MILLI = 3, // 1000 = off (v1: must be 1000)
+  SP_LANE_SEED_LO = 4,     // per-request philox seed, int64 split (low 32)
+  SP_LANE_SEED_HI = 5,     // per-request philox seed, int64 split (high 32)
+  SP_LANE_FREQ_PEN_MILLI = 6, // frequency_penalty*1000, 0 = off
+  SP_LANE_PRES_PEN_MILLI = 7, // presence_penalty*1000, 0 = off
+  SP_LANE_REP_PEN_MILLI = 8,  // repetition_penalty*1000, 1000 = off
+  // lanes 9..11 reserved (min_p / per-request max_new_tokens)
+  SP_NUM_LANES = 12,
+};
+
 struct RuntimeConfig {
   int num_workers, num_local_schedulers, num_remote_schedulers, num_graphs;
   int num_gpus, my_gpu_id;
@@ -414,6 +437,11 @@ struct RuntimeConfig {
   // allocating a buffer row so CPU can discover which row its request is
   // on by scanning rows, then poll pinned_step[row] for per-step streaming.
   int32_t *pinned_rid_at_row; // [total_inflight], pinned
+  // Per-request sampling ring records (pinned, CPU producer) and per-row
+  // device table (scheduler copies ring record -> row at admission; the
+  // partial sampling task reads rows).  See SamplingParamLane above.
+  int32_t *pinned_req_sampling; // [MPK_PINNED_RING_CAPACITY * SP_NUM_LANES]
+  int32_t *sampling_params;     // [total_inflight * SP_NUM_LANES], device
   // Running queue rid tracking: request_rids[i] stores the original rid
   // for active batch slot i (GPU device memory).
   int *request_rids; // [MPK_MAX_NUM_BATCHED_REQUESTS]

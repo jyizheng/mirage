@@ -68,6 +68,12 @@ class MPKMetadata:
     pinned_step: Optional[torch.Tensor] = None
     pinned_inbox_tokens: Optional[torch.Tensor] = None
     pinned_rid_at_row: Optional[torch.Tensor] = None
+    # Per-request sampling: [cap, SP_LANES] int32 pinned ring records plus the
+    # [n_req, SP_LANES] int32 device table the scheduler copies them into at
+    # admission (lane layout in online_pinned_runtime.SP_LANE_* /
+    # runtime_header.h SamplingParamLane).
+    pinned_req_sampling: Optional[torch.Tensor] = None
+    sampling_params: Optional[torch.Tensor] = None
     # spec decode config
     spec_decode: Optional[str] = None
     spec_decode_config: Optional[object] = None
@@ -228,6 +234,8 @@ class MPK:
         self.pinned_step             = args.pinned_step
         self.pinned_inbox_tokens     = args.pinned_inbox_tokens
         self.pinned_rid_at_row       = args.pinned_rid_at_row
+        self.pinned_req_sampling     = args.pinned_req_sampling
+        self.sampling_params_table   = args.sampling_params
 
         self.profiler_tensor = args.profiler_tensor
         self.spec_decode_config = args.spec_decode_config
@@ -270,6 +278,8 @@ class MPK:
             "pinned_step":             args.pinned_step,
             "pinned_inbox_tokens":     args.pinned_inbox_tokens,
             "pinned_rid_at_row":       args.pinned_rid_at_row,
+            "pinned_req_sampling":     args.pinned_req_sampling,
+            "sampling_params":         args.sampling_params,
         }
         self.persistent_kernel = PersistentKernel(
             mode=args.mode,

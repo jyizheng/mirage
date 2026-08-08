@@ -11,6 +11,7 @@ import torch
 import torch.distributed as dist
 from ..mpk.mpk import MPK, MPKMetadata
 from ..mpk import OnlinePinnedRuntime
+from ..mpk.online_pinned_runtime import SP_LANES
 from ..mpk.models.graph_builder import MirageModelConfig
 
 
@@ -212,6 +213,11 @@ class ModelRunner:
             paged_kv_indices_buffer=torch.zeros(config.max_num_pages, dtype=torch.int32, device="cuda"),
             paged_kv_last_page_len_buffer=torch.zeros(n_req, dtype=torch.int32, device="cuda"),
             paged_kv_indices_snapshot=torch.zeros(config.max_num_pages, dtype=torch.int32, device="cuda"),
+            # Per-row runtime sampling-param table (device): one SP_LANES-wide
+            # int32 record per buffer row, written by the scheduler's Step-4
+            # admission drain (verbatim copy of the ring record), read by the
+            # partial sampling task.  All-zero record = flags==0 fast path.
+            sampling_params=torch.zeros(n_req, SP_LANES, dtype=torch.int32, device="cuda"),
             # Pinned ring buffers for CPU↔GPU communication.  pin_memory()
             # gives a stable physical address so no DMA copy is needed.
             pinned_req_ready=torch.zeros(cap, dtype=torch.int32).pin_memory(),
@@ -226,4 +232,8 @@ class ModelRunner:
             pinned_step=torch.zeros(n_req, dtype=torch.int32).pin_memory(),
             pinned_inbox_tokens=torch.zeros(cap, config.max_seq_length, dtype=torch.int64).pin_memory(),
             pinned_rid_at_row=torch.full((n_req,), -1, dtype=torch.int32).pin_memory(),
+            # Per-request sampling ring records (pinned): CPU writes all
+            # SP_LANES lanes before setting ready=1 (see
+            # OnlinePinnedRuntime.submit); GPU copies slot -> row at admission.
+            pinned_req_sampling=torch.zeros(cap, SP_LANES, dtype=torch.int32).pin_memory(),
         )

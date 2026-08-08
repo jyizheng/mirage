@@ -618,6 +618,16 @@ __device__ __forceinline__ bool
     }
     config.prompt_length[row] = prompt_len;
     config.step[row] = initial_step;
+    // Copy the per-request sampling record ring-slot -> row (verbatim, all
+    // lanes).  Single scheduler thread, before the row becomes visible to
+    // any task (request_ids[slot] is filled below), so no new races.
+    static_assert(SP_NUM_LANES == 12,
+                  "sampling record layout is a 12-lane ABI shared with "
+                  "online_pinned_runtime.py and sampling.cuh");
+    for (int j = 0; j < SP_NUM_LANES; j++) {
+      config.sampling_params[row * SP_NUM_LANES + j] =
+          config.pinned_req_sampling[req_slot * SP_NUM_LANES + j];
+    }
     // Let CPU discover which row this rid is on by scanning pinned_rid_at_row.
     config.pinned_rid_at_row[row] = (int32_t)new_rid;
 
@@ -1455,6 +1465,8 @@ static std::map<std::string, void *> global_model_tensors;
 // meta_tensors[20]: pinned_step
 // meta_tensors[21]: pinned_inbox_tokens
 // meta_tensors[22]: pinned_rid_at_row
+// meta_tensors[23]: pinned_req_sampling ([cap * SP_NUM_LANES] int32, pinned)
+// meta_tensors[24]: sampling_params ([n_req * SP_NUM_LANES] int32, device)
 
 extern "C" void init_request_resources() {
   init_kernel<<<dim3(1, 1, 1), dim3(INIT_NUM_THREADS, 1, 1)>>>(
@@ -1482,10 +1494,11 @@ extern "C" void
     global_model_tensors[model_tensor_names[i]] = model_tensor_ptrs[i];
   }
   // meta_tensors[0..10] are always required.
-  // meta_tensors[11..22]: pinned ring pointers (MODE_ONLINE_PINNED only,
-  //   passed as CPU-side void* from Python's pinned tensors)
+  // meta_tensors[11..24]: pinned ring pointers + per-request sampling table
+  //   (MODE_ONLINE_PINNED only; pinned entries are CPU-side void* from
+  //   Python's pinned tensors, sampling_params is a device tensor)
 #if defined(MODE_ONLINE_PINNED)
-  assert(meta_tensors.size() == 23);
+  assert(meta_tensors.size() == 25);
 #else
   assert(meta_tensors.size() == 11);
 #endif
@@ -1530,6 +1543,10 @@ extern "C" void
       static_cast<int64_t *>(meta_tensors[21]);
   global_runtime_config.pinned_rid_at_row =
       static_cast<int32_t *>(meta_tensors[22]);
+  global_runtime_config.pinned_req_sampling =
+      static_cast<int32_t *>(meta_tensors[23]);
+  global_runtime_config.sampling_params =
+      static_cast<int32_t *>(meta_tensors[24]);
 #endif
   global_runtime_config.num_workers = num_workers;
   global_runtime_config.num_local_schedulers = num_local_schedulers;

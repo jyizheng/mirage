@@ -2938,6 +2938,11 @@ class PersistentKernel:
             "pinned_step",
             "pinned_inbox_tokens",
             "pinned_rid_at_row",
+            # Per-request sampling: pinned [cap, SP_LANES] ring records and
+            # the [n_req, SP_LANES] device table (ABI indices 23/24, see
+            # init_persistent_kernel in persistent_kernel.cuh).
+            "pinned_req_sampling",
+            "sampling_params",
         ]
         meta_tensors_ptr = []
         for key in expected_order:
@@ -3060,6 +3065,8 @@ class PersistentKernel:
             meta_tensors.append(self.meta_tensors["pinned_step"])
             meta_tensors.append(self.meta_tensors["pinned_inbox_tokens"])
             meta_tensors.append(self.meta_tensors["pinned_rid_at_row"])
+            meta_tensors.append(self.meta_tensors["pinned_req_sampling"])
+            meta_tensors.append(self.meta_tensors["sampling_params"])
         meta_tensors_ptr = [tensor.data_ptr() for tensor in meta_tensors]
         profiler_buffer_ptr = (
             self.profiler_tensor.data_ptr() if self.profiler_tensor is not None else 0
