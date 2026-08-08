@@ -62,8 +62,70 @@ def _extract_prompt(messages: list[dict]) -> str:
     return ""
 
 
+def _parse_sampling_params(body: dict, engine: LLMEngine) -> dict:
+    """Extract per-request sampling params from an OpenAI-style body.
+
+    v1 scope (design doc §3/§7): per-request temperature, seed and
+    frequency/presence/repetition penalties on the parallel sampling
+    pipeline.  Per-request top_k/top_p are STRUCTURAL on that pipeline
+    (top-p mass is a global-vocab quantity) — rejected with 400 unless the
+    caller passes the explicit no-op values (top_k=0 / top_p=1).  Any
+    sampling field on an engine built without --per-request-sampling is
+    rejected with 400.
+
+    Returns a kwargs dict for LLMEngine.submit()/submit_group() containing
+    only the fields the request actually set.
+    """
+    if body.get("top_k") not in (None, 0):
+        raise HTTPException(
+            status_code=400,
+            detail="per-request top_k is not supported on the parallel "
+                   "sampling engine (v1); only top_k=0 (off) is accepted")
+    if body.get("top_p") not in (None, 1, 1.0):
+        raise HTTPException(
+            status_code=400,
+            detail="per-request top_p is not supported on the parallel "
+                   "sampling engine (v1); only top_p=1.0 (off) is accepted")
+
+    params: dict = {}
+    for field, caster in (
+        ("temperature", float),
+        ("seed", int),
+        ("frequency_penalty", float),
+        ("presence_penalty", float),
+        ("repetition_penalty", float),
+    ):
+        value = body.get(field)
+        if value is None:
+            continue
+        try:
+            params[field] = caster(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"`{field}` must be a {caster.__name__}")
+    if not params:
+        return params
+
+    config = engine.model_runner.config
+    if not config.per_request_sampling:
+        raise HTTPException(
+            status_code=400,
+            detail="per-request sampling params require a server started "
+                   "with --per-request-sampling (and --sampling-seed)")
+    if "temperature" in params and not params["temperature"] > 0.0:
+        raise HTTPException(
+            status_code=400, detail="`temperature` must be > 0")
+    if ("repetition_penalty" in params
+            and not params["repetition_penalty"] > 0.0):
+        raise HTTPException(
+            status_code=400, detail="`repetition_penalty` must be > 0")
+    return params
+
+
 async def _stream_bridge(
     engine: LLMEngine, prompt: str, timeout: float,
+    sampling_params: dict | None = None,
 ) -> AsyncGenerator[str, None]:
     """Bridge a synchronous streaming generator to async SSE chunks.
 
@@ -81,7 +143,8 @@ async def _stream_bridge(
 
     def _run() -> None:
         try:
-            gen = engine.submit(prompt, stream=True, timeout=timeout)
+            gen = engine.submit(prompt, stream=True, timeout=timeout,
+                                **(sampling_params or {}))
             for text, is_final in gen:
                 loop.call_soon_threadsafe(_put, text, is_final, None)
         except BaseException as exc:
@@ -229,9 +292,13 @@ async def completions(request: Request):
     elif prompt is None:
         prompt = ""
 
+    sampling_params = _parse_sampling_params(
+        body, request.app.state.engine)
+
     if stream:
         return StreamingResponse(
-            _stream_bridge(request.app.state.engine, prompt, timeout),
+            _stream_bridge(request.app.state.engine, prompt, timeout,
+                           sampling_params),
             media_type="text/event-stream",
         )
     else:
@@ -244,7 +311,8 @@ async def completions(request: Request):
                 use_template=use_template,
                 timeout=timeout,
                 prompt_token_ids=prompt_token_ids,
-                max_new_tokens=max_new_tokens),
+                max_new_tokens=max_new_tokens,
+                **sampling_params),
         )
         choice = {
             "index": 0,
@@ -275,11 +343,15 @@ async def group_completions(request: Request):
     group_size = int(body.get("group_size", 1))
     use_template = body.get("use_template", True)
     timeout = request.app.state.request_timeout
+    # One sampling-param set applies to ALL group members.
+    sampling_params = _parse_sampling_params(
+        body, request.app.state.engine)
 
     loop = asyncio.get_running_loop()
     results = await loop.run_in_executor(
         None, lambda: request.app.state.engine.submit_group(
-            prompt, group_size, use_template=use_template, timeout=timeout),
+            prompt, group_size, use_template=use_template, timeout=timeout,
+            **sampling_params),
     )
     choices = []
     for i, result in enumerate(results):
@@ -336,6 +408,15 @@ def main():
                         help="HF-style repetition penalty over generated "
                              "tokens (compile-time; requires "
                              "--sampling-seed).")
+    parser.add_argument("--per-request-sampling", action="store_true",
+                        help="Compile the sampling task with per-request "
+                             "runtime overrides: /v1/completions and "
+                             "/v1/group_completions then accept "
+                             "temperature, seed, frequency_penalty, "
+                             "presence_penalty and repetition_penalty per "
+                             "request (requires --sampling-seed). Requests "
+                             "that omit them keep the engine defaults and "
+                             "the bitwise-unchanged fast path.")
     parser.add_argument("--ignore-eos", action="store_true",
                         help="Generate every request to max sequence length.")
     parser.add_argument("--request-timeout", default=7200.0, type=float,
@@ -357,6 +438,7 @@ def main():
         frequency_penalty=args.frequency_penalty,
         presence_penalty=args.presence_penalty,
         repetition_penalty=args.repetition_penalty,
+        per_request_sampling=args.per_request_sampling,
         ignore_eos=args.ignore_eos,
         max_seq_length=args.max_seq_length,
         max_num_pages=args.max_num_pages,

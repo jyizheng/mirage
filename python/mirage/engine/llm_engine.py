@@ -13,7 +13,18 @@ import math
 
 from .model_runner import ModelRunner
 from .tokenizer_manager import TokenizerManager
-from ..mpk.online_pinned_runtime import OnlinePinnedRuntime
+from ..mpk.online_pinned_runtime import (
+    OnlinePinnedRuntime,
+    SP_LANES,
+    SP_LANE_FLAGS,
+    SP_LANE_TEMP_MILLI,
+    SP_LANE_TOP_P_MILLI,
+    SP_LANE_SEED_LO,
+    SP_LANE_SEED_HI,
+    SP_LANE_FREQ_PEN_MILLI,
+    SP_LANE_PRES_PEN_MILLI,
+    SP_LANE_REP_PEN_MILLI,
+)
 
 
 class _StreamingMonitor:
@@ -211,6 +222,87 @@ class LLMEngine:
         # Launch MPK kernels
         self._ensure_kernel_running()
 
+    # ── Per-request sampling params ───────────────────────────────────────
+
+    def _sampling_lanes(
+        self,
+        temperature: float | None = None,
+        seed: int | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
+        repetition_penalty: float | None = None,
+    ) -> list[int] | None:
+        """Encode per-request sampling params into the 12-lane ring record.
+
+        Omitted (None) params fall back to the engine defaults
+        (temperature 1.0 — the online engine's hardwired value — and the
+        RunnerConfig seed/penalties).  Returns None when every resolved
+        value equals the engine default: the runtime then writes the
+        all-zero record (flags==0) and the kernel takes the
+        compiled-constant fast path, bitwise identical to an unparametrised
+        request.
+
+        Comparison and encoding happen in MILLI-INT space with the exact
+        rounding the compile-time path uses (int(round(x*1000)),
+        persistent_kernel.sampling_partial_sm100_layer), so a per-request
+        value equal to the compiled constant is indistinguishable from it.
+        """
+        cfg = self.model_runner.config
+        if temperature is not None and not temperature > 0.0:
+            raise ValueError("temperature must be > 0")
+        if repetition_penalty is not None and not repetition_penalty > 0.0:
+            raise ValueError("repetition_penalty must be > 0")
+
+        temp_milli = int(round(
+            (temperature if temperature is not None else 1.0) * 1000))
+        if temp_milli < 1:
+            raise ValueError("temperature too small (temperature*1000 "
+                             "rounds to 0)")
+        fp_milli = int(round(
+            (frequency_penalty if frequency_penalty is not None
+             else cfg.frequency_penalty) * 1000))
+        pp_milli = int(round(
+            (presence_penalty if presence_penalty is not None
+             else cfg.presence_penalty) * 1000))
+        rp_milli = int(round(
+            (repetition_penalty if repetition_penalty is not None
+             else cfg.repetition_penalty) * 1000))
+        seed_custom = seed is not None and int(seed) != cfg.sampling_seed
+
+        custom = (temp_milli != 1000
+                  or seed_custom
+                  or fp_milli != int(round(cfg.frequency_penalty * 1000))
+                  or pp_milli != int(round(cfg.presence_penalty * 1000))
+                  or rp_milli != int(round(cfg.repetition_penalty * 1000)))
+        if not custom:
+            return None
+        if not cfg.per_request_sampling:
+            raise ValueError(
+                "per-request sampling params require an engine built with "
+                "per_request_sampling=True (--per-request-sampling)")
+
+        flags = 1 | (2 if seed_custom else 0)
+        seed_lo = seed_hi = 0
+        if seed_custom:
+            s = int(seed) & 0xFFFFFFFFFFFFFFFF
+            seed_lo = s & 0xFFFFFFFF
+            seed_hi = (s >> 32) & 0xFFFFFFFF
+            # int32 lanes: fold to signed
+            if seed_lo >= 1 << 31:
+                seed_lo -= 1 << 32
+            if seed_hi >= 1 << 31:
+                seed_hi -= 1 << 32
+        lanes = [0] * SP_LANES
+        lanes[SP_LANE_FLAGS] = flags
+        lanes[SP_LANE_TEMP_MILLI] = temp_milli
+        lanes[SP_LANE_TOP_P_MILLI] = 1000  # v1: no per-request truncation
+        lanes[SP_LANE_SEED_LO] = seed_lo
+        lanes[SP_LANE_SEED_HI] = seed_hi
+        lanes[SP_LANE_FREQ_PEN_MILLI] = fp_milli
+        lanes[SP_LANE_PRES_PEN_MILLI] = pp_milli
+        lanes[SP_LANE_REP_PEN_MILLI] = rp_milli
+        return lanes
+
     # ── Public API ────────────────────────────────────────────────────────
 
     def submit(
@@ -222,6 +314,11 @@ class LLMEngine:
         stream: bool = False,
         prompt_token_ids: list[int] | None = None,
         max_new_tokens: int | None = None,
+        temperature: float | None = None,
+        seed: int | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
+        repetition_penalty: float | None = None,
     ):
         """Submit a single prompt for generation.
 
@@ -264,6 +361,12 @@ class LLMEngine:
                            to the global bound; budget cuts are client-side
                            by construction.  Not supported with
                            ``stream=True``.
+            temperature / seed / frequency_penalty / presence_penalty /
+                repetition_penalty: per-request sampling overrides (engine
+                           must be built with ``per_request_sampling``).
+                           None falls back to the engine default; an
+                           all-defaults request takes the compiled-constant
+                           fast path (bitwise identical to omitting them).
 
         Returns:
             When stream=False: ``{"text": str, "token_ids": list[int],
@@ -288,6 +391,14 @@ class LLMEngine:
             token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
         prompt_len = len(token_ids)
 
+        sampling_lanes = self._sampling_lanes(
+            temperature=temperature,
+            seed=seed,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            repetition_penalty=repetition_penalty,
+        )
+
         rid = self._next_rid
         self._next_rid += 1
 
@@ -295,7 +406,7 @@ class LLMEngine:
         self.stats.on_submit()
         t0 = time.monotonic()
         with self._submit_lock:
-            self.runtime.submit(rid, t)
+            self.runtime.submit(rid, t, sampling_lanes=sampling_lanes)
 
         if stream:
             return self._submit_stream(
@@ -338,8 +449,17 @@ class LLMEngine:
         use_template: bool = True,
         timeout: float = 300.0,
         poll_interval: float = 1e-4,
+        temperature: float | None = None,
+        seed: int | None = None,
+        frequency_penalty: float | None = None,
+        presence_penalty: float | None = None,
+        repetition_penalty: float | None = None,
     ):
         """GRPO-style group rollout with SHARED-PREFIX prefill.
+
+        Per-request sampling overrides (temperature/seed/penalties) apply
+        ONE set to ALL group members; trajectories still diverge because
+        the Gumbel noise is keyed by each member's buffer row.
 
         All ``group_size`` trajectories share one prompt, so the prompt's
         KV is computed ONCE: member 0 prefills normally; once its prefill
@@ -375,6 +495,14 @@ class LLMEngine:
             "group_size must be < pinned_ring_capacity (lockstep " \
             "completions overflow the completion ring and are lost)"
 
+        sampling_lanes = self._sampling_lanes(
+            temperature=temperature,
+            seed=seed,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            repetition_penalty=repetition_penalty,
+        )
+
         token_ids = self.tokenizer_manager.tokenize(prompt, use_template)
         prompt_len = len(token_ids)
         assert prompt_len >= 2 and prompt_len <= page_size
@@ -393,7 +521,7 @@ class LLMEngine:
         rid0 = self._next_rid
         self._next_rid += 1
         with self._submit_lock:
-            rt.submit(rid0, t)
+            rt.submit(rid0, t, sampling_lanes=sampling_lanes)
         deadline = time.monotonic() + timeout
         row0 = -1
         while row0 < 0:
@@ -449,7 +577,8 @@ class LLMEngine:
             rid = self._next_rid
             self._next_rid += 1
             with self._submit_lock:
-                rt.submit(rid, t, initial_step=pfx)
+                rt.submit(rid, t, initial_step=pfx,
+                          sampling_lanes=sampling_lanes)
             rids.append(rid)
 
         # ── collect ──
