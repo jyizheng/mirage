@@ -40,6 +40,13 @@ class TrainerBackend(Protocol):
     def named_parameters(self):
         """Expose trainer parameters for weight synchronization."""
 
+    # Checkpointing is an optional extension of the contract: backends that
+    # support it expose ``state_dict()`` / ``load_state_dict(state)`` covering
+    # model weights AND optimizer state.  Backends whose native persistence is
+    # sharded/distributed (and therefore cannot be captured through this
+    # single-process interface) raise NotImplementedError with a pointer to
+    # the native mechanism instead of silently saving partial state.
+
 
 @dataclass(frozen=True)
 class _ReplayBatch:
@@ -212,6 +219,19 @@ class HuggingFaceTrainerBackend:
     def named_parameters(self):
         return self.model.named_parameters()
 
+    def state_dict(self) -> dict:
+        """Full trainer state: model weights and AdamW optimizer state."""
+        return {
+            "model": self.model.state_dict(),
+            "optimizer": self.optimizer.state_dict(),
+        }
+
+    def load_state_dict(self, state: Mapping[str, object]) -> None:
+        self.model.load_state_dict(state["model"], strict=True)
+        # torch optimizers relocate loaded state to each parameter's device,
+        # so a CPU-mapped checkpoint restores correctly onto a CUDA model.
+        self.optimizer.load_state_dict(state["optimizer"])
+
 
 class TorchTitanTrainerBackend:
     """TorchTitan-native replay, clipping, optimizer, and scheduler adapter.
@@ -308,6 +328,51 @@ class TorchTitanTrainerBackend:
         if self._named_tensor_source is not None:
             return self._named_tensor_source()
         return self.model.named_parameters()
+
+    def _reject_sharded_state(self, action: str) -> None:
+        sharded = False
+        try:
+            from torch.distributed.tensor import DTensor
+        except ImportError:
+            pass
+        else:
+            sharded = any(
+                isinstance(p, DTensor)
+                for part in self.model_parts
+                for p in part.parameters()
+            )
+        if sharded or (
+            torch.distributed.is_available() and torch.distributed.is_initialized()
+            and torch.distributed.get_world_size() > 1
+        ):
+            raise NotImplementedError(
+                f"TorchTitanTrainerBackend cannot {action} sharded/distributed "
+                "state through the single-process checkpoint interface; use "
+                "TorchTitan's own CheckpointManager (torch.distributed."
+                "checkpoint) for FSDP2/TP runs"
+            )
+
+    def state_dict(self) -> dict:
+        """Single-process TorchTitan state (what its APIs expose here).
+
+        ``optimizers`` is TorchTitan's ``OptimizersContainer`` (a
+        ``Stateful``); its ``state_dict`` layout is TorchTitan-defined.
+        """
+        self._reject_sharded_state("save")
+        state = {
+            "model": self.model.state_dict(),
+            "optimizers": self.optimizers.state_dict(),
+        }
+        if self.lr_schedulers is not None:
+            state["lr_schedulers"] = self.lr_schedulers.state_dict()
+        return state
+
+    def load_state_dict(self, state: Mapping[str, object]) -> None:
+        self._reject_sharded_state("load")
+        self.model.load_state_dict(state["model"], strict=True)
+        self.optimizers.load_state_dict(state["optimizers"])
+        if self.lr_schedulers is not None and "lr_schedulers" in state:
+            self.lr_schedulers.load_state_dict(state["lr_schedulers"])
 
 
 class MegatronTrainerBackend:
@@ -431,6 +496,22 @@ class MegatronTrainerBackend:
         if not self._closed and self._cleanup is not None:
             self._cleanup()
         self._closed = True
+
+    def state_dict(self) -> dict:
+        raise NotImplementedError(
+            "MegatronTrainerBackend checkpointing is not implemented: with "
+            "DDP + the distributed optimizer, complete optimizer state only "
+            "exists as sharded state dicts consumed by megatron.core."
+            "dist_checkpointing; a faithful save/restore must go through "
+            "that API rather than this single-file interface"
+        )
+
+    def load_state_dict(self, state: Mapping[str, object]) -> None:
+        raise NotImplementedError(
+            "MegatronTrainerBackend checkpointing is not implemented; see "
+            "state_dict() for the reason (megatron.core.dist_checkpointing "
+            "owns sharded optimizer state)"
+        )
 
 
 def _create_torchtitan_backend(

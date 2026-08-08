@@ -164,6 +164,32 @@ if __name__ == "__main__":
         "Disabled by default so it is not charged to E2E engine time.",
     )
     parser.add_argument(
+        "--save-every",
+        type=int,
+        default=0,
+        help="Write a GRPO checkpoint every K outer steps (0 = off). "
+        "Requires --checkpoint-dir. The checkpoint holds trainer weights, "
+        "optimizer state, the outer-step/dataset cursor, host RNG states, "
+        "and a config echo, written atomically (temp file + rename).",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=str,
+        default=None,
+        help="Directory for --save-every GRPO checkpoints "
+        "(ckpt_step_<N>.pt).",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=str,
+        default=None,
+        help="Resume the GRPO loop from a checkpoint file. --grpo-steps is "
+        "the TOTAL outer-step count including the steps already in the "
+        "checkpoint. The trainer state and RNG are restored and the MPK "
+        "engine is re-armed via the weight-sync step, so the resumed run "
+        "reproduces the uninterrupted run's rollouts bitwise.",
+    )
+    parser.add_argument(
         "--sampling-seed",
         type=int,
         default=None,

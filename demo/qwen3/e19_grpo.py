@@ -30,13 +30,23 @@
 # slots (position-keyed Gumbel noise differs per request slot, so a group
 # on the same prompt yields distinct trajectories).
 import atexit
+import hashlib
 import json
 import math
+import os
 import re
 import time
 
 import torch
 
+from mirage.mpk.checkpoint import (
+    capture_rng_state,
+    config_echo,
+    load_checkpoint,
+    restore_rng_state,
+    save_checkpoint,
+    verify_config,
+)
 from mirage.mpk.trainer_backend import (
     bind_forward_values,
     create_trainer_backend,
@@ -106,8 +116,18 @@ def run(
         )
     dev = "cuda"
     arm = args.grpo_arm
+
+    save_every = int(getattr(args, "save_every", 0) or 0)
+    ckpt_dir = getattr(args, "checkpoint_dir", None)
+    resume_from = getattr(args, "resume_from", None)
+    if save_every < 0:
+        raise ValueError("--save-every must be >= 0")
+    if save_every > 0 and not ckpt_dir:
+        raise ValueError("--save-every requires --checkpoint-dir")
+
     out_path = args.grpo_log or f"/tmp/e19_{arm}.jsonl"
-    log_f = open(out_path, "w")
+    # A resumed run appends so a shared log keeps one contiguous history.
+    log_f = open(out_path, "a" if resume_from else "w")
 
     backend = create_trainer_backend(
         args.grpo_trainer_backend,
@@ -121,6 +141,40 @@ def run(
     close_backend = getattr(backend, "close", None)
     if close_backend is not None:
         atexit.register(close_backend)
+
+    if (save_every > 0 or resume_from) and not (
+        hasattr(backend, "state_dict") and hasattr(backend, "load_state_dict")
+    ):
+        raise TypeError(
+            f"trainer backend {args.grpo_trainer_backend!r} does not "
+            "implement the optional checkpoint contract "
+            "(state_dict/load_state_dict); checkpointing is unavailable"
+        )
+
+    start_step = 0
+    if resume_from:
+        t_load0 = time.perf_counter()
+        payload = load_checkpoint(resume_from)
+        verify_config(payload["config"], args)
+        if payload.get("trainer_backend") != args.grpo_trainer_backend:
+            raise ValueError(
+                f"checkpoint trainer state is {payload.get('trainer_backend')!r} "
+                f"but this run uses {args.grpo_trainer_backend!r}"
+            )
+        backend.load_state_dict(payload["trainer"])
+        restore_rng_state(payload["rng"])
+        start_step = int(payload["outer_step"])
+        del payload
+        t_load = time.perf_counter() - t_load0
+        print(f"[e19] resumed from {resume_from}: {start_step} outer steps "
+              f"completed, restore took {t_load:.2f}s; the weight sync below "
+              "re-arms the MPK engine from the restored trainer weights")
+        if start_step >= args.grpo_steps:
+            raise ValueError(
+                f"checkpoint already contains {start_step} completed steps; "
+                f"--grpo-steps {args.grpo_steps} is the TOTAL step count and "
+                "must exceed it for the run to continue"
+            )
 
     demo_sd = dict(model_demo.named_parameters())
     sync_plan = None
@@ -240,7 +294,15 @@ def run(
     clip_eps = 0.2
     measure_old_recompute = getattr(args, "grpo_measure_old_recompute", False)
 
-    for it, (prompt_ids, gold) in enumerate(data[: args.grpo_steps]):
+    if start_step >= len(data):
+        raise ValueError(
+            f"dataset provides {len(data)} prompts but the checkpoint has "
+            f"already consumed {start_step}; nothing to resume"
+        )
+    # The dataset reader is deterministic and sequential, so the saved
+    # data_cursor (== completed outer steps) is the full dataset state.
+    for it in range(start_step, min(args.grpo_steps, len(data))):
+        prompt_ids, gold = data[it]
         torch.cuda.synchronize()
         t0 = time.perf_counter()
         samples = rollout(prompt_ids)
@@ -250,6 +312,15 @@ def run(
             text = tokenizer.decode(s["ids"][s["plen"]:],
                                     skip_special_tokens=True)
             rewards.append(1.0 if extract_answer(text) == gold else 0.0)
+        # Bitwise fingerprint of the whole rollout group (token ids, prompt
+        # length, capture positions, and exact rollout logprobs via float
+        # repr round-trip); lets an interrupted+resumed run be compared
+        # against an uninterrupted one from the step logs alone.
+        rollout_digest = hashlib.sha256(json.dumps(
+            [{"ids": s["ids"], "plen": s["plen"], "pos": s["pos"],
+              "lp_old": s["lp_old"]} for s in samples],
+            sort_keys=True,
+        ).encode()).hexdigest()
         rw = torch.tensor(rewards, device=dev)
         adv = (rw - rw.mean()) / (rw.std() + 1e-6)
 
@@ -394,6 +465,8 @@ def run(
         rec = {
             "step": it,
             "reward_mean": float(rw.mean()),
+            "rewards": rewards,
+            "rollout_sha256": rollout_digest,
             # top-level ratio/clip keep their historical meaning: the
             # rollout-capture vs pi_theta comparison of the FIRST update
             # (identically the whole story when inner_epochs == 1);
@@ -432,6 +505,25 @@ def run(
         }
         log_f.write(json.dumps(rec) + "\n")
         log_f.flush()
+        if save_every and (it + 1) % save_every == 0:
+            # Saved AFTER this step's optimizer update and trainer->engine
+            # weight sync: the checkpoint state is exactly "it+1 outer steps
+            # completed".  Resume re-loads the trainer, restores RNG, and
+            # re-arms the engine through the same weight-sync step, so the
+            # deterministic engine's position-keyed sampling reproduces the
+            # uninterrupted run's rollouts bitwise from step it+1 onward.
+            ckpt_path = os.path.join(ckpt_dir, f"ckpt_step_{it + 1}.pt")
+            t_ck0 = time.perf_counter()
+            save_checkpoint(ckpt_path, {
+                "outer_step": it + 1,
+                "data_cursor": it + 1,
+                "trainer_backend": args.grpo_trainer_backend,
+                "trainer": backend.state_dict(),
+                "rng": capture_rng_state(),
+                "config": config_echo(args),
+            })
+            print(f"[e19] checkpoint step {it + 1} -> {ckpt_path} "
+                  f"({time.perf_counter() - t_ck0:.2f}s)")
         if it % 5 == 0:
             print(f"[e19] {rec}")
     log_f.close()
