@@ -19,7 +19,7 @@ from typing import AsyncGenerator
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from .model_runner import ModelRunner, RunnerConfig
 from .llm_engine import LLMEngine
@@ -109,6 +109,64 @@ async def _stream_bridge(
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+
+@app.get("/metrics")
+async def metrics(request: Request):
+    """Prometheus text-format metrics (hand-formatted, no client library).
+
+    All counters come from :class:`~.llm_engine.EngineStats`, which is
+    updated only at request submit/completion boundaries — reading this
+    endpoint never touches the GPU or the engine's polling loops.
+    """
+    engine = request.app.state.engine
+    config = engine.model_runner.config
+    mpk = engine.model_runner.mpk
+    snap = engine.stats.snapshot()
+
+    lines: list[str] = []
+
+    def emit(name: str, mtype: str, help_text: str, value, labels: str = ""):
+        lines.append(f"# HELP {name} {help_text}")
+        lines.append(f"# TYPE {name} {mtype}")
+        lines.append(f"{name}{labels} {value}")
+
+    emit("mirage_requests_submitted_total", "counter",
+         "Requests submitted to the engine (group members count "
+         "individually).", snap["requests_submitted"])
+    emit("mirage_requests_completed_total", "counter",
+         "Requests completed successfully.", snap["requests_completed"])
+    emit("mirage_requests_failed_total", "counter",
+         "Requests that timed out or errored.", snap["requests_failed"])
+    emit("mirage_requests_in_flight", "gauge",
+         "Requests submitted but not yet completed or failed.",
+         snap["requests_in_flight"])
+    emit("mirage_tokens_generated_total", "counter",
+         "Generated (non-prompt) tokens across all completed requests.",
+         snap["tokens_generated"])
+    emit("mirage_last_request_duration_seconds", "gauge",
+         "Wall-clock duration of the most recently completed request.",
+         f"{snap['last_request_duration_s']:.6f}")
+    emit("mirage_engine_uptime_seconds", "gauge",
+         "Seconds since the engine was constructed.",
+         f"{snap['uptime_s']:.3f}")
+
+    info_labels = (
+        '{model="%s",num_workers="%d",num_schedulers="%d",'
+        'max_num_batched_requests="%d",max_num_batched_tokens="%d",'
+        'max_num_pages="%d",page_size="%d",pinned_ring_capacity="%d",'
+        'max_seq_length="%d",deterministic="%s",sampling_seed="%s"}'
+        % (config.model, mpk.num_workers, mpk.num_schedulers,
+           config.max_num_batched_requests, config.max_num_batched_tokens,
+           config.max_num_pages, config.page_size,
+           config.pinned_ring_capacity, config.max_seq_length,
+           str(config.deterministic).lower(), config.sampling_seed))
+    emit("mirage_engine_info", "gauge",
+         "Engine build/config echo (always 1).", 1, info_labels)
+
+    return PlainTextResponse(
+        "\n".join(lines) + "\n",
+        media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.post("/v1/chat/completions")

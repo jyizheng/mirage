@@ -119,6 +119,57 @@ class _StreamingMonitor:
         self._stop.set()
 
 
+class EngineStats:
+    """Request-level counters backing the ``/metrics`` endpoint.
+
+    ZERO HOT-PATH COST BY DESIGN: counters are bumped only at request
+    submit/completion boundaries — a handful of lock-guarded integer
+    increments per *request* — never inside the step-polling loops or the
+    streaming monitor's 2 ms scan, so rollout throughput is unaffected.
+
+    ``in_flight`` is derived as ``submitted - completed - failed``.  A fatal
+    mid-``submit_group`` error (which requires an engine restart anyway) can
+    leave it nonzero; the counter resets with the engine.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.started_at = time.monotonic()
+        self.requests_submitted = 0
+        self.requests_completed = 0
+        self.requests_failed = 0
+        self.tokens_generated = 0
+        self.last_request_duration_s = 0.0
+
+    def on_submit(self, n: int = 1) -> None:
+        with self._lock:
+            self.requests_submitted += n
+
+    def on_complete(self, num_tokens: int, duration_s: float) -> None:
+        with self._lock:
+            self.requests_completed += 1
+            self.tokens_generated += num_tokens
+            self.last_request_duration_s = duration_s
+
+    def on_fail(self, n: int = 1) -> None:
+        with self._lock:
+            self.requests_failed += n
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            return {
+                "requests_submitted": self.requests_submitted,
+                "requests_completed": self.requests_completed,
+                "requests_failed": self.requests_failed,
+                "requests_in_flight": (self.requests_submitted
+                                       - self.requests_completed
+                                       - self.requests_failed),
+                "tokens_generated": self.tokens_generated,
+                "last_request_duration_s": self.last_request_duration_s,
+                "uptime_s": time.monotonic() - self.started_at,
+            }
+
+
 class LLMEngine:
     """Generation loop backed by the ``online_pinned`` persistent kernel.
 
@@ -148,6 +199,10 @@ class LLMEngine:
 
         # Shared streaming monitor — replaces per-request polling threads.
         self._monitor = _StreamingMonitor(self.runtime, self.tokenizer_manager)
+
+        # Request-level counters for /metrics (bumped only at submit /
+        # completion boundaries — never in polling loops).
+        self.stats = EngineStats()
 
         # Background kernel bookkeeping.
         self._kernel_launched: threading.Event = threading.Event()
@@ -237,14 +292,21 @@ class LLMEngine:
         self._next_rid += 1
 
         t = torch.tensor(token_ids, dtype=torch.int64)
+        self.stats.on_submit()
+        t0 = time.monotonic()
         with self._submit_lock:
             self.runtime.submit(rid, t)
 
         if stream:
-            return self._submit_stream(rid, prompt_len, timeout, poll_interval)
+            return self._submit_stream(
+                rid, prompt_len, timeout, poll_interval, t0)
         else:
-            buffer_row, final_step = self.runtime.wait_for_request(
-                rid, timeout, poll_interval)
+            try:
+                buffer_row, final_step = self.runtime.wait_for_request(
+                    rid, timeout, poll_interval)
+            except BaseException:
+                self.stats.on_fail()
+                raise
             full_tokens = self.runtime.read_tokens_at_row(buffer_row, final_step)
             output_ids = full_tokens[prompt_len:].tolist()
             if max_new_tokens is not None:
@@ -266,6 +328,7 @@ class LLMEngine:
                 result["logprobs"] = [
                     math.log(p) if p > 0.0 else None for p in probs]
             self.runtime.release_request(rid)
+            self.stats.on_complete(len(output_ids), time.monotonic() - t0)
             return result
 
     def submit_group(
@@ -325,6 +388,8 @@ class LLMEngine:
         rt._pinned_step.fill_(-1)
 
         # ── member 0: normal submission, prefills the shared prompt ──
+        self.stats.on_submit(group_size)
+        t0 = time.monotonic()
         rid0 = self._next_rid
         self._next_rid += 1
         with self._submit_lock:
@@ -405,6 +470,8 @@ class LLMEngine:
                 result["logprobs"] = [
                     math.log(p) if p > 0.0 else None for p in probs]
             rt.release_request(rid)
+            self.stats.on_complete(
+                len(output_ids), time.monotonic() - t0)
             results.append(result)
         return results
 
@@ -429,6 +496,7 @@ class LLMEngine:
         prompt_len: int,
         timeout: float,
         poll_interval: float,
+        t0: float | None = None,
     ):
         """Generator: yield ``(text, is_final)`` as tokens are decoded.
 
@@ -437,21 +505,32 @@ class LLMEngine:
         threads stays constant regardless of concurrent request count.
         """
         q = self._monitor.register(rid, prompt_len, timeout)
+        if t0 is None:
+            t0 = time.monotonic()
 
         def generator():
+            # Monitor queue items are one decoded token each, so the chunk
+            # count is the exact generated-token count.
+            num_tokens = 0
             while True:
                 try:
                     text, is_final = q.get(timeout=0.05)
                 except queue.Empty:
                     continue
                 if text == "__timeout__":
+                    self.stats.on_fail()
                     raise TimeoutError(
                         f"stream timed out for rid={rid}")
                 if text == "__error__":
+                    self.stats.on_fail()
                     raise RuntimeError(
                         f"stream error for rid={rid}")
+                if text:
+                    num_tokens += 1
                 yield (text, is_final)
                 if is_final:
+                    self.stats.on_complete(
+                        num_tokens, time.monotonic() - t0)
                     break
 
         return generator()
