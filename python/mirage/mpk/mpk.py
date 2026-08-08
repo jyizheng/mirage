@@ -94,6 +94,12 @@ class MPKMetadata:
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
     repetition_penalty: float = 1.0
+    # Opt-in build flag: compile the parallel sampling task with per-request
+    # runtime overrides (temperature/seed/penalties read from the per-row
+    # sampling_params record when its flags bit0 is set; flags==0 rows keep
+    # the compiled constants).  Off keeps legacy byte-identical code strings.
+    # Requires sampling_seed (the greedy argmax path has no sampling task).
+    per_request_sampling: bool = False
     # Run every request to max_seq_length for matched-token benchmarks.
     ignore_eos: bool = False
     
@@ -317,6 +323,15 @@ class MPK:
             raise ValueError(
                 "frequency/presence/repetition penalties require "
                 "sampling_seed (the greedy argmax path does not apply them)")
+        self.per_request_sampling = args.per_request_sampling
+        if self.per_request_sampling and self.sampling_seed is None:
+            raise ValueError(
+                "per_request_sampling requires sampling_seed (the greedy "
+                "argmax path has no sampling task to override)")
+        if self.per_request_sampling and args.mode != "online_pinned":
+            raise ValueError(
+                "per_request_sampling requires mode='online_pinned' (the "
+                "sampling_params table exists only in that mode)")
         self.ignore_eos = args.ignore_eos
         self.is_built = False
         self.task_graph_generated = False
@@ -504,6 +519,7 @@ class MPK:
         self.model_builder.frequency_penalty = self.frequency_penalty
         self.model_builder.presence_penalty = self.presence_penalty
         self.model_builder.repetition_penalty = self.repetition_penalty
+        self.model_builder.per_request_sampling = self.per_request_sampling
         if self.weight_from_model:
             self.model_builder.build_from_model(model_name=self.model_name)
             self.tokenizer = self.model_builder.tokenizer

@@ -62,6 +62,12 @@ class RunnerConfig:
     """HF-style repetition penalty (logit>0 ? logit/rp : logit*rp) over the
     request's generated tokens; same constraints as ``frequency_penalty``."""
 
+    per_request_sampling: bool = False
+    """Opt-in build flag: compile the sampling task with per-request runtime
+    overrides (temperature/seed/penalties from the per-row sampling_params
+    record).  All-defaults requests keep the compiled-constant fast path
+    bitwise unchanged.  Requires ``sampling_seed``."""
+
     ignore_eos: bool = False
     """Generate to ``max_seq_length`` for matched-token measurements."""
 
@@ -129,6 +135,7 @@ class ModelRunner:
             frequency_penalty=config.frequency_penalty,
             presence_penalty=config.presence_penalty,
             repetition_penalty=config.repetition_penalty,
+            per_request_sampling=config.per_request_sampling,
             ignore_eos=config.ignore_eos,
             num_workers=config.num_workers,
             num_schedulers=config.num_schedulers,

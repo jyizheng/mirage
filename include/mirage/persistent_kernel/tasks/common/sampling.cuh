@@ -198,21 +198,22 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
     float presence_penalty = 0.0f,
     float repetition_penalty = 1.0f,
     long long const *all_tokens_ptr = nullptr,
-    int const *prompt_lengths_ptr = nullptr) {
+    int const *prompt_lengths_ptr = nullptr,
+    int const *sampling_params_ptr = nullptr) {
   uint32_t const tx = threadIdx.x;
-  // Stateless history-scan penalties (OpenAI frequency/presence + HF
-  // repetition). Uniform branch: at the no-op defaults (0/0/1) — including
-  // the legacy 3-arg codegen form that relies on these default arguments —
-  // the whole scan folds away and the emitted arithmetic below is exactly
-  // the pre-penalty expression, keeping existing bitwise gates valid.
-  bool const do_penalties = (frequency_penalty != 0.0f) ||
-                            (presence_penalty != 0.0f) ||
-                            (repetition_penalty != 1.0f);
   using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
                                          BLOCK_THREADS,
                                          SAMPLING_REDUCE_ALGO>::TempStorage;
   extern __shared__ __align__(alignof(SharedMem)) uint8_t smem_sampling_logit[];
   auto &temp_storage = reinterpret_cast<SharedMem &>(smem_sampling_logit);
+  // Per-row sampling-record staging: thread 0 reads the 9 meaningful lanes
+  // once and broadcasts them through shared memory, so every thread of the
+  // block sees ONE consistent view of the record — block uniformity of the
+  // override branch by construction, and a single load per row instead of
+  // one per thread.  (Per-thread reads of the record were observed to
+  // produce rare single-token nondeterminism on GB300; see the per-request
+  // sampling design notes.)
+  __shared__ int sp_shared[9];
 
   for (int row = 0; row < num_active_tokens; ++row) {
     int rid = 0;
@@ -236,6 +237,55 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
     uint64_t const philox_offset =
         static_cast<uint64_t>(noise_rid) * static_cast<uint64_t>(max_seq) +
         pos + 1;
+
+    // Per-request runtime sampling params. The row's 12-lane int32 record
+    // (lane layout: runtime_header.h SamplingParamLane, written verbatim by
+    // the scheduler's admission drain) overrides the compiled constants when
+    // flags bit0 is set; flags==0 keeps the compiled-constant fast path —
+    // the arithmetic below is then exactly the pre-override expression, so
+    // all-defaults rows stay bitwise identical. The branch is BLOCK-UNIFORM
+    // (every thread is on the same row). The milli-int decodings match the
+    // codegen literals (1000.0f / temp_milli, milli * 1e-3f) so a value
+    // supplied per-request is bitwise identical to the same value compiled
+    // in. sampling_params_ptr is nullptr in the legacy codegen forms, where
+    // this whole block folds away.
+    float row_inv_temperature = inv_temperature;
+    float row_frequency_penalty = frequency_penalty;
+    float row_presence_penalty = presence_penalty;
+    float row_repetition_penalty = repetition_penalty;
+    uint64_t row_philox_seed = philox_seed;
+    if (sampling_params_ptr != nullptr) {
+      if (threadIdx.x == 0) {
+        int const *sp = sampling_params_ptr + noise_rid * 12;
+#pragma unroll
+        for (int j = 0; j < 9; ++j) {
+          sp_shared[j] = sp[j];
+        }
+      }
+      __syncthreads();
+      int const sp_flags = sp_shared[0];
+      if (sp_flags & 1) {
+        if (sp_shared[1] > 0) { // temp_milli; 0 sentinel = engine default
+          row_inv_temperature = 1000.0f / static_cast<float>(sp_shared[1]);
+        }
+        if (sp_flags & 2) { // per-request seed present (int64 split)
+          row_philox_seed =
+              static_cast<uint64_t>(static_cast<uint32_t>(sp_shared[4])) |
+              (static_cast<uint64_t>(static_cast<uint32_t>(sp_shared[5])) << 32);
+        }
+        row_frequency_penalty = static_cast<float>(sp_shared[6]) * 1e-3f;
+        row_presence_penalty = static_cast<float>(sp_shared[7]) * 1e-3f;
+        row_repetition_penalty = static_cast<float>(sp_shared[8]) * 1e-3f;
+      }
+    }
+    // Stateless history-scan penalties (OpenAI frequency/presence + HF
+    // repetition). Uniform branch: at the no-op defaults (0/0/1) — including
+    // the legacy 3-arg codegen form that relies on the default arguments —
+    // the whole scan folds away and the emitted arithmetic below is exactly
+    // the pre-penalty expression, keeping existing bitwise gates valid.
+    bool const do_penalties = (row_frequency_penalty != 0.0f) ||
+                              (row_presence_penalty != 0.0f) ||
+                              (row_repetition_penalty != 1.0f);
 
     // Generated-token history for this request: tokens[] holds
     // prompt + generated at their absolute positions (keyed by the stable
@@ -267,7 +317,7 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
       }
       sampling_vec_t<DType, VEC_SIZE> gumbel_noise =
           GenerateSamplingGumbelNoise<DType, VEC_SIZE>(
-              philox_seed, philox_offset,
+              row_philox_seed, philox_offset,
               static_cast<uint64_t>(global_part_off + local_base));
 
       // Per-element occurrence counts of this thread's vocab ids in the
@@ -304,16 +354,16 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
         //   logit -= presence*(count>0) + frequency*count.
         float logit_f = static_cast<float>(logits_vec[j]);
         if (do_penalties && pen_count[j] > 0) {
-          if (repetition_penalty != 1.0f) {
-            logit_f = logit_f > 0.0f ? logit_f / repetition_penalty
-                                     : logit_f * repetition_penalty;
+          if (row_repetition_penalty != 1.0f) {
+            logit_f = logit_f > 0.0f ? logit_f / row_repetition_penalty
+                                     : logit_f * row_repetition_penalty;
           }
-          logit_f -= presence_penalty +
-                     frequency_penalty * static_cast<float>(pen_count[j]);
+          logit_f -= row_presence_penalty +
+                     row_frequency_penalty * static_cast<float>(pen_count[j]);
         }
         candidates[j].data =
             local_idx < CHUNK_SIZE && global_idx < vocab_size
-                ? static_cast<DType>(logit_f * inv_temperature) +
+                ? static_cast<DType>(logit_f * row_inv_temperature) +
                       gumbel_noise[j]
                 : -cuda::std::numeric_limits<DType>::infinity();
         candidates[j].index = local_idx;

@@ -2369,7 +2369,13 @@ int TaskRegister::register_sampling_partial_sm100_task(
   //   emits the legacy code string byte-for-byte (penalty defaults are
   //   supplied by the kernel's default arguments), so graphs without
   //   penalties stay bitwise-unchanged.
-  assert(params.size() == 3 || params.size() == 6);
+  // params[6] (optional, opt-in build flag): 1 = per-request runtime
+  //   sampling params; additionally emits runtime_config.sampling_params so
+  //   the kernel can override temp/seed/penalties from the per-row record
+  //   (flags==0 rows keep the compiled constants).  Builds without the flag
+  //   (3- or 6-param forms) emit byte-identical legacy code strings.
+  assert(params.size() == 3 || params.size() == 6 || params.size() == 7);
+  assert(params.size() != 7 || params[6] == 1);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
   assert(bgraph.operators.size() == 3);
@@ -2409,14 +2415,22 @@ int TaskRegister::register_sampling_partial_sm100_task(
   code.e("    MPK_PAGE_SIZE,");
   code.e("    MPK_MAX_SEQ_LENGTH,");
   code.e("    runtime_config.qo_indptr_buffer[MPK_MAX_NUM_BATCHED_REQUESTS],");
-  if (params.size() == 6) {
+  if (params.size() >= 6) {
     code.e("    1000.0f / $.0f,", temp_milli);
     // milli-int -> float; penalties act pre-temperature in the kernel.
     code.e("    ($.0f) * 1e-3f,", params[3]);
     code.e("    ($.0f) * 1e-3f,", params[4]);
     code.e("    ($.0f) * 1e-3f,", params[5]);
     code.e("    runtime_config.tokens,");
-    code.e("    runtime_config.prompt_length);");
+    if (params.size() == 7) {
+      // Per-request runtime sampling params (opt-in build flag): the kernel
+      // reads the per-row 12-lane record and overrides the compiled
+      // constants above when flags bit0 is set.
+      code.e("    runtime_config.prompt_length,");
+      code.e("    runtime_config.sampling_params);");
+    } else {
+      code.e("    runtime_config.prompt_length);");
+    }
   } else {
     code.e("    1000.0f / $.0f);", temp_milli);
   }

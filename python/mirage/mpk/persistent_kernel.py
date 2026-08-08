@@ -2228,6 +2228,7 @@ class PersistentKernel:
         frequency_penalty: float = 0.0,
         presence_penalty: float = 0.0,
         repetition_penalty: float = 1.0,
+        per_request_sampling: bool = False,
     ):
         """Parallel first stage for position-keyed Gumbel-Max sampling.
 
@@ -2237,6 +2238,12 @@ class PersistentKernel:
         fixed-order scan of the request's generated tokens. Defaults
         (0/0/1) emit the legacy 3-param task -- byte-identical kernel code,
         so penalty-free graphs stay bitwise-unchanged.
+
+        per_request_sampling (opt-in build flag): emit the 7-param form,
+        which passes runtime_config.sampling_params so the kernel can
+        override temperature/seed/penalties per request from the row's
+        12-lane record (flags==0 rows keep the compiled constants above).
+        Off (default) preserves the legacy byte-identical code strings.
         """
         assert logits.num_dims == 2
         assert len(output) == 2
@@ -2256,13 +2263,18 @@ class PersistentKernel:
             [logits, output_value, output_index], tb_graph
         )
         params = [num_tasks, seed, int(round(temperature * 1000))]
-        if (frequency_penalty != 0.0 or presence_penalty != 0.0
-                or repetition_penalty != 1.0):
+        if (per_request_sampling or frequency_penalty != 0.0
+                or presence_penalty != 0.0 or repetition_penalty != 1.0):
+            # NOTE: this milli-int rounding is the compile-time half of the
+            # per-request A/B contract — the server-side lane encoding
+            # (llm_engine._sampling_lanes) must round identically.
             params += [
                 int(round(frequency_penalty * 1000)),
                 int(round(presence_penalty * 1000)),
                 int(round(repetition_penalty * 1000)),
             ]
+        if per_request_sampling:
+            params.append(1)
         self.kn_graph.register_task(
             tb_graph, "sampling_partial_sm100", params
         )

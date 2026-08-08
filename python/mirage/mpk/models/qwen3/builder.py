@@ -757,6 +757,8 @@ class Qwen3Builder(GraphBuilder):
                     frequency_penalty=self.frequency_penalty,
                     presence_penalty=self.presence_penalty,
                     repetition_penalty=self.repetition_penalty,
+                    per_request_sampling=getattr(
+                        self, "per_request_sampling", False),
                 )
             self.mpk.argmax_reduce_layer(
                 input=(self.argmax_part_value, self.argmax_part_index),
