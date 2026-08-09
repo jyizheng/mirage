@@ -720,6 +720,17 @@ __device__ __noinline__ void
     // wait all TMA stores to complete
     if (warp_idx == 0 && cute::elect_one_sync()) {
       cute::tma_store_wait<0>();
+      // tma_store_wait lowers to cp.async.bulk.wait_group.READ, which only
+      // guarantees the TMA unit finished reading smem -- the GLOBAL writes
+      // may still be in flight in the async proxy.  Inside the persistent
+      // megakernel there is no kernel-end fence, so the task-completion
+      // release (atom.add.release on the event counter) would NOT order
+      // these writes: a fast consumer acquiring the event could read torn
+      // output (observed as rare NaN-pattern winners in the sampling
+      // partials on GB300).  Wait for WRITE completion and fence the async
+      // proxy before returning.
+      asm volatile("cp.async.bulk.wait_group 0;" ::: "memory");
+      asm volatile("fence.proxy.async.global;" ::: "memory");
     }
   }
   __syncthreads();
