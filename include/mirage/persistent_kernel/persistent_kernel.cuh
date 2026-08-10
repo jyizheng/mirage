@@ -968,6 +968,18 @@ __device__ __forceinline__ void execute_worker(RuntimeConfig config) {
       }
     }
     __syncthreads();
+    // Consumer-side half of the async-proxy visibility contract (the
+    // producer-side half is the cp.async.bulk.wait_group 0 +
+    // fence.proxy.async.global before each TMA-storing task returns).  The
+    // acquire above is a GENERIC-proxy load, but many tasks read their
+    // inputs with TMA bulk loads, which execute in the ASYNC proxy: without
+    // a cross-proxy fence between the acquire and the TMA load issue, the
+    // async proxy is not guaranteed to observe the producer's settled
+    // output, and a task can compute on a torn input tile (observed on
+    // GB300 as rare bursts of impossible sampled logprobs when the lm_head
+    // linear TMA-loads the final-norm output).  Every thread fences, since
+    // TMA loads are issued by per-task elected threads.
+    asm volatile("fence.proxy.async.global;" ::: "memory");
 
 #ifdef MPK_ENABLE_PROFILING
     if (task_desc->task_type != TASK_TERMINATE) {
