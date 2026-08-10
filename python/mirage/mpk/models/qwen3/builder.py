@@ -315,324 +315,339 @@ class Qwen3Builder(GraphBuilder):
         deterministic = getattr(self, "deterministic", False) or bool(
             int(os.environ.get("MPK_DETERMINISTIC", "0")))
         for i in range(self.num_layers):
-            prefix = f"model.layers.{i}."
-            w_norm = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}input_layernorm.weight"],
-                name=f"layer_{i}_input_layernorm",
-            )
-            if (f"{prefix}self_attn.qkv_proj.weight" in state_dict) and (f"{prefix}self_attn.q_proj.weight" in state_dict):
-                    # Shuffle on CPU in place for qkv_proj.weight tensor
-                    inplace_shuffle_tensors(
-                        [
-                            state_dict[f"{prefix}self_attn.q_proj.weight"], # views
-                            state_dict[f"{prefix}self_attn.k_proj.weight"],
-                            state_dict[f"{prefix}self_attn.v_proj.weight"],
-                        ],
-                        state_dict[f"{prefix}self_attn.qkv_proj.weight"], # target tensor
-                        self.num_local_kv_heads,
-                        0,
-                    )
-                    w_qkv = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}self_attn.qkv_proj.weight"], name=f"layer_{i}_qkv_proj"
-                    )
-            elif f"{prefix}self_attn.q_proj.weight" in state_dict:
-                if self.mpk.mode == "online_notoken":
-                    self.w_qkv_tensor = shuffle_tensors(
-                        [
-                            state_dict[f"{prefix}self_attn.q_proj.weight"],
-                            state_dict[f"{prefix}self_attn.k_proj.weight"],
-                            state_dict[f"{prefix}self_attn.v_proj.weight"],
-                        ],
-                        self.num_local_kv_heads,
-                        0,
-                    )
-                    assert self.w_qkv_tensor.is_contiguous(), "qkv tensor should be contiguous"
-                    # We need to self maintain the shuffled tensor to avoid recycling
-                    self.shuffled_tensors[f"layer_{i}_qkv_proj"] = self.w_qkv_tensor
-                    w_qkv = self.mpk.attach_input(
-                        torch_tensor=self.w_qkv_tensor, name=f"layer_{i}_qkv_proj"
-                    )
-                else:
-                    w_q = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}self_attn.q_proj.weight"], name=f"layer_{i}_q_proj"
-                    )
-                    w_k = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}self_attn.k_proj.weight"], name=f"layer_{i}_k_proj"
-                    )
-                    w_v = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}self_attn.v_proj.weight"], name=f"layer_{i}_v_proj"
-                    )
-                    w_qkv = self.mpk.shuffle_tensors(
-                        inputs=[w_q, w_k, w_v],
-                        shuffled_dim=0,
-                        num_groups=self.num_local_kv_heads,
-                        name=f"layer_{i}_qkv_proj",
-                    )
-            elif f"{prefix}self_attn.qkv_proj.weight" in state_dict:
+            self._build_attention_block(i, state_dict, use_splitk, deterministic)
+            self._build_mlp_block(i, state_dict, use_splitk, deterministic)
+
+    def _build_attention_block(self, i: int, state_dict: dict,
+                               use_splitk: bool, deterministic: bool):
+        """Per-layer input_layernorm + fused QKV + paged attention + o_proj
+        (+ TP allreduce). Extracted verbatim from the build_layers loop so
+        architecture variants can override one block at a time."""
+        prefix = f"model.layers.{i}."
+        w_norm = self.mpk.attach_input(
+            torch_tensor=state_dict[f"{prefix}input_layernorm.weight"],
+            name=f"layer_{i}_input_layernorm",
+        )
+        if (f"{prefix}self_attn.qkv_proj.weight" in state_dict) and (f"{prefix}self_attn.q_proj.weight" in state_dict):
+                # Shuffle on CPU in place for qkv_proj.weight tensor
+                inplace_shuffle_tensors(
+                    [
+                        state_dict[f"{prefix}self_attn.q_proj.weight"], # views
+                        state_dict[f"{prefix}self_attn.k_proj.weight"],
+                        state_dict[f"{prefix}self_attn.v_proj.weight"],
+                    ],
+                    state_dict[f"{prefix}self_attn.qkv_proj.weight"], # target tensor
+                    self.num_local_kv_heads,
+                    0,
+                )
                 w_qkv = self.mpk.attach_input(
                     torch_tensor=state_dict[f"{prefix}self_attn.qkv_proj.weight"], name=f"layer_{i}_qkv_proj"
                 )
-            else:
-                raise ValueError(f"No qkv projection weight found for layer {i}")
-            self.mpk.rmsnorm_layer(
-                input=self.x,
-                weight=w_norm,
-                output=self.rmsnorm_out,
-                grid_dim=(self.mpk.max_num_batched_tokens, 1, 1),
-                block_dim=(128, 1, 1),
-            )
-            self.mpk.linear_layer(
-                input=self.rmsnorm_out,
-                weight=w_qkv,
-                output=self.attn_in,
-                grid_dim=(grid_for_rmsnorm_linear_layer(w_qkv.dim(0)), 1, 1),
-                block_dim=(128, 1, 1),
-            )
-
-            # add attention
-            # Architectures without q/k-norm (e.g. Llama-3) get a shared
-            # dummy (head_dim,) tensor + enable_qk_norm=False — the
-            # attention task requires valid DTensor slots either way
-            # (same pattern as the Eagle3 builder).
-            has_qk_norm = f"{prefix}self_attn.q_norm.weight" in state_dict
-            if has_qk_norm:
-                w_q_norm = self.mpk.attach_input(
-                    torch_tensor=state_dict[f"{prefix}self_attn.q_norm.weight"], name=f"layer_{i}_q_norm"
-                )
-                w_k_norm = self.mpk.attach_input(
-                    torch_tensor=state_dict[f"{prefix}self_attn.k_norm.weight"], name=f"layer_{i}_k_norm"
-                )
-            else:
-                if not hasattr(self, "_dummy_qk_norm"):
-                    self._dummy_qk_norm_buf = torch.zeros(
-                        self.head_dim, dtype=torch.bfloat16, device="cuda")
-                    self._dummy_qk_norm = self.mpk.attach_input(
-                        torch_tensor=self._dummy_qk_norm_buf,
-                        name="dummy_qk_norm")
-                w_q_norm = self._dummy_qk_norm
-                w_k_norm = self._dummy_qk_norm
-            # TODO: KV cache handling
-            k_cache = self.mpk.attach_input(
-                torch_tensor=self.k_cache[i], name=f"layer_{i}_k_cache"
-            )
-            v_cache = self.mpk.attach_input(
-                torch_tensor=self.v_cache[i], name=f"layer_{i}_v_cache"
-            )
-            
-            # TODO(Jianan Ji): spec_decode_config handling (see previous implementation)
-            # if spec_decode_config:
-            #     self.mpk.single_batch_extend_attention_layer(
-            #         input=attn_in,
-            #         k_cache=k_cache,
-            #         v_cache=v_cache,
-            #         q_norm=w_q_norm,
-            #         k_norm=w_k_norm,
-            #         cos_pos_embed=cos_pos_embed,
-            #         sin_pos_embed=sin_pos_embed,
-            #         output=attn_out,
-            #         grid_dim=(1, num_local_kv_heads, 1), #TODO: further divide across batch dim
-            #         block_dim=(128, 1, 1),
-            #     )
-            # else:
-            self.mpk.paged_attention_layer(
-                input=self.attn_in,
-                k_cache=k_cache,
-                v_cache=v_cache,
-                q_norm=w_q_norm,
-                k_norm=w_k_norm,
-                cos_pos_embed=self.cos_pos_embed,
-                sin_pos_embed=self.sin_pos_embed,
-                output=self.attn_out,
-                grid_dim=(self.mpk.max_num_batched_requests, self.num_local_kv_heads, 1),
-                block_dim=(128, 1, 1),
-                enable_qk_norm=has_qk_norm,
-            )
-            # add linear w/ residual
-            self.w = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}self_attn.o_proj.weight"], name=f"layer_{i}_o_proj"
-            )
-            if use_splitk and deterministic:
-                num_splits = self._det_num_splits(
-                    self.num_local_q_heads * self.head_dim)
-                o_proj_partials = self.mpk.new_tensor(
-                    dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
-                    dtype=bfloat16,
-                    name=f"layer_{i}_o_proj_partials",
-                    io_category="cuda_tensor",
-                )
-                self.mpk.splitk_linear_det_layer(
-                    input=self.attn_out,
-                    weight=self.w,
-                    residual=self.x,
-                    partials=o_proj_partials,
-                    output=self.attn_proj_out,
-                    grid_dim=(self.hidden_size // 128, num_splits, 1),
-                    block_dim=(256, 1, 1),
-                    reduce_grid_dim=(self.hidden_size // 128, 1, 1),
-                )
-            elif use_splitk:
-                self.attn_proj_out = self.x
-                self.mpk.splitk_linear_layer(
-                    input=self.attn_out,
-                    weight=self.w,
-                    output=self.attn_proj_out,
-                    grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
-                    block_dim=(256, 1, 1),
-                )
-            else:
-                self.mpk.linear_with_residual_layer(
-                    input=self.attn_out,
-                    weight=self.w,
-                    residual=self.x,
-                    output=self.attn_proj_out,
-                    grid_dim=(self.hidden_size // 64, 1, 1),
-                    block_dim=(128, 1, 1),
-                )
-            # reset residual input as x
-            self.x = self.attn_proj_out
-            # add allreduce if needed
-            if self.world_size > 1:
-                self.mpk.allreduce_layer(
-                    input=self.attn_proj_out,
-                    buffer=self.allreduce_buf,
-                    output=self.attn_allreduce_out,
-                    grid_dim=(self.hidden_size // 64, 1, 1),
-                    block_dim=(128, 1, 1),
-                )
-                self.x = self.attn_allreduce_out
-            # add rmsnorm_linear layer
-            w_norm = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}post_attention_layernorm.weight"],
-                name=f"layer_{i}_post_attn_layernorm",
-            )
-            # 
-            if (f"{prefix}mlp.gate_proj.weight" in state_dict) and (f"{prefix}mlp.gate_up_proj.weight" in state_dict):
-                rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(state_dict[f"{prefix}mlp.gate_up_proj.weight"].shape[0])
-                inplace_shuffle_tensors(
+        elif f"{prefix}self_attn.q_proj.weight" in state_dict:
+            if self.mpk.mode == "online_notoken":
+                self.w_qkv_tensor = shuffle_tensors(
                     [
-                        state_dict[f"{prefix}mlp.gate_proj.weight"], # views
+                        state_dict[f"{prefix}self_attn.q_proj.weight"],
+                        state_dict[f"{prefix}self_attn.k_proj.weight"],
+                        state_dict[f"{prefix}self_attn.v_proj.weight"],
+                    ],
+                    self.num_local_kv_heads,
+                    0,
+                )
+                assert self.w_qkv_tensor.is_contiguous(), "qkv tensor should be contiguous"
+                # We need to self maintain the shuffled tensor to avoid recycling
+                self.shuffled_tensors[f"layer_{i}_qkv_proj"] = self.w_qkv_tensor
+                w_qkv = self.mpk.attach_input(
+                    torch_tensor=self.w_qkv_tensor, name=f"layer_{i}_qkv_proj"
+                )
+            else:
+                w_q = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}self_attn.q_proj.weight"], name=f"layer_{i}_q_proj"
+                )
+                w_k = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}self_attn.k_proj.weight"], name=f"layer_{i}_k_proj"
+                )
+                w_v = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}self_attn.v_proj.weight"], name=f"layer_{i}_v_proj"
+                )
+                w_qkv = self.mpk.shuffle_tensors(
+                    inputs=[w_q, w_k, w_v],
+                    shuffled_dim=0,
+                    num_groups=self.num_local_kv_heads,
+                    name=f"layer_{i}_qkv_proj",
+                )
+        elif f"{prefix}self_attn.qkv_proj.weight" in state_dict:
+            w_qkv = self.mpk.attach_input(
+                torch_tensor=state_dict[f"{prefix}self_attn.qkv_proj.weight"], name=f"layer_{i}_qkv_proj"
+            )
+        else:
+            raise ValueError(f"No qkv projection weight found for layer {i}")
+        self.mpk.rmsnorm_layer(
+            input=self.x,
+            weight=w_norm,
+            output=self.rmsnorm_out,
+            grid_dim=(self.mpk.max_num_batched_tokens, 1, 1),
+            block_dim=(128, 1, 1),
+        )
+        self.mpk.linear_layer(
+            input=self.rmsnorm_out,
+            weight=w_qkv,
+            output=self.attn_in,
+            grid_dim=(grid_for_rmsnorm_linear_layer(w_qkv.dim(0)), 1, 1),
+            block_dim=(128, 1, 1),
+        )
+
+        # add attention
+        # Architectures without q/k-norm (e.g. Llama-3) get a shared
+        # dummy (head_dim,) tensor + enable_qk_norm=False — the
+        # attention task requires valid DTensor slots either way
+        # (same pattern as the Eagle3 builder).
+        has_qk_norm = f"{prefix}self_attn.q_norm.weight" in state_dict
+        if has_qk_norm:
+            w_q_norm = self.mpk.attach_input(
+                torch_tensor=state_dict[f"{prefix}self_attn.q_norm.weight"], name=f"layer_{i}_q_norm"
+            )
+            w_k_norm = self.mpk.attach_input(
+                torch_tensor=state_dict[f"{prefix}self_attn.k_norm.weight"], name=f"layer_{i}_k_norm"
+            )
+        else:
+            if not hasattr(self, "_dummy_qk_norm"):
+                self._dummy_qk_norm_buf = torch.zeros(
+                    self.head_dim, dtype=torch.bfloat16, device="cuda")
+                self._dummy_qk_norm = self.mpk.attach_input(
+                    torch_tensor=self._dummy_qk_norm_buf,
+                    name="dummy_qk_norm")
+            w_q_norm = self._dummy_qk_norm
+            w_k_norm = self._dummy_qk_norm
+        # TODO: KV cache handling
+        k_cache = self.mpk.attach_input(
+            torch_tensor=self.k_cache[i], name=f"layer_{i}_k_cache"
+        )
+        v_cache = self.mpk.attach_input(
+            torch_tensor=self.v_cache[i], name=f"layer_{i}_v_cache"
+        )
+        
+        # TODO(Jianan Ji): spec_decode_config handling (see previous implementation)
+        # if spec_decode_config:
+        #     self.mpk.single_batch_extend_attention_layer(
+        #         input=attn_in,
+        #         k_cache=k_cache,
+        #         v_cache=v_cache,
+        #         q_norm=w_q_norm,
+        #         k_norm=w_k_norm,
+        #         cos_pos_embed=cos_pos_embed,
+        #         sin_pos_embed=sin_pos_embed,
+        #         output=attn_out,
+        #         grid_dim=(1, num_local_kv_heads, 1), #TODO: further divide across batch dim
+        #         block_dim=(128, 1, 1),
+        #     )
+        # else:
+        self.mpk.paged_attention_layer(
+            input=self.attn_in,
+            k_cache=k_cache,
+            v_cache=v_cache,
+            q_norm=w_q_norm,
+            k_norm=w_k_norm,
+            cos_pos_embed=self.cos_pos_embed,
+            sin_pos_embed=self.sin_pos_embed,
+            output=self.attn_out,
+            grid_dim=(self.mpk.max_num_batched_requests, self.num_local_kv_heads, 1),
+            block_dim=(128, 1, 1),
+            enable_qk_norm=has_qk_norm,
+        )
+        # add linear w/ residual
+        self.w = self.mpk.attach_input(
+            torch_tensor=state_dict[f"{prefix}self_attn.o_proj.weight"], name=f"layer_{i}_o_proj"
+        )
+        if use_splitk and deterministic:
+            num_splits = self._det_num_splits(
+                self.num_local_q_heads * self.head_dim)
+            o_proj_partials = self.mpk.new_tensor(
+                dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
+                dtype=bfloat16,
+                name=f"layer_{i}_o_proj_partials",
+                io_category="cuda_tensor",
+            )
+            self.mpk.splitk_linear_det_layer(
+                input=self.attn_out,
+                weight=self.w,
+                residual=self.x,
+                partials=o_proj_partials,
+                output=self.attn_proj_out,
+                grid_dim=(self.hidden_size // 128, num_splits, 1),
+                block_dim=(256, 1, 1),
+                reduce_grid_dim=(self.hidden_size // 128, 1, 1),
+            )
+        elif use_splitk:
+            self.attn_proj_out = self.x
+            self.mpk.splitk_linear_layer(
+                input=self.attn_out,
+                weight=self.w,
+                output=self.attn_proj_out,
+                grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
+                block_dim=(256, 1, 1),
+            )
+        else:
+            self.mpk.linear_with_residual_layer(
+                input=self.attn_out,
+                weight=self.w,
+                residual=self.x,
+                output=self.attn_proj_out,
+                grid_dim=(self.hidden_size // 64, 1, 1),
+                block_dim=(128, 1, 1),
+            )
+        # reset residual input as x
+        self.x = self.attn_proj_out
+        # add allreduce if needed
+        if self.world_size > 1:
+            self.mpk.allreduce_layer(
+                input=self.attn_proj_out,
+                buffer=self.allreduce_buf,
+                output=self.attn_allreduce_out,
+                grid_dim=(self.hidden_size // 64, 1, 1),
+                block_dim=(128, 1, 1),
+            )
+            self.x = self.attn_allreduce_out
+
+    def _build_mlp_block(self, i: int, state_dict: dict,
+                         use_splitk: bool, deterministic: bool):
+        """Per-layer post_attention_layernorm + dense gate/up -> silu_mul ->
+        down_proj (+ TP allreduce). Overridden by Qwen3MoeBuilder with the
+        MoE expert block."""
+        prefix = f"model.layers.{i}."
+        # add rmsnorm_linear layer
+        w_norm = self.mpk.attach_input(
+            torch_tensor=state_dict[f"{prefix}post_attention_layernorm.weight"],
+            name=f"layer_{i}_post_attn_layernorm",
+        )
+        # 
+        if (f"{prefix}mlp.gate_proj.weight" in state_dict) and (f"{prefix}mlp.gate_up_proj.weight" in state_dict):
+            rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(state_dict[f"{prefix}mlp.gate_up_proj.weight"].shape[0])
+            inplace_shuffle_tensors(
+                [
+                    state_dict[f"{prefix}mlp.gate_proj.weight"], # views
+                    state_dict[f"{prefix}mlp.up_proj.weight"],
+                ],
+                state_dict[f"{prefix}mlp.gate_up_proj.weight"], # target tensor
+                rmsnorm_num_tasks//2,
+                0,
+            )
+            w_gatedup = self.mpk.attach_input(
+                torch_tensor=state_dict[f"{prefix}mlp.gate_up_proj.weight"], name=f"layer_{i}_gatedup_proj"
+            )
+        elif f"{prefix}mlp.gate_proj.weight" in state_dict:
+            rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(
+                state_dict[f"{prefix}mlp.gate_proj.weight"].shape[0] 
+                + state_dict[f"{prefix}mlp.up_proj.weight"].shape[0]
+            )
+            if self.mpk.mode == "online_notoken":
+                self.w_gatedup_tensor = shuffle_tensors(
+                    [
+                        state_dict[f"{prefix}mlp.gate_proj.weight"],
                         state_dict[f"{prefix}mlp.up_proj.weight"],
                     ],
-                    state_dict[f"{prefix}mlp.gate_up_proj.weight"], # target tensor
                     rmsnorm_num_tasks//2,
                     0,
                 )
+                assert self.w_gatedup_tensor.is_contiguous(), "gatedup tensor should be contiguous"
+                # We need to self maintain the shuffled tensor to avoid recycling
+                self.shuffled_tensors[f"layer_{i}_gatedup_proj"] = self.w_gatedup_tensor
                 w_gatedup = self.mpk.attach_input(
-                    torch_tensor=state_dict[f"{prefix}mlp.gate_up_proj.weight"], name=f"layer_{i}_gatedup_proj"
-                )
-            elif f"{prefix}mlp.gate_proj.weight" in state_dict:
-                rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(
-                    state_dict[f"{prefix}mlp.gate_proj.weight"].shape[0] 
-                    + state_dict[f"{prefix}mlp.up_proj.weight"].shape[0]
-                )
-                if self.mpk.mode == "online_notoken":
-                    self.w_gatedup_tensor = shuffle_tensors(
-                        [
-                            state_dict[f"{prefix}mlp.gate_proj.weight"],
-                            state_dict[f"{prefix}mlp.up_proj.weight"],
-                        ],
-                        rmsnorm_num_tasks//2,
-                        0,
-                    )
-                    assert self.w_gatedup_tensor.is_contiguous(), "gatedup tensor should be contiguous"
-                    # We need to self maintain the shuffled tensor to avoid recycling
-                    self.shuffled_tensors[f"layer_{i}_gatedup_proj"] = self.w_gatedup_tensor
-                    w_gatedup = self.mpk.attach_input(
-                        torch_tensor=self.w_gatedup_tensor, name=f"layer_{i}_gatedup_proj"
-                    )
-                else:
-                    w_gate_proj = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}mlp.gate_proj.weight"], name=f"layer_{i}_gate_proj"
-                    )
-                    w_up_proj = self.mpk.attach_input(
-                        torch_tensor=state_dict[f"{prefix}mlp.up_proj.weight"], name=f"layer_{i}_up_proj"
-                    )                    
-                    w_gatedup = self.mpk.shuffle_tensors(
-                        inputs=[w_gate_proj, w_up_proj],
-                        shuffled_dim=0,
-                        num_groups=rmsnorm_num_tasks//2,
-                        name=f"layer_{i}_gatedup_proj",
-                    )
-            elif f"{prefix}mlp.gate_up_proj.weight" in state_dict:
-                rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(state_dict[f"{prefix}mlp.gate_up_proj.weight"].shape[0])
-                w_gatedup = self.mpk.attach_input(
-                    torch_tensor=state_dict[f"{prefix}mlp.gate_up_proj.weight"], name=f"layer_{i}_gatedup_proj"
+                    torch_tensor=self.w_gatedup_tensor, name=f"layer_{i}_gatedup_proj"
                 )
             else:
-                raise ValueError(f"No gate or up projection weight found for layer {i}")
-            self.mpk.rmsnorm_layer(
-                input=self.x,
-                weight=w_norm,
-                output=self.rmsnorm_out,
-                grid_dim=(self.mpk.max_num_batched_tokens, 1, 1),
-                block_dim=(128, 1, 1),
+                w_gate_proj = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}mlp.gate_proj.weight"], name=f"layer_{i}_gate_proj"
+                )
+                w_up_proj = self.mpk.attach_input(
+                    torch_tensor=state_dict[f"{prefix}mlp.up_proj.weight"], name=f"layer_{i}_up_proj"
+                )                    
+                w_gatedup = self.mpk.shuffle_tensors(
+                    inputs=[w_gate_proj, w_up_proj],
+                    shuffled_dim=0,
+                    num_groups=rmsnorm_num_tasks//2,
+                    name=f"layer_{i}_gatedup_proj",
+                )
+        elif f"{prefix}mlp.gate_up_proj.weight" in state_dict:
+            rmsnorm_num_tasks = grid_for_rmsnorm_linear_layer(state_dict[f"{prefix}mlp.gate_up_proj.weight"].shape[0])
+            w_gatedup = self.mpk.attach_input(
+                torch_tensor=state_dict[f"{prefix}mlp.gate_up_proj.weight"], name=f"layer_{i}_gatedup_proj"
             )
-            self.mpk.linear_layer(
-                input=self.rmsnorm_out,
-                weight=w_gatedup,
-                output=self.mlp_mid,
-                grid_dim=(rmsnorm_num_tasks, 1, 1),
-                block_dim=(128, 1, 1),
-            )
+        else:
+            raise ValueError(f"No gate or up projection weight found for layer {i}")
+        self.mpk.rmsnorm_layer(
+            input=self.x,
+            weight=w_norm,
+            output=self.rmsnorm_out,
+            grid_dim=(self.mpk.max_num_batched_tokens, 1, 1),
+            block_dim=(128, 1, 1),
+        )
+        self.mpk.linear_layer(
+            input=self.rmsnorm_out,
+            weight=w_gatedup,
+            output=self.mlp_mid,
+            grid_dim=(rmsnorm_num_tasks, 1, 1),
+            block_dim=(128, 1, 1),
+        )
 
-            self.mpk.silu_mul_layer(
-                input=self.mlp_mid,
-                output=self.silu_mul_out,
-                grid_dim=(rmsnorm_num_tasks//2, 1, 1),
+        self.mpk.silu_mul_layer(
+            input=self.mlp_mid,
+            output=self.silu_mul_out,
+            grid_dim=(rmsnorm_num_tasks//2, 1, 1),
+            block_dim=(128, 1, 1),
+        )
+        # add silu_mul_linear layer
+        self.w = self.mpk.attach_input(
+            torch_tensor=state_dict[f"{prefix}mlp.down_proj.weight"], name=f"layer_{i}_down_proj"
+        )
+        if use_splitk and deterministic:
+            num_splits = self._det_num_splits(
+                self.intermediate_size // self.world_size)
+            down_proj_partials = self.mpk.new_tensor(
+                dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
+                dtype=bfloat16,
+                name=f"layer_{i}_down_proj_partials",
+                io_category="cuda_tensor",
+            )
+            self.mpk.splitk_linear_det_layer(
+                input=self.silu_mul_out,
+                weight=self.w,
+                residual=self.x,
+                partials=down_proj_partials,
+                output=self.mlp_out,
+                grid_dim=(self.hidden_size // 128, num_splits, 1),
+                block_dim=(256, 1, 1),
+                reduce_grid_dim=(self.hidden_size // 128, 1, 1),
+            )
+        elif use_splitk:
+            self.mlp_out = self.x
+            self.mpk.splitk_linear_layer(
+                input=self.silu_mul_out,
+                weight=self.w,
+                output=self.mlp_out,
+                grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
+                block_dim=(256, 1, 1),
+            )
+        else:
+            self.mpk.linear_with_residual_layer(
+                input=self.silu_mul_out,
+                weight=self.w,
+                residual=self.x,
+                output=self.mlp_out,
+                grid_dim=(self.hidden_size // 64, 1, 1),
                 block_dim=(128, 1, 1),
             )
-            # add silu_mul_linear layer
-            self.w = self.mpk.attach_input(
-                torch_tensor=state_dict[f"{prefix}mlp.down_proj.weight"], name=f"layer_{i}_down_proj"
+        # reset residual input as x
+        self.x = self.mlp_out
+        if self.world_size > 1:
+            self.mpk.allreduce_layer(
+                input=self.mlp_out,
+                buffer=self.allreduce_buf,
+                output=self.mlp_final,
+                grid_dim=(self.hidden_size // 64, 1, 1),
+                block_dim=(128, 1, 1),
             )
-            if use_splitk and deterministic:
-                num_splits = self._det_num_splits(
-                    self.intermediate_size // self.world_size)
-                down_proj_partials = self.mpk.new_tensor(
-                    dims=(num_splits * self.max_num_batched_tokens, self.hidden_size),
-                    dtype=bfloat16,
-                    name=f"layer_{i}_down_proj_partials",
-                    io_category="cuda_tensor",
-                )
-                self.mpk.splitk_linear_det_layer(
-                    input=self.silu_mul_out,
-                    weight=self.w,
-                    residual=self.x,
-                    partials=down_proj_partials,
-                    output=self.mlp_out,
-                    grid_dim=(self.hidden_size // 128, num_splits, 1),
-                    block_dim=(256, 1, 1),
-                    reduce_grid_dim=(self.hidden_size // 128, 1, 1),
-                )
-            elif use_splitk:
-                self.mlp_out = self.x
-                self.mpk.splitk_linear_layer(
-                    input=self.silu_mul_out,
-                    weight=self.w,
-                    output=self.mlp_out,
-                    grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
-                    block_dim=(256, 1, 1),
-                )
-            else:
-                self.mpk.linear_with_residual_layer(
-                    input=self.silu_mul_out,
-                    weight=self.w,
-                    residual=self.x,
-                    output=self.mlp_out,
-                    grid_dim=(self.hidden_size // 64, 1, 1),
-                    block_dim=(128, 1, 1),
-                )
-            # reset residual input as x
-            self.x = self.mlp_out
-            if self.world_size > 1:
-                self.mpk.allreduce_layer(
-                    input=self.mlp_out,
-                    buffer=self.allreduce_buf,
-                    output=self.mlp_final,
-                    grid_dim=(self.hidden_size // 64, 1, 1),
-                    block_dim=(128, 1, 1),
-                )
-                self.x = self.mlp_final
+            self.x = self.mlp_final
         
     def build_from_dict(self, 
                         state_dict: dict,
