@@ -731,6 +731,24 @@ __device__ __noinline__ void
         }
       }
     }
+    // Drain the TMA store pipeline before the task returns.  The loop above
+    // only waits to depth kNumTMAStoreStages-1, so trailing stores are still
+    // pending here: (a) the TMA unit may not have finished READING the smem
+    // staging buffers, which the next task scheduled on this SM will reuse,
+    // and (b) the GLOBAL writes may still be in flight in the async proxy.
+    // Inside the persistent megakernel there is no kernel-end fence, and the
+    // task-completion release (atom.add.release in the generic proxy) does
+    // not order un-awaited async-proxy writes -- a consumer task acquiring
+    // the event on another SM could read torn output.  Wait for READ
+    // completion (smem reuse), then WRITE completion (cp.async.bulk.
+    // wait_group, non-.read), then fence the async proxy (same pattern as
+    // linear_sm100_mpk.cuh).  Must run on the thread that issued the
+    // commits: bulk async-groups are per-thread state.
+    if (epilogue_warp_idx == 0 && cute::elect_one_sync()) {
+      cute::tma_store_wait<0>();
+      asm volatile("cp.async.bulk.wait_group 0;" ::: "memory");
+      asm volatile("fence.proxy.async.global;" ::: "memory");
+    }
   }
 
   kNumMulticast > 1 ? cute::cluster_sync() : __syncthreads();

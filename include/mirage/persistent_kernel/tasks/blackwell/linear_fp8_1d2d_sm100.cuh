@@ -714,6 +714,17 @@ __device__ __noinline__ void
 
     if (warp_idx == 0 && cute::elect_one_sync()) {
       cute::tma_store_wait<0>();
+      // tma_store_wait lowers to cp.async.bulk.wait_group.READ, which only
+      // guarantees the TMA unit finished reading smem -- the GLOBAL writes
+      // (tma_store_async, and tma_reduce_add_async under SplitK) may still
+      // be in flight in the async proxy.  Inside the persistent megakernel
+      // there is no kernel-end fence, so the task-completion release
+      // (atom.add.release on the event counter) would NOT order these
+      // writes: a fast consumer acquiring the event could read torn output.
+      // Wait for WRITE completion and fence the async proxy before
+      // returning (same pattern as linear_sm100_mpk.cuh).
+      asm volatile("cp.async.bulk.wait_group 0;" ::: "memory");
+      asm volatile("fence.proxy.async.global;" ::: "memory");
     }
   }
 
