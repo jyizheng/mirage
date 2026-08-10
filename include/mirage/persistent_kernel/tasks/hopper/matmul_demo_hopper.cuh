@@ -260,6 +260,9 @@ __device__ __forceinline__ void
       store_commit_group();
     }
     store_async_wait<0>();
+    // Write-completion wait done; fence the async-proxy writes into the
+    // generic proxy before the task-completion release (see tma.cuh).
+    async_proxy_fence_global();
     wg_sync<THREADS_PER_WARPGROUP * CONSUMER_WARPGROUPS>(8);
 
     // if (threadIdx.x == 0) {

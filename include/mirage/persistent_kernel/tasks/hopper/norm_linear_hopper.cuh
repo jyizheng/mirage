@@ -361,6 +361,10 @@ __device__ __forceinline__ void
       store_commit_group();
     }
     store_async_wait<0>();
+    // The wait above covers WRITE completion, but the writes happened in
+    // the ASYNC proxy: fence them into the generic proxy so the
+    // task-completion release orders them for consumer tasks on other SMs.
+    async_proxy_fence_global();
   }
 }
 

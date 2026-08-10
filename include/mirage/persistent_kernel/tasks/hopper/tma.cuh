@@ -26,6 +26,18 @@ __device__ static inline void async_proxy_fence() {
   asm volatile("fence.proxy.async.shared::cta;");
 }
 
+// Cross-proxy fence for GLOBAL memory: makes async-proxy writes (TMA
+// stores / reduce-adds) that have already completed (store_async_wait<0>)
+// visible to generic-proxy readers.  Inside the persistent megakernel a
+// task's completion is published with a generic-proxy release
+// (atom.add.release on the event counter) and there is no kernel-end
+// implicit fence, so without this fence a consumer task acquiring the
+// event on another SM could read torn output.  Issue it after the final
+// store_async_wait<0>() of every task that TMA-stores its outputs.
+__device__ static inline void async_proxy_fence_global() {
+  asm volatile("fence.proxy.async.global;" ::: "memory");
+}
+
 __device__ static inline void store_commit_group() {
   asm volatile("cp.async.bulk.commit_group;");
 }
