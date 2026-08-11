@@ -1,0 +1,13 @@
+pre-fix seeded gen_len=448 spike victims (logprob<-20.0): 1
+  pre spike: pos=332 token=70920 logprob=-35.719
+post-fix seeded gen_len=448 spike victims: 0 []
+group16 members matching single greedy: 16/16
+gate pre_has_spikes: PASS
+gate post_zero_spikes: PASS
+gate seeded_repeatable_tokens: PASS
+gate seeded_repeatable_logprobs: PASS
+gate seeded_trajectory_changed: PASS
+gate greedy_tokens_unchanged: PASS
+gate greedy_logprobs_unchanged: PASS
+gate group16_all_match: PASS
+ALL GATES: PASS
