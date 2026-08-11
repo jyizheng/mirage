@@ -1,0 +1,12 @@
+greedy gen_len=448 seeded gen_len=448 dense gen_len=448
+group16 members matching single greedy: 16/16
+gate i_greedy_rerun_same_server: PASS
+gate i_greedy_rerun_fresh_server: PASS
+gate ii_seeded_rerun_across_restart: PASS
+gate iii_group16_matches_reference: PASS
+gate iv_batch_composition_invariant: PASS
+gate vi_dense_1p7b_greedy_rerun: PASS
+gate sanity_seeded_differs_from_greedy: PASS
+HTTP GATES: PASS
+gate v_rescore_eq_rollout: PASS
+[moe-rescore] SERVING RESCORE: 343/343 bitwise-identical, 0 mismatches

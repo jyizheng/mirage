@@ -21,6 +21,19 @@ cuda_library_dirs = [
 
 macros=[("MIRAGE_BACKEND_USE_CUDA", None), ("MIRAGE_FINGERPRINT_USE_CUDA", None)]
 
+
+def _sm100_family_arch():
+    """Target the local GPU within the SM100 family (sm_100a cubins do not
+    load on sm_103/B300 and vice versa)."""
+    try:
+        import torch
+        major, minor = torch.cuda.get_device_capability()
+        if major == 10:
+            return f"-gencode=arch=compute_{major}{minor}a,code=sm_{major}{minor}a"
+    except Exception:
+        pass
+    return "-gencode=arch=compute_100a,code=sm_100a"
+
 setup(
     name='runtime_kernel_blackwell',
     ext_modules=[
@@ -49,7 +62,7 @@ setup(
                 'cxx': ['-DMIRAGE_GRACE_BLACKWELL'],
                 'nvcc': [
                     '-O3',
-                    '-gencode=arch=compute_100a,code=sm_100a',
+                    _sm100_family_arch(),
                     '-DMIRAGE_GRACE_BLACKWELL',
                     '-DMPK_ENABLE_TMA',
                 ]
