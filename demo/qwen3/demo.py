@@ -158,6 +158,20 @@ if __name__ == "__main__":
         "lazy '<module>:<factory>' plugin.",
     )
     parser.add_argument(
+        "--trainer-device",
+        type=str,
+        default=None,
+        help="CUDA device for the GRPO trainer backend (e.g. 'cuda:1'). "
+        "Default: colocated with the engine (exact current behavior). "
+        "When set to a different GPU (2-GPU disaggregation, design doc "
+        "option C), the engine/megakernel stays on the current device, "
+        "the trainer model+optimizer live on the given device, the "
+        "trainer->engine weight sync becomes a cross-device P2P copy, "
+        "and on the mpk arm the trainer replay-forward is streamed per "
+        "completed trajectory while the rollout decode tail drains. "
+        "Strict on-policy semantics (epoch-1 ratio == 1) are unchanged.",
+    )
+    parser.add_argument(
         "--grpo-measure-old-recompute",
         action="store_true",
         help="Measure the eliminated trainer-side old-logprob recompute pass. "

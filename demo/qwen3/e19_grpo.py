@@ -26,9 +26,27 @@
 # drift — no trainer/inference mismatch enters the objective.
 #
 # Called from demo.py (--grpo-steps > 0) with the compiled MPK and its meta
-# tensors in scope. Single GPU; group sampling uses the batch's request
-# slots (position-keyed Gumbel noise differs per request slot, so a group
-# on the same prompt yields distinct trajectories).
+# tensors in scope. Group sampling uses the batch's request slots
+# (position-keyed Gumbel noise differs per request slot, so a group on the
+# same prompt yields distinct trajectories).
+#
+# Device placement (--trainer-device, design doc option C): by default the
+# trainer backend is colocated with the engine (single GPU, exact historical
+# behavior). With --trainer-device cuda:1 the loop disaggregates: the
+# engine/megakernel keeps the current device, the trainer (master weights +
+# AdamW) lives on cuda:1, the trainer->engine weight sync becomes a
+# cross-device P2P copy, and on the mpk arm the trainer replay-forward is
+# STREAMED: as trajectories retire inside the rollout (the offline kernel's
+# per-request completion is host-observable through step[]/tokens[]), their
+# selected-token replay forward runs on cuda:1 while the surviving decodes
+# drain the rollout tail on cuda:0; rewards are computed on the CPU
+# concurrently. Backward + optimizer still wait for all rewards (GRPO
+# advantages are group-normalized) and the fenced weight sync still precedes
+# the next rollout, so strict on-policy semantics -- including the epoch-1
+# ratio == 1 assert -- are device-placement-invariant. Retirement bursts are
+# coalesced into one batched replay forward per wave, so a matched
+# --ignore-eos run (all trajectories finish together) issues bitwise the
+# same batched trainer forward as the colocated loop.
 import atexit
 import hashlib
 import json
@@ -117,6 +135,37 @@ def run(
     dev = "cuda"
     arm = args.grpo_arm
 
+    # --- device placement (option C: 2-GPU disaggregation) ---------------
+    # The engine/megakernel always lives on the current device; the trainer
+    # backend is colocated by default and moves to --trainer-device when set.
+    engine_dev = torch.device("cuda", torch.cuda.current_device())
+    trainer_device = getattr(args, "trainer_device", None)
+    if trainer_device:
+        td = torch.device(trainer_device)
+        if td.type != "cuda":
+            raise ValueError(
+                f"--trainer-device must be a CUDA device, got {trainer_device!r}")
+        td_index = td.index if td.index is not None else torch.cuda.current_device()
+        if td_index >= torch.cuda.device_count():
+            raise ValueError(
+                f"--trainer-device {trainer_device} needs {td_index + 1} visible "
+                f"CUDA device(s), found {torch.cuda.device_count()}")
+        train_dev = torch.device("cuda", td_index)
+    else:
+        train_dev = engine_dev
+    disagg = train_dev != engine_dev
+    # Streamed replay-forward needs the value bridge (arm mpk): the loss
+    # forward uses MPK-authoritative values, so per-wave trainer batching
+    # only affects gradients. On the hf arm the trainer forward VALUES enter
+    # the ratio, so streaming would change the objective with batch shape;
+    # the hf arm therefore keeps the batched post-rollout forward.
+    stream_replay = disagg and arm == "mpk"
+
+    def sync_devices():
+        torch.cuda.synchronize(engine_dev)
+        if disagg:
+            torch.cuda.synchronize(train_dev)
+
     save_every = int(getattr(args, "save_every", 0) or 0)
     ckpt_dir = getattr(args, "checkpoint_dir", None)
     resume_from = getattr(args, "resume_from", None)
@@ -135,9 +184,19 @@ def run(
         tokenizer=tokenizer,
         learning_rate=args.grpo_lr,
         micro_batch_size=getattr(args, "grpo_trainer_micro_batch_size", 0),
+        device=str(train_dev),
         factory_kwargs={"engine_args": args}
         if args.grpo_trainer_backend != "hf" else None,
     )
+    if disagg:
+        backend_dev = next(iter(backend.named_parameters()))[1].device
+        if backend_dev != train_dev:
+            raise ValueError(
+                f"--trainer-device {train_dev} requested but the "
+                f"{args.grpo_trainer_backend!r} backend placed parameters on "
+                f"{backend_dev}; this backend is not device-parameterized")
+        print(f"[e19] disaggregated: engine on {engine_dev}, trainer on "
+              f"{train_dev}, streamed replay-fwd={stream_replay}")
     close_backend = getattr(backend, "close", None)
     if close_backend is not None:
         atexit.register(close_backend)
@@ -192,6 +251,7 @@ def run(
         return report
 
     sync_report = sync_weights()  # start from identical weights on both sides
+    sync_devices()
     print(f"[e19] weight-sync plan: {len(sync_plan.specs)} tensors")
     print(f"[e19] initial weight-sync: {sync_report.tensors} tensors, "
           f"{sync_report.gib:.2f} GiB")
@@ -202,7 +262,108 @@ def run(
           f"trainer_backend={args.grpo_trainer_backend} trainer_micro_batch="
           f"{getattr(backend, 'micro_batch_size', 0) or R}")
 
-    def rollout(prompt_ids):
+    # --- streamed per-trajectory completion (option C tail filling) ------
+    # The offline-mode kernel retires request r when, after committing the
+    # iteration's tokens and advancing step[r], either
+    #   step[r] + 1 >= max_seq_length, or
+    #   tokens[r, step[r]] == eos and step[r] >= prompt_len
+    # (persistent_kernel.cuh, MODE_OFFLINE prepare_next_batch step 1). Both
+    # signals live in device global memory the host can watch while the
+    # kernel runs, which gives per-trajectory completion in offline mode
+    # without the online pinned completion ring.
+    engine_eos = -1 if getattr(args, "ignore_eos", False) else int(eos_token_id)
+    poll_stream = None
+    if stream_replay:
+        poll_stream = torch.cuda.Stream(device=engine_dev)
+        _step_h = torch.empty(R, dtype=step.dtype, pin_memory=True)
+        _step_h2 = torch.empty(R, dtype=step.dtype, pin_memory=True)
+        _tok_h = torch.empty(1, dtype=tokens.dtype, pin_memory=True)
+        _row_tok_h = torch.empty(max_seq, dtype=tokens.dtype, pin_memory=True)
+        _row_prob_h = torch.empty(
+            prob_buffer.shape[1], dtype=prob_buffer.dtype, pin_memory=True)
+
+    def _poll_read(dst, src):
+        # DtoH read of live engine state on a dedicated side stream. It must
+        # be copy-engine-only: a read enqueued on the launch stream would
+        # serialize behind the running megakernel, and any SM kernel
+        # (gather/elementwise) would never be scheduled because every SM is
+        # pinned by a persistent worker block. Contiguous slice -> pinned
+        # host tensor is a pure cudaMemcpyAsync.
+        with torch.cuda.stream(poll_stream):
+            dst.copy_(src, non_blocking=True)
+        poll_stream.synchronize()
+
+    def _streamed_sample(r, plen, end):
+        # Same extraction as the post-rollout read in rollout(); float32
+        # bits survive the DtoH copy unchanged, so lp_old is bitwise the
+        # value the post-sync read produces (verified per step below).
+        _poll_read(_row_tok_h[:end], tokens[r, :end])
+        if end > 1:
+            _poll_read(_row_prob_h[:end - 1], prob_buffer[r, :end - 1])
+        ids = _row_tok_h[:end].tolist()
+        lp = []
+        pos = []
+        for t in range(plen, end):
+            p = float(_row_prob_h[t - 1])
+            if p > 0.0:
+                lp.append(math.log(p))
+                pos.append(t)
+        return {"ids": ids, "plen": plen, "pos": pos, "lp_old": lp}
+
+    def _drain_completions(plen, done_ev, on_wave):
+        # Poll step[]/tokens[] until every request has retired, emitting
+        # completion WAVES. A wave coalesces one retirement burst: after
+        # detecting completions we re-poll on a short settle delay until no
+        # new request retires, so requests that finish in the same kernel
+        # iteration (all of them, under --ignore-eos with equal lengths)
+        # land in ONE wave and the callback's batched trainer forward is
+        # bitwise the colocated post-rollout batched forward. Detection is
+        # torn-read safe: a row is accepted only if step[r] is unchanged
+        # across two reads (or the kernel already exited); a stale
+        # tokens[r, step[r]] read can only MISS an eos (the buffer is
+        # zeroed at rollout start and committed generated tokens are never
+        # eos before the final one), delaying detection by one poll.
+        pending = set(range(R))
+        while pending:
+            kernel_done = done_ev.query()
+            wave = []
+            grown = True
+            while grown and pending:
+                grown = False
+                _poll_read(_step_h, step)
+                s1 = _step_h.tolist()
+                cand = []
+                for r in sorted(pending):
+                    sr = int(s1[r])
+                    if sr + 1 >= max_seq:
+                        cand.append((r, sr))
+                    elif sr >= plen:
+                        _poll_read(_tok_h, tokens[r, sr:sr + 1])
+                        if int(_tok_h[0]) == engine_eos:
+                            cand.append((r, sr))
+                if cand and not kernel_done:
+                    _poll_read(_step_h2, step)
+                    s2 = _step_h2.tolist()
+                    cand = [(r, sr) for r, sr in cand if int(s2[r]) == sr]
+                for r, sr in cand:
+                    pending.discard(r)
+                    wave.append((r, _streamed_sample(r, plen, sr + 1)))
+                    grown = True
+                if grown and pending and not kernel_done:
+                    time.sleep(0.0002)  # settle: catch same-burst retirements
+                    kernel_done = done_ev.query()
+            if wave:
+                on_wave(sorted(wave))
+            if pending:
+                if kernel_done:
+                    raise RuntimeError(
+                        "megakernel exited but requests "
+                        f"{sorted(pending)} do not satisfy the offline "
+                        "retirement condition; completion polling is "
+                        "inconsistent with the kernel")
+                time.sleep(0.001)
+
+    def rollout(prompt_ids, on_wave=None):
         plen = len(prompt_ids)
         with torch.no_grad():
             tokens.zero_()
@@ -217,7 +378,15 @@ def run(
         # resource registrations from the initial init are reused
         mpk.init_request_func()
         mpk()
+        if on_wave is not None:
+            done_ev = torch.cuda.Event()
+            done_ev.record()
+            _drain_completions(plen, done_ev, on_wave)
         torch.cuda.synchronize()
+        if on_wave is not None and disagg:
+            # fold any straggling streamed trainer work into the rollout
+            # wall time (it overlapped the decode tail on the other GPU)
+            torch.cuda.synchronize(train_dev)
         outs = []
         for r in range(R):
             end = int(step[r].item()) + 1
@@ -288,7 +457,9 @@ def run(
                     lp.append(math.log(p))
                 else:
                     lp.append(s["lp_old"][k])
-            lps.append(torch.tensor(lp, dtype=torch.float32, device=dev))
+            # authoritative values feed bind_forward_values against the
+            # trainer's differentiable replay -> live on the trainer device
+            lps.append(torch.tensor(lp, dtype=torch.float32, device=train_dev))
         return lps
 
     clip_eps = 0.2
@@ -303,15 +474,66 @@ def run(
     # data_cursor (== completed outer steps) is the full dataset state.
     for it in range(start_step, min(args.grpo_steps, len(data))):
         prompt_ids, gold = data[it]
-        torch.cuda.synchronize()
+
+        # Per-step streaming state: as completion waves arrive during the
+        # rollout, compute each trajectory's reward (CPU) and its trainer
+        # replay-forward (trainer GPU, graph retained) while the engine GPU
+        # still decodes the stragglers. Only the forward is streamed; the
+        # loss/backward/optimizer wait for all rewards (group-normalized
+        # advantages) after the rollout.
+        streamed = {}
+        stream_stat = {"t_cb": 0.0, "waves": 0}
+
+        def _on_wave(items, gold=gold, streamed=streamed, stat=stream_stat):
+            cb0 = time.perf_counter()
+            stat["waves"] += 1
+            for r, sample in items:
+                text = tokenizer.decode(sample["ids"][sample["plen"]:],
+                                        skip_special_tokens=True)
+                streamed[r] = {
+                    "sample": sample,
+                    "reward": 1.0 if extract_answer(text) == gold else 0.0,
+                    "lp": None,
+                }
+            fwd = [(r, sample) for r, sample in items if sample["lp_old"]]
+            if fwd:
+                lps = backend.selected_token_logprobs(
+                    [sample for _, sample in fwd])
+                for (r, _), lp in zip(fwd, lps):
+                    streamed[r]["lp"] = lp
+            stat["t_cb"] += time.perf_counter() - cb0
+
+        sync_devices()
         t0 = time.perf_counter()
-        samples = rollout(prompt_ids)
+        samples = rollout(prompt_ids,
+                          on_wave=_on_wave if stream_replay else None)
         t_rollout = time.perf_counter() - t0
-        rewards = []
-        for s in samples:
-            text = tokenizer.decode(s["ids"][s["plen"]:],
-                                    skip_special_tokens=True)
-            rewards.append(1.0 if extract_answer(text) == gold else 0.0)
+        t_rw0 = time.perf_counter()
+        if stream_replay:
+            # Semantics guard: pi_old capture and the streamed trainer
+            # forward must have seen EXACTLY the trajectories the post-sync
+            # read reports -- device placement must not change what enters
+            # the objective.
+            if sorted(streamed) != list(range(R)):
+                raise RuntimeError(
+                    f"streamed completions cover {sorted(streamed)} but the "
+                    f"rollout has {R} requests")
+            for r in range(R):
+                a, b = streamed[r]["sample"], samples[r]
+                if (a["ids"] != b["ids"] or a["plen"] != b["plen"]
+                        or a["pos"] != b["pos"] or a["lp_old"] != b["lp_old"]):
+                    raise RuntimeError(
+                        f"streamed trajectory {r} diverges from the "
+                        "post-rollout read; mid-rollout completion polling "
+                        "returned torn state")
+            rewards = [streamed[r]["reward"] for r in range(R)]
+        else:
+            rewards = []
+            for s in samples:
+                text = tokenizer.decode(s["ids"][s["plen"]:],
+                                        skip_special_tokens=True)
+                rewards.append(1.0 if extract_answer(text) == gold else 0.0)
+        t_reward = time.perf_counter() - t_rw0
         # Bitwise fingerprint of the whole rollout group (token ids, prompt
         # length, capture positions, and exact rollout logprobs via float
         # repr round-trip); lets an interrupted+resumed run be compared
@@ -321,7 +543,7 @@ def run(
               "lp_old": s["lp_old"]} for s in samples],
             sort_keys=True,
         ).encode()).hexdigest()
-        rw = torch.tensor(rewards, device=dev)
+        rw = torch.tensor(rewards, device=train_dev)
         adv = (rw - rw.mean()) / (rw.std() + 1e-6)
 
         # This pass is a counterfactual baseline, not part of the zero-TIM
@@ -330,14 +552,14 @@ def run(
         t_old_recompute = 0.0
         if measure_old_recompute:
             old_recompute_samples = [s for s in samples if s["lp_old"]]
-            torch.cuda.synchronize()
+            sync_devices()
             t1 = time.perf_counter()
             with torch.no_grad():
                 backend.selected_token_logprobs(old_recompute_samples)
-            torch.cuda.synchronize()
+            sync_devices()
             t_old_recompute = time.perf_counter() - t1
 
-        torch.cuda.synchronize()
+        sync_devices()
         t2 = time.perf_counter()
         active = [
             i for i, s in enumerate(samples)
@@ -371,11 +593,24 @@ def run(
             ratio_dev_sum = 0.0
             if ep == 1:
                 worst = {}
-            trainer_lps = backend.selected_token_logprobs(active_samples)
+            if stream_replay and ep == 1:
+                # epoch-1 replay forwards were streamed during the rollout
+                # tail (trainer weights unchanged since the rollout, so the
+                # graphs are valid for this update)
+                trainer_lps = []
+                for i in active:
+                    lp = streamed[i]["lp"]
+                    if lp is None:
+                        raise RuntimeError(
+                            f"active trajectory {i} has no streamed trainer "
+                            "forward")
+                    trainer_lps.append(lp)
+            else:
+                trainer_lps = backend.selected_token_logprobs(active_samples)
             for active_idx, i in enumerate(active):
                 s = samples[i]
                 lp_old = torch.tensor(s["lp_old"], dtype=torch.float32,
-                                      device=dev)
+                                      device=train_dev)
                 lp_trainer = trainer_lps[active_idx]
                 if arm == "mpk":
                     authoritative = lp_old if rescored is None else rescored[i]
@@ -425,12 +660,15 @@ def run(
             if losses:
                 loss = torch.stack(losses).mean()
                 gn = backend.backward_and_step(loss)
-                torch.cuda.synchronize()
+                sync_devices()
                 # sync trainer -> rollout weights (MPK reads them at the
-                # next epoch's rescore / the next rollout)
+                # next epoch's rescore / the next rollout); when the trainer
+                # is disaggregated this is a fenced cross-device P2P copy —
+                # the engine kernel has exited, so no mixed-version rollout
+                # is possible
                 t_sync_start = time.perf_counter()
                 sync_report = sync_weights()
-                torch.cuda.synchronize()
+                sync_devices()
                 t_sync = time.perf_counter() - t_sync_start
             else:
                 t_sync = 0.0
@@ -459,7 +697,7 @@ def run(
                 # happened, so further epochs would rescore unchanged
                 # weights — skip them
                 break
-        torch.cuda.synchronize()
+        sync_devices()
         t_train = time.perf_counter() - t2
         t_step = time.perf_counter() - t0
         rec = {
@@ -478,6 +716,14 @@ def run(
             "grad_norm": float(gn) if losses else None,
             "gen_lens": [len(s["pos"]) for s in samples],
             "t_rollout_s": round(t_rollout, 4),
+            "t_reward_s": round(t_reward, 6),
+            "trainer_device": str(train_dev),
+            "engine_device": str(engine_dev),
+            "disaggregated": disagg,
+            "streamed_replay_fwd": stream_replay,
+            "stream_waves": stream_stat["waves"] if stream_replay else 0,
+            "t_stream_cb_s": round(stream_stat["t_cb"], 4)
+            if stream_replay else 0.0,
             "t_old_recompute_s": round(t_old_recompute, 4),
             # Deprecated alias retained for existing analysis scripts.
             "t_recompute_s": round(t_old_recompute, 4),
