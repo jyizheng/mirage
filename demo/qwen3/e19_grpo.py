@@ -137,6 +137,19 @@ def run(
     dev = "cuda"
     arm = args.grpo_arm
 
+    # --- trainer determinism ---------------------------------------------
+    # The MPK engine is deterministic by construction, but the HF trainer's
+    # backward is NOT bit-reproducible by default (embedding/SDPA backward
+    # atomics): measured on B300, two identical colocated runs produce
+    # different grad norms at step 0 and their rollouts diverge from step 1
+    # (through the synced weights). Under --deterministic, pin the trainer
+    # ops too, so the whole loop is a pure function of (weights, data,
+    # seeds) and checkpoint resume / device placement are bitwise
+    # invariants.
+    if getattr(args, "deterministic", False):
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.use_deterministic_algorithms(True)
+
     # --- device placement (option C: 2-GPU disaggregation) ---------------
     # The engine/megakernel always lives on the current device; the trainer
     # backend is colocated by default and moves to --trainer-device when set.
