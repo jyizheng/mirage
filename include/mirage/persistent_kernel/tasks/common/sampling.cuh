@@ -142,6 +142,17 @@ __device__ __forceinline__ sampling_vec_t<DType, VEC_SIZE>
   constexpr float kLOG2 = 0.6931471806f;
 
   auto uniform2gumbel = [](float x) {
+    // curand_uniform yields values in (0, 1]: the top 128 u32 draws map to
+    // exactly 1.0f (probability 2^-25 per draw). gumbel(1.0f) degenerates to
+    // -kLOG2 * log2f(kEPSILON) = +46.05 -- a deterministic noise spike that
+    // force-samples whatever token it lands on, ~3x the largest legitimate
+    // Gumbel value (+16.3 at u = 1 - 2^-24). Clamp to the largest float
+    // strictly below 1.0f (0x1.fffffep-1f = 1 - 2^-24), merging the 1.0f
+    // bucket into the adjacent top bucket the generator already produces.
+    // Pure per-draw fminf: no RNG state or draw-order change, so seeded
+    // runs remain bitwise deterministic (but trajectories differ from
+    // pre-fix builds; references regenerated in references_v2).
+    x = fminf(x, 0x1.fffffep-1f);
     return -kLOG2 * log2f(-log2f(x + kEPSILON) + kEPSILON);
   };
 
