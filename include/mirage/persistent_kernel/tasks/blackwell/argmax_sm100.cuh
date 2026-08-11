@@ -73,6 +73,11 @@ __device__ __forceinline__ void block_reduce_max_idx_sm100(T &val,
       idx = block_max_idx;
     }
   }
+
+  // Trailing barrier: callers invoke this in a loop (one call per batch
+  // row) reusing the same shared buffers. Without it, other warps' stores
+  // for the NEXT call race with warp 0's smem reads above.
+  wg_barrier.arrive_and_wait();
 }
 
 template <typename T, int BATCH_SIZE, int CHUNK_SIZE, int NUM_PARTIAL_TASKS>

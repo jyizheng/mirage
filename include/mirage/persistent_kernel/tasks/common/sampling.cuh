@@ -40,6 +40,28 @@ __host__ __device__ __forceinline__ T sampling_ceil_div(T a, T b) {
   return (a + b - 1) / b;
 }
 
+// True -infinity for the sampling DType.
+//
+// cuda::std::numeric_limits is NOT specialized for mirage's
+// type::bfloat16_t; the primary template's infinity() returns T() == +0.0,
+// so guards spelled "-cuda::std::numeric_limits<DType>::infinity()"
+// silently evaluated to **-0.0** for bf16. A -0.0 "guard" outranks every
+// negative candidate, so vocab shards whose logits+noise are all negative
+// stored (-0.0, out-of-range index) as their partial winner (observed as
+// val_bits=0x8000 idx=2047 partials on all-negative shards every step).
+template <typename T>
+__device__ __forceinline__ T sampling_neg_inf() {
+  static_assert(cuda::std::numeric_limits<T>::is_specialized,
+                "add an explicit sampling_neg_inf specialization");
+  return -cuda::std::numeric_limits<T>::infinity();
+}
+template <>
+__device__ __forceinline__ type::bfloat16_t
+    sampling_neg_inf<type::bfloat16_t>() {
+  // bf16 -inf (0xFF80); constructed from float -inf via cvt.rn.bf16.f32.
+  return type::bfloat16_t(-cuda::std::numeric_limits<float>::infinity());
+}
+
 /******************* vec_t - Simplified Vector Type *******************/
 
 template <typename T, size_t vec_size>
@@ -300,7 +322,7 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
     }
 
     SamplingDataAndIndex<DType, IdType> max_data = {
-        -cuda::std::numeric_limits<DType>::infinity(), 0};
+        sampling_neg_inf<DType>(), 0};
     uint32_t const n_chunks =
         sampling_ceil_div(static_cast<uint32_t>(CHUNK_SIZE),
                           BLOCK_THREADS * VEC_SIZE);
@@ -311,7 +333,7 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
     for (uint32_t c = 0; c < n_chunks; ++c) {
       uint32_t const local_base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
       sampling_vec_t<DType, VEC_SIZE> logits_vec;
-      logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
+      logits_vec.fill(sampling_neg_inf<DType>());
       if (local_base < CHUNK_SIZE && global_part_off + local_base < vocab_size) {
         logits_vec.cast_load(logits + row_off + local_base);
       }
@@ -365,13 +387,21 @@ __device__ __forceinline__ void sampling_partial_poskeyed_kernel(
             local_idx < CHUNK_SIZE && global_idx < vocab_size
                 ? static_cast<DType>(logit_f * row_inv_temperature) +
                       gumbel_noise[j]
-                : -cuda::std::numeric_limits<DType>::infinity();
+                : sampling_neg_inf<DType>();
         candidates[j].index = local_idx;
       }
       max_data += BlockReduce<SamplingDataAndIndex<DType, IdType>,
                               BLOCK_THREADS,
                               SAMPLING_REDUCE_ALGO>(temp_storage)
                       .template Sum<VEC_SIZE>(candidates);
+      // cub requires a barrier before temp_storage is REUSED. Without it,
+      // thread 0's serial combine of warp_aggregates (this chunk) races
+      // with the other warps' lane-0 stores for the NEXT chunk, splicing
+      // (data, index) across chunks — the winning index could then be a
+      // guarded out-of-range candidate ((256+tx)*4+3 >= CHUNK_SIZE), i.e.
+      // a token in the NEXT shard's range. Root cause of the rare
+      // one-token nondeterminism in seeded decode (~1-3/30 runs).
+      __syncthreads();
     }
 
     if (tx == 0) {
@@ -405,12 +435,12 @@ __device__ __forceinline__ void
   for (int batch_idx = 0; batch_idx < batch_size; ++batch_idx) {
     sampling_vec_t<DType, VEC_SIZE> logits_vec;
     SamplingDataAndIndex<DType, IdType> max_data = {
-        -cuda::std::numeric_limits<DType>::infinity(), 0};
+        sampling_neg_inf<DType>(), 0};
 
     // Process logits in chunks with vectorized loads
     for (uint32_t i = 0; i < sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
          ++i) {
-      logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
+      logits_vec.fill(sampling_neg_inf<DType>());
 
       // Load logits vector if within bounds
       if ((i * BLOCK_THREADS + tx) * VEC_SIZE < d) {
@@ -432,7 +462,7 @@ __device__ __forceinline__ void
       for (uint32_t j = 0; j < VEC_SIZE; ++j) {
         cur_data[j].data = (i * BLOCK_THREADS + tx) * VEC_SIZE + j < d
                                ? logits_vec[j] + gumbel_noise[j]
-                               : -cuda::std::numeric_limits<DType>::infinity();
+                               : sampling_neg_inf<DType>();
         cur_data[j].index = (i * BLOCK_THREADS + tx) * VEC_SIZE + j;
       }
 
@@ -441,6 +471,9 @@ __device__ __forceinline__ void
                               BLOCK_THREADS,
                               SAMPLING_REDUCE_ALGO>(temp_storage)
                       .template Sum<VEC_SIZE>(cur_data);
+      // Barrier before temp_storage reuse (see
+      // sampling_partial_poskeyed_kernel).
+      __syncthreads();
     }
 
     // Write output for this batch
@@ -534,7 +567,7 @@ __device__ __forceinline__ void
 
       sampling_vec_t<DType, VEC_SIZE> logits_vec;
       SamplingDataAndIndex<DType, IdType> max_data = {
-          -cuda::std::numeric_limits<DType>::infinity(), 0};
+          sampling_neg_inf<DType>(), 0};
 
       uint64_t const row_off = static_cast<uint64_t>(row) * d;
       uint32_t const n_chunks = sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
@@ -558,7 +591,7 @@ __device__ __forceinline__ void
           for (uint32_t c = 0; c < n_chunks; ++c) {
             uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
             sampling_vec_t<DType, VEC_SIZE> lv;
-            lv.fill(-cuda::std::numeric_limits<DType>::infinity());
+            lv.fill(sampling_neg_inf<DType>());
             if (base < d) {
               lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
                            tx * VEC_SIZE);
@@ -590,7 +623,7 @@ __device__ __forceinline__ void
           for (uint32_t c = 0; c < n_chunks; ++c) {
             uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
             sampling_vec_t<DType, VEC_SIZE> lv;
-            lv.fill(-cuda::std::numeric_limits<DType>::infinity());
+            lv.fill(sampling_neg_inf<DType>());
             if (base < d) {
               lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
                            tx * VEC_SIZE);
@@ -621,7 +654,7 @@ __device__ __forceinline__ void
       }
 
       for (uint32_t c = 0; c < n_chunks; ++c) {
-        logits_vec.fill(-cuda::std::numeric_limits<DType>::infinity());
+        logits_vec.fill(sampling_neg_inf<DType>());
         if ((c * BLOCK_THREADS + tx) * VEC_SIZE < d) {
           logits_vec.cast_load(logits + row_off +
                                c * BLOCK_THREADS * VEC_SIZE + tx * VEC_SIZE);
@@ -658,7 +691,7 @@ __device__ __forceinline__ void
               keep ? static_cast<DType>(static_cast<float>(logits_vec[j]) *
                                         inv_temperature) +
                          gumbel_noise[j]
-                   : -cuda::std::numeric_limits<DType>::infinity();
+                   : sampling_neg_inf<DType>();
           cur_data[j].index = idx;
         }
 
@@ -666,6 +699,9 @@ __device__ __forceinline__ void
                                 BLOCK_THREADS,
                                 SAMPLING_REDUCE_ALGO>(temp_storage)
                         .template Sum<VEC_SIZE>(cur_data);
+        // Barrier before temp_storage reuse (see
+        // sampling_partial_poskeyed_kernel).
+        __syncthreads();
       }
 
       if (tx == 0) {
