@@ -344,18 +344,18 @@ def _copy_with_optional_pad(
     *,
     non_blocking: bool,
 ) -> None:
+    # ``Tensor.copy_`` performs the device transfer and dtype conversion
+    # itself, so a cross-device sync (disaggregated trainer, e.g. trainer on
+    # cuda:1 -> engine tensors on cuda:0) is a direct P2P copy.  The previous
+    # ``source.to(device=..., dtype=...)`` staging was a no-op view when
+    # colocated but allocated a full temporary on the target device for every
+    # tensor when disaggregated (double copy + allocator churn).
     if tuple(source.shape) == tuple(target.shape):
-        target.copy_(
-            source.to(device=target.device, dtype=target.dtype),
-            non_blocking=non_blocking,
-        )
+        target.copy_(source, non_blocking=non_blocking)
         return
     if _can_pad_dim0(source, target):
         target.zero_()
-        target[: source.shape[0]].copy_(
-            source.to(device=target.device, dtype=target.dtype),
-            non_blocking=non_blocking,
-        )
+        target[: source.shape[0]].copy_(source, non_blocking=non_blocking)
         return
     raise ValueError(
         f"cannot copy source shape {tuple(source.shape)} into target "
