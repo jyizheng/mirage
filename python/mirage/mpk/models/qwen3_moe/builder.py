@@ -17,12 +17,13 @@ moe_intermediate_size 768, norm_topk_prob=true (the routing kernel
 hard-codes renormalize=true, matching), mlp_only_layers=[] (every layer
 is MoE), and NO shared expert.
 
-Determinism status (phase a): the dense ops keep their deterministic
+Determinism status (phase b): the dense ops keep their deterministic
 paths; the router gate is built as a single-tile linear (no split-K
 tma_reduce_add, design hazard row 1) and the expert GEMMs / combine are
-fixed-order by construction. The remaining known gap is the
-arrival-order active-expert compaction inside topk_softmax (design
-hazard row 5) — value-neutral today, gated in phase (b).
+fixed-order by construction. The active-expert compaction inside
+topk_softmax (design hazard row 5) is now a fixed-order single-thread
+scan, and the bf16 expert GEMM zero-fills unrouted smem lanes, so the
+whole MoE block is deterministic and batch-invariant by construction.
 """
 
 import torch

@@ -538,7 +538,10 @@ __device__ __forceinline__ void
 
             // CP_ASYNC for loading B
             int32_t token_idx = n_tile * MMA_N + lane_idx / cp_async_group_size;
-            int32_t topk_idx = tRoutingIndex(token_idx);
+            // Guard the routing-index read: the MMA N-tile can extend past
+            // BATCH_SIZE (same guard as the fp8 group GEMM).
+            int32_t topk_idx =
+                (token_idx < BATCH_SIZE) ? tRoutingIndex(token_idx) : 0;
             if (token_idx < BATCH_SIZE && topk_idx > 0) {
               if constexpr (W13_LINEAR) {
                 cute::copy(copyB,
@@ -549,6 +552,18 @@ __device__ __forceinline__ void
                            tBgB(_, _, _, _, k_tile, topk_idx - 1),
                            tBsB(_, _, _, _, smem_wr_buffer));
               }
+            } else {
+              // Zero-fill this lane's share of the B tile: unrouted rows used
+              // to skip the copy and leave stale bf16 from the previous
+              // (expert, tile) iteration in smem.  The garbage columns are
+              // computed but never stored (epilogue routing guard), so this
+              // is value-neutral -- zeroing makes the tile contents
+              // deterministic (mirrors the fp8 group GEMM's zero-fill of
+              // unrouted rows).
+              cute::clear(tBsB(_, _, _, _, smem_wr_buffer));
+              // The zeros are generic-proxy stores; make them visible to the
+              // async proxy (UMMA) before the b_full barrier arrive.
+              cutlass::arch::fence_view_async_shared();
             }
 
             cutlass::arch::cpasync_barrier_arrive_noinc(
@@ -788,7 +803,8 @@ __device__ __forceinline__ void
           for (int i = 0; i < MMA_N; ++i) {
             int32_t m_idx = m_tile * MMA_M + threadIdx.x;
             int32_t n_idx = n_tile * MMA_N + i;
-            int32_t topk_idx = tRoutingIndex(n_idx);
+            // Guard the routing-index read (tile may extend past BATCH_SIZE)
+            int32_t topk_idx = (n_idx < BATCH_SIZE) ? tRoutingIndex(n_idx) : 0;
             if (n_idx < BATCH_SIZE && topk_idx > 0) {
               mOutput(n_idx, topk_idx - 1, m_idx) = tCrC[i];
             }

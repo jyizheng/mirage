@@ -632,6 +632,15 @@ if __name__ == "__main__":
             
             if args.splitk_gate:
                 # moe gate with split-k
+                # WARNING: splitk_linear_layer combines partials with an
+                # arrival-order tma_reduce_add -- the router logits (and
+                # thus near-tie top-k picks) are NOT deterministic run to
+                # run.  Offline perf-comparison only; the online
+                # Qwen3MoeBuilder always builds the single-tile gate.
+                if i == 0:
+                    print("[demo_30B_A3B] --splitk-gate: router logits use a "
+                          "nondeterministic split-K combine; do not use for "
+                          "determinism experiments", flush=True)
                 mpk.splitk_linear_layer(
                     input=rmsnorm_out,
                     weight=w_moe_gate,

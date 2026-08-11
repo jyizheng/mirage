@@ -295,17 +295,22 @@ __device__ __forceinline__ void topk_softmax_task_impl(
     }
   }
   __syncthreads();
-  // Compact marks into a dense list and count
-  if (mpk_active_expert_ids != nullptr) {
-    for (int expert = start_expert + threadIdx.x; expert < end_expert;
-         expert += blockDim.x) {
-      int const local_expert = expert - start_expert;
-      int const mark = mpk_active_expert_ids[local_expert];
-      if (mark >= 0) {
-        int const pos = atomicAdd(mpk_active_expert_ids + NUM_EXPERTS, 1);
-        mpk_active_expert_ids[pos] = expert;
+  // Compact marks into a dense list and count.  Single-thread serial scan in
+  // ascending expert order: the previous strided atomicAdd compaction made
+  // the list order arrival-dependent (the downstream MoE GEMMs stride this
+  // list, so expert->task assignment varied run to run) and raced each
+  // thread's unsynchronized mark read against another thread's compacted
+  // write landing in the same low slots.  The list is tiny (<= NUM_EXPERTS)
+  // and off the critical path.  In-place forward compaction within a single
+  // thread is safe: the write position never exceeds the slot just read.
+  if (mpk_active_expert_ids != nullptr && threadIdx.x == 0) {
+    int count = 0;
+    for (int expert = start_expert; expert < end_expert; ++expert) {
+      if (mpk_active_expert_ids[expert - start_expert] >= 0) {
+        mpk_active_expert_ids[count++] = expert;
       }
     }
+    mpk_active_expert_ids[NUM_EXPERTS] = count;
   }
 }
 
