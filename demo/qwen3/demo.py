@@ -167,9 +167,21 @@ if __name__ == "__main__":
         "option C), the engine/megakernel stays on the current device, "
         "the trainer model+optimizer live on the given device, the "
         "trainer->engine weight sync becomes a cross-device P2P copy, "
-        "and on the mpk arm the trainer replay-forward is streamed per "
-        "completed trajectory while the rollout decode tail drains. "
-        "Strict on-policy semantics (epoch-1 ratio == 1) are unchanged.",
+        "and the trainer runs on that GPU. Strict on-policy semantics "
+        "(epoch-1 ratio == 1) are unchanged.",
+    )
+    parser.add_argument(
+        "--stream-replay-fwd",
+        action="store_true",
+        help="With a disaggregated --trainer-device (mpk arm only): stream "
+        "the epoch-1 trainer replay-forward in completion waves while the "
+        "rollout decode tail drains on the engine GPU, instead of one "
+        "batched forward after the rollout. Semantically identical (forward "
+        "values are MPK-authoritative; this only changes the gradient "
+        "micro-batching, like --grpo-trainer-micro-batch-size), but the "
+        "update is no longer bitwise comparable to the colocated loop, and "
+        "backward over fragmented replay graphs can cost more than the "
+        "overlap saves at small scale; measure before enabling.",
     )
     parser.add_argument(
         "--grpo-measure-old-recompute",

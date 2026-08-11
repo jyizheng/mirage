@@ -35,18 +35,20 @@
 # behavior). With --trainer-device cuda:1 the loop disaggregates: the
 # engine/megakernel keeps the current device, the trainer (master weights +
 # AdamW) lives on cuda:1, the trainer->engine weight sync becomes a
-# cross-device P2P copy, and on the mpk arm the trainer replay-forward is
-# STREAMED: as trajectories retire inside the rollout (the offline kernel's
-# per-request completion is host-observable through step[]/tokens[]), their
-# selected-token replay forward runs on cuda:1 while the surviving decodes
-# drain the rollout tail on cuda:0; rewards are computed on the CPU
-# concurrently. Backward + optimizer still wait for all rewards (GRPO
-# advantages are group-normalized) and the fenced weight sync still precedes
-# the next rollout, so strict on-policy semantics -- including the epoch-1
-# ratio == 1 assert -- are device-placement-invariant. Retirement bursts are
-# coalesced into one batched replay forward per wave, so a matched
-# --ignore-eos run (all trajectories finish together) issues bitwise the
-# same batched trainer forward as the colocated loop.
+# cross-device P2P copy, and by default the update is bitwise comparable to
+# the colocated loop (single batched epoch-1 replay forward, now on cuda:1).
+# With --stream-replay-fwd additionally set (mpk arm only), the epoch-1
+# replay forward is STREAMED: as trajectories retire inside the rollout
+# (the offline kernel's per-request completion is host-observable through
+# step[]/tokens[]), completion waves of selected-token replay forwards run
+# on cuda:1 while the surviving decodes drain the rollout tail on cuda:0;
+# rewards are computed on the CPU concurrently. Backward + optimizer still
+# wait for all rewards (GRPO advantages are group-normalized) and the
+# fenced weight sync still precedes the next rollout, so strict on-policy
+# semantics -- including the epoch-1 ratio == 1 assert -- are
+# device-placement-invariant either way; streaming only changes gradient
+# micro-batching (like --grpo-trainer-micro-batch-size), so its update is
+# not bitwise comparable to the colocated one.
 import atexit
 import hashlib
 import json
@@ -154,12 +156,23 @@ def run(
     else:
         train_dev = engine_dev
     disagg = train_dev != engine_dev
-    # Streamed replay-forward needs the value bridge (arm mpk): the loss
-    # forward uses MPK-authoritative values, so per-wave trainer batching
-    # only affects gradients. On the hf arm the trainer forward VALUES enter
-    # the ratio, so streaming would change the objective with batch shape;
-    # the hf arm therefore keeps the batched post-rollout forward.
-    stream_replay = disagg and arm == "mpk"
+    # Streamed replay-forward is opt-in (--stream-replay-fwd) and needs the
+    # value bridge (arm mpk): the loss forward uses MPK-authoritative
+    # values, so per-wave trainer batching only affects gradient
+    # micro-batching. On the hf arm the trainer forward VALUES enter the
+    # ratio, so streaming would change the objective with batch shape.
+    # Default disagg keeps the single batched post-rollout forward, whose
+    # update is bitwise comparable to the colocated loop. Measured on B300
+    # (Qwen3-1.7B, group 16, mbt 16): chunked prefill staggers each row's
+    # decode start, so rows retire in 13-15 bursts even under --ignore-eos,
+    # and backward over that many fragmented replay graphs cost 0.84-0.97 s
+    # vs 0.26 s batched - far more than the ~0.1 s of forward it hides.
+    stream_replay = (disagg and arm == "mpk"
+                     and bool(getattr(args, "stream_replay_fwd", False)))
+    if getattr(args, "stream_replay_fwd", False) and not stream_replay:
+        raise ValueError(
+            "--stream-replay-fwd requires a disaggregated --trainer-device "
+            "and --grpo-arm mpk")
 
     def sync_devices():
         torch.cuda.synchronize(engine_dev)
@@ -310,50 +323,48 @@ def run(
                 pos.append(t)
         return {"ids": ids, "plen": plen, "pos": pos, "lp_old": lp}
 
+    # Wave-size floor: completed trajectories accumulate until at least
+    # this many are ready (or the kernel exits), bounding the number of
+    # separate replay graphs per step to ~4. Chunked prefill staggers
+    # decode starts, so rows retire one-by-one ~4 engine iterations apart;
+    # per-trajectory (batch-1) forwards fragment the later backward, which
+    # measured 3-4x slower than the batched graph and dwarfs the overlap.
+    stream_wave_min = max(1, R // 4)
+
     def _drain_completions(plen, done_ev, on_wave):
         # Poll step[]/tokens[] until every request has retired, emitting
-        # completion WAVES. A wave coalesces one retirement burst: after
-        # detecting completions we re-poll on a short settle delay until no
-        # new request retires, so requests that finish in the same kernel
-        # iteration (all of them, under --ignore-eos with equal lengths)
-        # land in ONE wave and the callback's batched trainer forward is
-        # bitwise the colocated post-rollout batched forward. Detection is
-        # torn-read safe: a row is accepted only if step[r] is unchanged
-        # across two reads (or the kernel already exited); a stale
-        # tokens[r, step[r]] read can only MISS an eos (the buffer is
-        # zeroed at rollout start and committed generated tokens are never
-        # eos before the final one), delaying detection by one poll.
+        # completion WAVES of at least stream_wave_min trajectories (the
+        # final flush may be smaller). Detection is torn-read safe: a row
+        # is accepted only if step[r] is unchanged across two reads (or
+        # the kernel already exited); a stale tokens[r, step[r]] read can
+        # only MISS an eos (the buffer is zeroed at rollout start and
+        # committed generated tokens are never eos before the final one),
+        # delaying detection by one poll.
         pending = set(range(R))
+        acc = []
         while pending:
             kernel_done = done_ev.query()
-            wave = []
-            grown = True
-            while grown and pending:
-                grown = False
-                _poll_read(_step_h, step)
-                s1 = _step_h.tolist()
-                cand = []
-                for r in sorted(pending):
-                    sr = int(s1[r])
-                    if sr + 1 >= max_seq:
+            _poll_read(_step_h, step)
+            s1 = _step_h.tolist()
+            cand = []
+            for r in sorted(pending):
+                sr = int(s1[r])
+                if sr + 1 >= max_seq:
+                    cand.append((r, sr))
+                elif sr >= plen:
+                    _poll_read(_tok_h, tokens[r, sr:sr + 1])
+                    if int(_tok_h[0]) == engine_eos:
                         cand.append((r, sr))
-                    elif sr >= plen:
-                        _poll_read(_tok_h, tokens[r, sr:sr + 1])
-                        if int(_tok_h[0]) == engine_eos:
-                            cand.append((r, sr))
-                if cand and not kernel_done:
-                    _poll_read(_step_h2, step)
-                    s2 = _step_h2.tolist()
-                    cand = [(r, sr) for r, sr in cand if int(s2[r]) == sr]
-                for r, sr in cand:
-                    pending.discard(r)
-                    wave.append((r, _streamed_sample(r, plen, sr + 1)))
-                    grown = True
-                if grown and pending and not kernel_done:
-                    time.sleep(0.0002)  # settle: catch same-burst retirements
-                    kernel_done = done_ev.query()
-            if wave:
-                on_wave(sorted(wave))
+            if cand and not kernel_done:
+                _poll_read(_step_h2, step)
+                s2 = _step_h2.tolist()
+                cand = [(r, sr) for r, sr in cand if int(s2[r]) == sr]
+            for r, sr in cand:
+                pending.discard(r)
+                acc.append((r, _streamed_sample(r, plen, sr + 1)))
+            if acc and (len(acc) >= stream_wave_min or not pending):
+                on_wave(sorted(acc))
+                acc = []
             if pending:
                 if kernel_done:
                     raise RuntimeError(
