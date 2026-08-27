@@ -767,17 +767,27 @@ class PersistentKernel:
         sliding_window: int = 0,
         head_dim: int = 128,
     ):
-        # DFlash non-causal block attention (split ctx/block KV; one task/request).
+        # DFlash non-causal block attention (split ctx/block KV).
+        # grid_dim[0] > 1 splits the layer across kv heads: each task gets a
+        # column slice (dim 1) of every tensor via imap (1, -1, -1).
         for t in (q, ctx_k, ctx_v, blk_k, blk_v, output):
             assert t.num_dims == 2
+        G = grid_dim[0]
+        if G > 1:
+            for t in (q, ctx_k, ctx_v, blk_k, blk_v, output):
+                assert t.dim(1) % (G * head_dim) == 0, (
+                    "dflash_attention grid split requires dim1 divisible by "
+                    f"grid_dim[0]*head_dim ({t.dim(1)} % {G * head_dim})"
+                )
+        imap = (1, -1, -1) if G > 1 else (-1, -1, -1)
         params = [sliding_window, head_dim]
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
-        tb_graph.new_input(q, (-1, -1, -1), -1, True)
-        tb_graph.new_input(ctx_k, (-1, -1, -1), -1, True)
-        tb_graph.new_input(ctx_v, (-1, -1, -1), -1, True)
-        tb_graph.new_input(blk_k, (-1, -1, -1), -1, True)
-        tb_graph.new_input(blk_v, (-1, -1, -1), -1, True)
-        tb_graph.new_input(output, (-1, -1, -1), -1, True)
+        tb_graph.new_input(q, imap, -1, True)
+        tb_graph.new_input(ctx_k, imap, -1, True)
+        tb_graph.new_input(ctx_v, imap, -1, True)
+        tb_graph.new_input(blk_k, imap, -1, True)
+        tb_graph.new_input(blk_v, imap, -1, True)
+        tb_graph.new_input(output, imap, -1, True)
         self.kn_graph.customized([q, ctx_k, ctx_v, blk_k, blk_v, output], tb_graph)
         self.kn_graph.register_task(tb_graph, "dflash_attention", params)
 
@@ -823,6 +833,160 @@ class PersistentKernel:
         tb_graph.new_input(cache, (-1, -1, -1), -1, True)
         self.kn_graph.customized([kv_in, slot_mapping, cache], tb_graph)
         self.kn_graph.register_task(tb_graph, "dflash_kv_store", params)
+
+    def inkling_attention_layer(
+        self,
+        q: DTensor,       # [1, num_q_heads*head_dim] (per-head q_norm applied)
+        ctx_k: DTensor,   # [max_ctx, num_kv_heads*head_dim] (k cache)
+        ctx_v: DTensor,   # [max_ctx, num_kv_heads*head_dim] (v cache)
+        blk_k: DTensor,   # [1, num_kv_heads*head_dim] (this step's k)
+        blk_v: DTensor,   # [1, num_kv_heads*head_dim]
+        bias: DTensor,    # [num_q_heads, extent] bf16 (r @ proj, per step)
+        step: DTensor,    # [1] int32 = ctx_len (= position of new token)
+        output: DTensor,  # [1, num_q_heads*head_dim]
+        grid_dim: tuple,
+        block_dim: tuple,
+        sliding_window: int = 0,       # 0 = global layer
+        extent: int = 1024,            # rel_extent
+        head_dim: int = 128,
+        log_scaling_alpha: float = 0.0,  # 0 = no log scaling (local layers)
+        log_scaling_n_floor: int = 128000,
+    ):
+        # Inkling GQA decode attention with relative-position bias.
+        # grid_dim[0] = G partitions kv heads: imap slices dim 1 of
+        # q/ctx/blk/out and dim 0 of bias.
+        import struct
+
+        for t in (q, ctx_k, ctx_v, blk_k, blk_v, output):
+            assert t.num_dims == 2
+        assert bias.num_dims == 2 and bias.dim(1) == extent
+        G = grid_dim[0]
+        if G > 1:
+            for t in (q, ctx_k, ctx_v, blk_k, blk_v, output):
+                assert t.dim(1) % (G * head_dim) == 0
+            assert bias.dim(0) % G == 0
+        cmap = (1, -1, -1) if G > 1 else (-1, -1, -1)
+        bmap = (0, -1, -1) if G > 1 else (-1, -1, -1)
+        alpha_bits = struct.unpack("i", struct.pack("f", log_scaling_alpha))[0]
+        params = [sliding_window, extent, head_dim, alpha_bits, log_scaling_n_floor]
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(q, cmap, -1, True)
+        tb_graph.new_input(ctx_k, cmap, -1, True)
+        tb_graph.new_input(ctx_v, cmap, -1, True)
+        tb_graph.new_input(blk_k, cmap, -1, True)
+        tb_graph.new_input(blk_v, cmap, -1, True)
+        tb_graph.new_input(bias, bmap, -1, True)
+        tb_graph.new_input(step, (-1, -1, -1), -1, True)
+        tb_graph.new_input(output, cmap, -1, True)
+        self.kn_graph.customized(
+            [q, ctx_k, ctx_v, blk_k, blk_v, bias, step, output], tb_graph
+        )
+        self.kn_graph.register_task(tb_graph, "inkling_attention", params)
+
+    def inkling_sconv_layer(
+        self,
+        x: DTensor,          # [seq_len, hidden] bf16
+        weight: DTensor,     # [hidden, K] fp32 (depthwise taps, [:,0] oldest)
+        conv_state: DTensor, # [K-1, hidden] fp32, updated in place
+        output: DTensor,     # [seq_len, hidden] bf16 (conv + residual)
+        grid_dim: tuple,
+        block_dim: tuple,
+    ):
+        # Inkling depthwise short convolution + residual (fp32 math).
+        # grid_dim[0] = G partitions the channel dim; imap slices dim 1 of
+        # x/state/out and dim 0 of weight.
+        assert x.num_dims == 2 and output.num_dims == 2
+        assert weight.num_dims == 2 and conv_state.num_dims == 2
+        G = grid_dim[0]
+        assert x.dim(1) % G == 0
+        cmap = (1, -1, -1) if G > 1 else (-1, -1, -1)
+        wmap = (0, -1, -1) if G > 1 else (-1, -1, -1)
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(x, cmap, -1, True)
+        tb_graph.new_input(weight, wmap, -1, True)
+        tb_graph.new_input(conv_state, cmap, -1, True)
+        tb_graph.new_input(output, cmap, -1, True)
+        self.kn_graph.customized([x, weight, conv_state, output], tb_graph)
+        self.kn_graph.register_task(tb_graph, "inkling_sconv")
+
+    def inkling_moe_router_layer(
+        self,
+        logits: DTensor,       # [rows, stride>=R+S] bf16 (cols R+S.. padded)
+        bias: DTensor,         # [num_routed] fp32 e_score_correction_bias
+        global_scale: DTensor, # [1] fp32
+        output: tuple,         # (weights, routing_indices, active_expert_ids)
+        grid_dim: tuple,
+        block_dim: tuple,
+        route_scale: float = 8.0,
+        n_shared: int = 2,
+    ):
+        # Inkling router: sigmoid+bias top-k over routed experts, weights =
+        # softmax(logsigmoid(selected ++ shared logits)) * route_scale *
+        # global_scale. Shared experts are emitted as always-selected experts
+        # num_routed..num_routed+n_shared-1 (folded into the expert tensor).
+        import struct
+
+        weights, routing_indices, active_ids = output
+        assert logits.num_dims == 2
+        assert bias.num_dims == 1
+        assert weights.num_dims == 2      # [rows, topk + n_shared] fp32
+        assert routing_indices.num_dims == 2  # [num_total, rows] int32
+        assert active_ids.num_dims == 1   # [num_total + 1] int32
+        assert grid_dim == (1, 1, 1)
+        scale_bits = struct.unpack("i", struct.pack("f", route_scale))[0]
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(logits, (-1, -1, -1), -1, True)
+        tb_graph.new_input(bias, (-1, -1, -1), -1, True)
+        tb_graph.new_input(global_scale, (-1, -1, -1), -1, True)
+        tb_graph.new_input(weights, (-1, -1, -1), -1, True)
+        tb_graph.new_input(routing_indices, (-1, -1, -1), -1, True)
+        tb_graph.new_input(active_ids, (-1, -1, -1), -1, True)
+        self.kn_graph.customized(
+            [logits, bias, global_scale, weights, routing_indices, active_ids],
+            tb_graph,
+        )
+        self.kn_graph.register_task(
+            tb_graph, "inkling_moe_router", [scale_bits, n_shared]
+        )
+
+    def glm_moe_router_layer(
+        self,
+        logits: DTensor,   # [rows, stride>=R] bf16 (cols R.. padded)
+        bias: DTensor,     # [num_routed] fp32 e_score_correction_bias
+        output: tuple,     # (weights, routing_indices, active_expert_ids)
+        grid_dim: tuple,
+        block_dim: tuple,
+        routed_scaling_factor: float = 2.5,
+        n_shared: int = 1,
+    ):
+        # GLM-4.x router (n_group=1): topk on sigmoid(logits)+bias, weights =
+        # gathered unbiased sigmoid scores normalized by their sum and scaled
+        # by routed_scaling_factor. Shared experts are emitted as
+        # always-selected experts num_routed..num_routed+n_shared-1 with
+        # weight 1.0 (folded into the expert tensor).
+        import struct
+
+        weights, routing_indices, active_ids = output
+        assert logits.num_dims == 2
+        assert bias.num_dims == 1
+        assert weights.num_dims == 2          # [rows, topk + n_shared] fp32
+        assert routing_indices.num_dims == 2  # [num_total, rows] int32
+        assert active_ids.num_dims == 1       # [num_total + 1] int32
+        assert grid_dim == (1, 1, 1)
+        scale_bits = struct.unpack(
+            "i", struct.pack("f", routed_scaling_factor))[0]
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(logits, (-1, -1, -1), -1, True)
+        tb_graph.new_input(bias, (-1, -1, -1), -1, True)
+        tb_graph.new_input(weights, (-1, -1, -1), -1, True)
+        tb_graph.new_input(routing_indices, (-1, -1, -1), -1, True)
+        tb_graph.new_input(active_ids, (-1, -1, -1), -1, True)
+        self.kn_graph.customized(
+            [logits, bias, weights, routing_indices, active_ids], tb_graph
+        )
+        self.kn_graph.register_task(
+            tb_graph, "glm_moe_router", [scale_bits, n_shared]
+        )
 
     def single_batch_extend_attention_layer(
         self,
@@ -910,6 +1074,10 @@ class PersistentKernel:
         enable_qk_norm: bool = True,
         q_len_override: int = 0,
         tail_offset: int = 0,
+        rotary_dim: int = 0,        # 0 = full head_dim; GLM-4.6 partial RoPE
+        qk_norm_eps: float = 1e-6,
+        window_size: int = 0,       # 0 = full causal
+        sinks: DTensor = None,      # per-head attention sinks
     ):
         # Currently assume that input/output
         assert input.num_dims == 2  # (num_tokens, fused_outdim / world_size)
@@ -924,11 +1092,12 @@ class PersistentKernel:
         num_kv_heads = k_cache.dim(2)
         num_q_heads = output.dim(1) // head_dim
         rotary_embed = 0
+        effective_rotary_dim = rotary_dim if rotary_dim > 0 else head_dim
         if cos_pos_embed is not None or sin_pos_embed is not None:
-            assert cos_pos_embed.num_dims == 2  # (seq_len, head_dim)
-            assert sin_pos_embed.num_dims == 2  # (seq_len, head_dim)
-            assert cos_pos_embed.dim(1) == head_dim
-            assert sin_pos_embed.dim(1) == head_dim
+            assert cos_pos_embed.num_dims == 2  # (seq_len, rotary_dim)
+            assert sin_pos_embed.num_dims == 2  # (seq_len, rotary_dim)
+            assert cos_pos_embed.dim(1) == effective_rotary_dim
+            assert sin_pos_embed.dim(1) == effective_rotary_dim
             rotary_embed = 1
         assert q_norm is not None and k_norm is not None, (
             "q_norm/k_norm must be valid DTensors; pass a dummy + "
@@ -947,10 +1116,30 @@ class PersistentKernel:
         # params[5]: page_size
         # params[6]: q_len_override (only included if non-zero; for Eagle3 K>1 chain)
         # params[7]: tail_offset    (only included if non-zero; for Eagle3 K>1 chain)
+        # params[8]: rotary_dim     (0 = head_dim; GLM-4.6 partial RoPE)
+        # params[9]: qk-norm eps float bits (default 1e-6)
+        # params[10]: window_size   (0 = full causal)
+        # params[11]: has_sink      (1 = an 8th input holds the sinks)
+        # Trailing pairs are only emitted when non-default (legacy sizes 6/8).
+        import struct
+        has_sink = 1 if sinks is not None else 0
+        if has_sink:
+            assert sinks.num_dims == 2  # (num_kv_heads, num_q_heads/num_kv)
+            assert sinks.dim(0) == num_kv_heads
+            assert sinks.dim(1) == num_q_heads // num_kv_heads
         params = [num_q_heads, num_kv_heads, qk_norm, rotary_embed,
                   self.max_seq_length, self.page_size]
-        if q_len_override != 0 or tail_offset != 0:
+        if (q_len_override != 0 or tail_offset != 0 or rotary_dim != 0
+                or qk_norm_eps != 1e-6 or window_size != 0 or has_sink):
             params.extend([q_len_override, tail_offset])
+        if (rotary_dim != 0 or qk_norm_eps != 1e-6 or window_size != 0
+                or has_sink):
+            eps_bits = struct.unpack("i", struct.pack("f", qk_norm_eps))[0]
+            params.extend([rotary_dim, eps_bits])
+        if window_size != 0 or has_sink:
+            params.append(window_size)
+        if has_sink:
+            params.append(has_sink)
 
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         assert grid_dim[0] == self.max_num_batched_requests
@@ -962,20 +1151,19 @@ class PersistentKernel:
         tb_graph.new_input(k_norm, (-1, -1, -1), -1, True)
         tb_graph.new_input(cos_pos_embed, (-1, -1, -1), -1, True)
         tb_graph.new_input(sin_pos_embed, (-1, -1, -1), -1, True)
+        graph_inputs = [input, k_cache, v_cache, q_norm, k_norm,
+                        cos_pos_embed, sin_pos_embed]
+        if has_sink:
+            # grid.y is the KV head, so each task sees its own head's sinks
+            tb_graph.new_input(sinks, (-1, 0, -1), -1, True)
+            graph_inputs.append(sinks)
         tb_graph.new_input(output, (-1, 1, -1), -1, True)
-        self.kn_graph.customized(
-            [
-                input,
-                k_cache,
-                v_cache,
-                q_norm,
-                k_norm,
-                cos_pos_embed,
-                sin_pos_embed,
-                output,
-            ],
-            tb_graph,
-        )
+        self.kn_graph.customized(graph_inputs + [output], tb_graph)
+        # SM100 only: the other kernels drop the extra params in a Release
+        # build and fall back to plain causal attention with no sink.
+        assert (window_size == 0 and not has_sink) or self.target_cc == 100, (
+            f"window_size={window_size} / sinks are only implemented for "
+            f"sm100, got target_cc={self.target_cc}")
         if self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_hopper", params)
         elif self.target_cc in (100, 103):
@@ -1572,6 +1760,7 @@ class PersistentKernel:
         output: DTensor,
         grid_dim: tuple,
         block_dim: tuple,
+        bias: DTensor = None,
     ):
         # Currently assume that input/output
         assert input.num_dims == 2  # (batch_size, hidden_size / world_size)
@@ -1584,11 +1773,24 @@ class PersistentKernel:
         tb_graph.new_input(weight, (-1, 1, -1), 2, True)
         tb_graph.new_input(moe_routing_indices, (-1, -1, -1), -1, True)
         tb_graph.new_input(moe_mask, (-1, -1, -1), -1, True)
+        graph_inputs = [input, weight, moe_routing_indices, moe_mask]
+        params = []
+        if bias is not None:
+            assert bias.num_dims == 2  # (num_experts, 2*intermediate_size)
+            assert bias.dim(0) == weight.dim(0)
+            assert bias.dim(1) == weight.dim(1)
+            # Same partition as the weight's output dim: each task takes its
+            # column slice of every expert's row.
+            tb_graph.new_input(bias, (-1, 1, -1), -1, True)
+            graph_inputs.append(bias)
+            params = [1]
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
-        self.kn_graph.customized([input, weight, moe_routing_indices, moe_mask, output], tb_graph)
+        self.kn_graph.customized(graph_inputs + [output], tb_graph)
 
+        assert bias is None or self.target_cc in (100, 103), (
+            "moe_w13_linear_layer(bias=...) is only implemented for sm100")
         if self.target_cc in (100, 103):
-            self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm100")
+            self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm90")
         else:
@@ -1770,16 +1972,46 @@ class PersistentKernel:
         tb_graph.new_input(output, (0, 1, -1), -1, True)
         self.kn_graph.customized([input, output], tb_graph)
         self.kn_graph.register_task(tb_graph, "moe_silu_mul")
+
+    def moe_clamped_swiglu_layer(
+        self,
+        input: DTensor,
+        output: DTensor,
+        grid_dim: tuple,
+        block_dim: tuple,
+        limit: float = 7.0,
+        alpha: float = 1.702,
+    ):
+        """Gated activation with both halves clamped and a scaled sigmoid:
+
+            out = (clamp(up, -limit, limit) + 1)
+                  * min(gate, limit) * sigmoid(min(gate, limit) * alpha)
+
+        `input` holds gate then up, as moe_silu_mul does. A checkpoint that
+        stores the two interleaved must be de-interleaved by its loader.
+        """
+        import struct
+
+        assert input.num_dims == 3  # (batch_size, num_expert_per_tok, 2 * intermediate_size)
+        assert output.num_dims == 3  # (batch_size, num_expert_per_tok, intermediate_size)
+        params = [struct.unpack("i", struct.pack("f", limit))[0],
+                  struct.unpack("i", struct.pack("f", alpha))[0]]
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(input, (0, 1, -1), -1, True)
+        tb_graph.new_input(output, (0, 1, -1), -1, True)
+        self.kn_graph.customized([input, output], tb_graph)
+        self.kn_graph.register_task(tb_graph, "moe_clamped_swiglu", params)
             
     def moe_w2_linear_layer(
         self,
         input: DTensor,
         weight: DTensor,
         moe_routing_indices: DTensor,
-        moe_mask: DTensor, 
+        moe_mask: DTensor,
         output: DTensor,
         grid_dim: tuple,
         block_dim: tuple,
+        bias: DTensor = None,
     ):
         # Currently assume that input/output
         assert input.num_dims == 3  # (batch_size, num_expert_per_tok, intermediate_size)
@@ -1792,11 +2024,22 @@ class PersistentKernel:
         tb_graph.new_input(weight, (-1, 1, -1), 2, True)
         tb_graph.new_input(moe_routing_indices, (-1, -1, -1), -1, True)
         tb_graph.new_input(moe_mask, (-1, -1, -1), -1, True)
+        graph_inputs = [input, weight, moe_routing_indices, moe_mask]
+        params = []
+        if bias is not None:
+            assert bias.num_dims == 2  # (num_experts, hidden_size)
+            assert bias.dim(0) == weight.dim(0)
+            assert bias.dim(1) == weight.dim(1)
+            tb_graph.new_input(bias, (-1, 1, -1), -1, True)
+            graph_inputs.append(bias)
+            params = [1]
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
-        self.kn_graph.customized([input, weight, moe_routing_indices, moe_mask, output], tb_graph)
+        self.kn_graph.customized(graph_inputs + [output], tb_graph)
 
+        assert bias is None or self.target_cc in (100, 103), (
+            "moe_w2_linear_layer(bias=...) is only implemented for sm100")
         if self.target_cc in (100, 103):
-            self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm100")
+            self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm90")
         else:
@@ -1867,6 +2110,7 @@ class PersistentKernel:
         output: DTensor,
         grid_dim: tuple,
         block_dim: tuple,
+        bias: DTensor = None,
     ):
         # Currently assume that input/output
         assert input.num_dims == 2  # (batch_size, hidden_size / world_size)
@@ -1875,10 +2119,37 @@ class PersistentKernel:
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         tb_graph.new_input(input, (-1, -1, -1), 1, True)
         tb_graph.new_input(weight, (0, -1, -1), 1, True)
+        if bias is not None:
+            assert bias.num_dims == 2  # (1, hidden_size) -- one shared row
+            assert bias.dim(0) == 1
+            assert bias.dim(1) == output.dim(1)
+            # Same partition as the output: each task takes its column slice.
+            tb_graph.new_input(bias, (1, -1, -1), -1, True)
         tb_graph.new_input(output, (1, -1, -1), -1, True)
-        self.kn_graph.customized([input, weight, output], tb_graph)
+        graph_inputs = [input, weight] + ([bias] if bias is not None else [])
+        self.kn_graph.customized(graph_inputs + [output], tb_graph)
 
-        if self.target_cc >= 100 and self.target_cc < 120:
+        # A bias reuses the residual epilogue with a zero row stride, which
+        # only sm100 implements; elsewhere the param is dropped in a Release
+        # build and the bias lost.
+        assert bias is None or self.target_cc == 100, (
+            f"linear_layer(bias=...) is only implemented for sm100, "
+            f"got target_cc={self.target_cc}")
+        if self.target_cc == 100:
+            # The SM100 output TMA needs each task's column slice 16-byte
+            # aligned; a misaligned one dies at launch as an illegal
+            # instruction.
+            cols_per_task = output.dim(1) // grid_dim[0]
+            assert output.dim(1) % grid_dim[0] == 0 and cols_per_task % 8 == 0, (
+                f"linear_layer: {output.dim(1)} output columns over "
+                f"{grid_dim[0]} tasks gives {output.dim(1) / grid_dim[0]} "
+                f"columns each; it must divide evenly into a multiple of 8")
+        if bias is not None:
+            # params[0]=1: a bias is added on every rank. Unlike a residual
+            # it is column-parallel, so an allreduce does not double-count it.
+            self.kn_graph.register_task(
+                tb_graph, "linear_with_bias_sm100", [1, 1])
+        elif self.target_cc >= 100 and self.target_cc < 120:
             self.kn_graph.register_task(tb_graph, "linear_sm100")
         elif self.target_cc >= 90 and self.target_cc < 100:
             if weight.dim(0) // grid_dim[0] <= 64:

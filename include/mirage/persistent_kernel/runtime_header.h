@@ -76,7 +76,7 @@ unsigned long long int const EVENT_NVSHMEM_TAG = 0x1e00000000000000;
 unsigned long long int const EVENT_INVALID_ID = 0x7ffffffffffffffe;
 typedef unsigned long long int EventCounter;
 
-int const MAX_INPUTS_PER_TASK = 7;
+int const MAX_INPUTS_PER_TASK = 8;
 int const MAX_OUTPUTS_PER_TASK = 3;
 // B200 has 148 SMs — need more workers than the default 128
 int const MAX_NUM_WORKERS = 160;
@@ -210,6 +210,25 @@ enum TaskType {
   TASK_NVSHMEM_ALLGATHER_STRIDED_PUT = 301,
   TASK_NVSHMEM_TILE_ALLREDUCE = 302,
   TASK_MULTIGPU_TASK_END = 349, // end placeholder, not a real task
+  // Inkling (Thinking Machines) tasks, SM100
+  TASK_INKLING_TASK_BEGIN = 350, // begin placeholder, not a real task
+  // Depthwise short conv (k=4) + residual, decode state updated in place.
+  TASK_INKLING_SCONV_SM100 = 351,
+  // Sigmoid top-6 + logsigmoid-softmax router with folded shared experts.
+  TASK_INKLING_MOE_ROUTER_SM100 = 352,
+  // GQA decode attention with relative-position bias + log scaling.
+  TASK_INKLING_ATTENTION_SM100 = 353,
+  TASK_INKLING_TASK_END = 399, // end placeholder, not a real task
+  // GLM-4.x (zai-org) tasks, SM100
+  TASK_GLM_TASK_BEGIN = 400, // begin placeholder, not a real task
+  // Sigmoid+bias top-k router (n_group=1) with folded shared expert.
+  TASK_GLM_MOE_ROUTER_SM100 = 401,
+  TASK_GLM_TASK_END = 449, // end placeholder, not a real task
+  // GPT-OSS (openai) tasks, SM100
+  TASK_GPT_OSS_TASK_BEGIN = 450, // begin placeholder, not a real task
+  // Clamped-alpha SwiGLU: (clamp(up) + 1) * clamp(gate) * sigmoid(gate*alpha)
+  TASK_CLAMPED_SWIGLU = 451,
+  TASK_GPT_OSS_TASK_END = 499, // end placeholder, not a real task
 };
 
 enum EventType {

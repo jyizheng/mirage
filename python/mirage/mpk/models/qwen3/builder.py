@@ -3,7 +3,7 @@ import os
 from safetensors.torch import load_model
 import torch
 
-from ..utils import grid_for_rmsnorm_linear_layer, max_factor_leq_n, shuffle_tensors, inplace_shuffle_tensors
+from ..utils import grid_for_rmsnorm_linear_layer, grid_for_splitk_linear_layer, max_legal_splitk, max_factor_leq_n, shuffle_tensors, inplace_shuffle_tensors
 from ..graph_builder import GraphBuilder, MirageModelConfig
 from ...persistent_kernel import PersistentKernel
 from ...model_registry import register_model_builder
@@ -11,7 +11,7 @@ from ....core import bfloat16, int64
 
 from typing import Optional
 
-@register_model_builder("Qwen3", "Qwen/Qwen3-8B", "Qwen/Qwen3-1.7B", "Qwen/Qwen3-14B", "Qwen/Qwen3-0.6B", "Qwen/Qwen3.5-0.8B", "Qwen3.5-0.8B")
+@register_model_builder("Qwen3", "Qwen/Qwen3-8B", "Qwen/Qwen3-1.7B", "Qwen/Qwen3-14B", "Qwen/Qwen3-32B", "Qwen/Qwen3-0.6B", "Qwen/Qwen3.5-0.8B", "Qwen3.5-0.8B")
 class Qwen3Builder(GraphBuilder):
     def __init__(self, mpk: PersistentKernel, weights: Optional[dict] = None):
         super().__init__(mpk, weights)
@@ -44,13 +44,9 @@ class Qwen3Builder(GraphBuilder):
         Llama-3.2-3B (hidden 3072, K 3072/8192).
         """
         target = int(os.environ.get(
-            "MPK_DET_NUM_SPLITS", 128 * 128 // self.hidden_size))
+            "MPK_DET_NUM_SPLITS", max(1, 128 * 128 // self.hidden_size)))
         assert k_dim % 64 == 0, f"split-K dim {k_dim} not a 64 multiple"
-        chunks64 = k_dim // 64
-        n = max(1, min(target, chunks64))
-        while n > 1 and chunks64 % n != 0:
-            n -= 1
-        return n
+        return max_legal_splitk(k_dim, target)
 
     @staticmethod
     def _padded_vocab_size(vocab_size: int) -> int:
@@ -484,7 +480,7 @@ class Qwen3Builder(GraphBuilder):
                 input=self.attn_out,
                 weight=self.w,
                 output=self.attn_proj_out,
-                grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
+                grid_dim=grid_for_splitk_linear_layer(self.hidden_size, self.w.dim(1)),
                 block_dim=(256, 1, 1),
             )
         else:
@@ -625,7 +621,7 @@ class Qwen3Builder(GraphBuilder):
                 input=self.silu_mul_out,
                 weight=self.w,
                 output=self.mlp_out,
-                grid_dim=(self.hidden_size // 128, 128 * 128 // self.hidden_size, 1),
+                grid_dim=grid_for_splitk_linear_layer(self.hidden_size, self.w.dim(1)),
                 block_dim=(256, 1, 1),
             )
         else:
@@ -663,8 +659,11 @@ class Qwen3Builder(GraphBuilder):
             self.lm_head_weight = torch.cat(
                 (
                     lm_head_src,
+                    # Pad rows with -1e4 (not 0) so pad-token logits can never
+                    # win the argmax (upstream #755). Numerics-changing: all
+                    # seeded/greedy references regenerate after this.
                     torch.full(
-                        (self.padded_vocab_size - self.vocab_size, self.hidden_size), 0, device="cuda"
+                        (self.padded_vocab_size - self.vocab_size, self.hidden_size), -1e4, device="cuda"
                     ),
                 ),
                 0,

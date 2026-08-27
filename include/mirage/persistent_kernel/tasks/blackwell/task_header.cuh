@@ -1,4 +1,5 @@
 // Ampere task impls
+#include "tasks/ampere/clamped_swiglu.cuh"
 #include "tasks/ampere/embedding.cuh"
 #include "tasks/ampere/merge_splitkv.cuh"
 #include "tasks/ampere/multitoken_paged_attention_split_kv.cuh"
@@ -29,6 +30,10 @@
 #include "dflash_kv_store_sm100.cuh"
 #include "dflash_norm_rope_sm100.cuh"
 #include "fp8_group_gemm_sm100.cuh"
+#include "glm_moe_router_sm100.cuh"
+#include "inkling_attention_sm100.cuh"
+#include "inkling_moe_router_sm100.cuh"
+#include "inkling_sconv_sm100.cuh"
 #include "linear_fp8_1d2d_sm100.cuh"
 #include "linear_fp8_sm100.cuh"
 #include "linear_sm100_mpk.cuh"

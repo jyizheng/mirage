@@ -22,7 +22,33 @@ def grid_for_rmsnorm_linear_layer(size):
         return 96
     elif size % 64 == 0:
         return 64
-    
+
+def grid_for_splitk_linear_layer(output_size, reduction_size):
+    """Grid for the split-K linear task (SM100).
+
+    x tiles the output in MMA_M=128 rows; y is the number of K splits. Each
+    split becomes a task whose input/weight slice starts reduction_size//y
+    elements into the K dim, so that size must keep TMA 16B alignment and
+    match the kernel's 64-element K tiles: y must divide reduction_size and
+    reduction_size//y must be a multiple of 64. The previous fixed
+    y = 128*128//output_size broke models where it does not divide the K dim
+    (e.g. Qwen3-32B o_proj: 8192 / 3), producing misaligned TMA descriptors.
+    """
+    max_splits = max(1, (128 * 128) // output_size)
+    return (output_size // 128, max_legal_splitk(reduction_size, max_splits), 1)
+
+def max_legal_splitk(reduction_size: int, target: int) -> int:
+    """Largest split count <= target such that each K split is a
+    64-element multiple (TMA 16B alignment + bK=64 K tiles): the count
+    must divide reduction_size and reduction_size//count must be a
+    multiple of 64. Single legality rule shared by the split-K grid
+    helper above and the deterministic split-K path (MPK_DET_NUM_SPLITS
+    clamps through it)."""
+    for s in range(max(1, target), 0, -1):
+        if reduction_size % s == 0 and (reduction_size // s) % 64 == 0:
+            return s
+    return 1
+
 # Return the largest factor of m that is less than or equal to n
 # This is used to determine the grid size
 def max_factor_leq_n(m: int, n: int) -> int:
