@@ -68,6 +68,14 @@ def main():
     victims = [x for x in (lp["token_logprobs"] if lp else []) if
                x < SPIKE_THRESHOLD]
     gate("4_no_seeded_spikes", not victims, f"(victims={len(victims)})")
+    # Deterministic garbage passes bitwise gates: also require that no
+    # run ever emits a pad token (id >= true vocab size). Caught the
+    # upstream #755 -1e4 pad regression (2026-08-27).
+    vocab = 151936  # Qwen3 true vocab (padded to 153600)
+    pads = {name: sum(1 for t in run["token_ids"] if t >= vocab)
+            for name, run in (("seeded1", seeded1), ("seeded2", seeded2),
+                              ("greedy1", greedy1), ("greedy2", greedy2))}
+    gate("5_no_pad_tokens", not any(pads.values()), f"({pads})")
 
     for name, run in (("seeded_1p7b", seeded1), ("greedy_1p7b", greedy1)):
         try:
