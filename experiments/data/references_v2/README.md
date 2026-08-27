@@ -32,6 +32,19 @@ full server response (token_ids, prompt_token_ids, per-token logprobs).
 same scripts (`refv2_run.sh <gpu> <pre> <post>` or refv2_client.py against
 a hand-launched server).
 
+## Revalidation log
+
+- **2026-08-27, upstream merge `ca26f917` (upstream/mpk `176042f5`), gates
+  rerun at `fac2fc02`** via `merge_gate_run.sh` + `moe30b_run.sh` on
+  ali-apse7 b200-0: both JSONs regenerated **bitwise identical** — the
+  references remain valid at the merge head, no regeneration needed.
+  Note: upstream #755 (lm_head pad rows -1e4 instead of 0) was first
+  adopted and DID change both trajectories from token 6 on — into
+  deterministic pad-token garbage (a constant -1e4 weight row gives
+  logit = -1e4·Σh, unbounded positive for Σh<0). It is reverted to the
+  0 pad on our engine paths; see the revert commit for details. The
+  gate suite now also fails on any emitted pad token (id ≥ 151936).
+
 ## Superseded artifacts
 
 Anything seeded and produced before `cef4f342` no longer matches HEAD,
