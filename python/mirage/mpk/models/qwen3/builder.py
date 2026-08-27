@@ -659,11 +659,15 @@ class Qwen3Builder(GraphBuilder):
             self.lm_head_weight = torch.cat(
                 (
                     lm_head_src,
-                    # Pad rows with -1e4 (not 0) so pad-token logits can never
-                    # win the argmax (upstream #755). Numerics-changing: all
-                    # seeded/greedy references regenerate after this.
+                    # Pad rows stay 0 (pad logit = exactly 0). Upstream #755
+                    # pads with -1e4, but a constant weight ROW gives
+                    # logit = -1e4 * sum(h): unbounded POSITIVE whenever
+                    # sum(h) < 0, so pad tokens win the argmax and decode
+                    # degenerates to pad-token garbage (reproduced on 1.7B,
+                    # 30B-A3B and 32B, 2026-08-27). Keep 0 until a real fix
+                    # masks indices >= vocab_size in the argmax/sampling task.
                     torch.full(
-                        (self.padded_vocab_size - self.vocab_size, self.hidden_size), -1e4, device="cuda"
+                        (self.padded_vocab_size - self.vocab_size, self.hidden_size), 0, device="cuda"
                     ),
                 ),
                 0,

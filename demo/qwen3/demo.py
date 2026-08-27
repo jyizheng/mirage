@@ -448,7 +448,10 @@ if __name__ == "__main__":
             (
                 model.lm_head.weight,
                 torch.full(
-                    (153600 - model.config.vocab_size, hidden_size), -1e4, device="cuda"
+                    # 0, not upstream #755's -1e4: constant -1e4 rows give
+                    # logit = -1e4 * sum(h), unbounded positive for
+                    # sum(h) < 0 — pad tokens then win the argmax.
+                    (153600 - model.config.vocab_size, hidden_size), 0, device="cuda"
                 ),
             ),
             0,
@@ -1228,10 +1231,10 @@ if __name__ == "__main__":
             w_fnorm = rin(ref_model.model.norm.weight, "ref_norm")
             ref_lm_head = torch.cat(
                 (ref_model.lm_head.weight,
-                 # Match the rollout lm_head pad (-1e4, upstream #755) so
-                 # rescore stays bitwise-identical to rollout.
+                 # Match the rollout lm_head pad (0) so rescore stays
+                 # bitwise-identical to rollout.
                  torch.full((vocab_size - model.config.vocab_size, hidden_size),
-                            -1e4, device="cuda", dtype=torch.bfloat16)), 0)
+                            0, device="cuda", dtype=torch.bfloat16)), 0)
             w_head = rin(ref_lm_head, "ref_lm_head")
             mpk.rmsnorm_layer(input=rx_h, weight=w_fnorm, output=r_rms,
                               grid_dim=(mpk.max_num_batched_tokens, 1, 1),
