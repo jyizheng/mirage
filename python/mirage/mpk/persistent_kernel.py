@@ -20,6 +20,7 @@ from typing import Optional
 
 HARD_CODE = """
 #include <Python.h>
+#include <cstdint>
 #include <cuda_runtime.h>
 #include <string>
 #include <vector>
@@ -114,9 +115,52 @@ static PyObject *launch_func(PyObject *self, PyObject *args) {
   Py_RETURN_NONE;
 }
 
+static PyObject *wait_func(PyObject *self, PyObject *args) {
+  cudaError_t err;
+  Py_BEGIN_ALLOW_THREADS
+  err = wait_persistent_kernel();
+  Py_END_ALLOW_THREADS
+  if (err != cudaSuccess) {
+    PyErr_Format(PyExc_RuntimeError,
+                 "persistent kernel failed: %s",
+                 cudaGetErrorString(err));
+    return NULL;
+  }
+  Py_RETURN_NONE;
+}
+
 static PyObject *finalize_func(PyObject *self, PyObject *args) {
   finalize_persistent_kernel();
 
+  Py_RETURN_NONE;
+}
+
+static PyObject *load_i32_acquire(PyObject *self, PyObject *args) {
+  PyObject *py_ptr;
+  Py_ssize_t index;
+  if (!PyArg_ParseTuple(args, "On", &py_ptr, &index)) {
+    return NULL;
+  }
+  auto *ptr = static_cast<int32_t *>(PyLong_AsVoidPtr(py_ptr));
+  if (PyErr_Occurred()) {
+    return NULL;
+  }
+  int32_t value = __atomic_load_n(ptr + index, __ATOMIC_ACQUIRE);
+  return PyLong_FromLong(value);
+}
+
+static PyObject *store_i32_release(PyObject *self, PyObject *args) {
+  PyObject *py_ptr;
+  Py_ssize_t index;
+  int value;
+  if (!PyArg_ParseTuple(args, "Oni", &py_ptr, &index, &value)) {
+    return NULL;
+  }
+  auto *ptr = static_cast<int32_t *>(PyLong_AsVoidPtr(py_ptr));
+  if (PyErr_Occurred()) {
+    return NULL;
+  }
+  __atomic_store_n(ptr + index, static_cast<int32_t>(value), __ATOMIC_RELEASE);
   Py_RETURN_NONE;
 }
 
@@ -124,7 +168,10 @@ static PyMethodDef ModuleMethods[] = {
   {"init_func", init_func, METH_VARARGS, "initialize persistent kernel"},
   {"init_request_func", init_request_func, METH_VARARGS, "initialize request resources"},
   {"launch_func", launch_func, METH_VARARGS, "launch persistent kernel"},
+  {"wait_func", wait_func, METH_NOARGS, "wait for persistent kernel"},
   {"finalize_func", finalize_func, METH_VARARGS, "finalize persistent kernel"},
+  {"load_i32_acquire", load_i32_acquire, METH_VARARGS, "acquire-load int32"},
+  {"store_i32_release", store_i32_release, METH_VARARGS, "release-store int32"},
   {NULL, NULL, 0, NULL} // sentinel
 };
 
@@ -2053,6 +2100,7 @@ class PersistentKernel:
         output: DTensor,
         grid_dim: tuple,
         block_dim: tuple,
+        add_residual_once: bool = True,
     ):
         # Currently assume that input/output
         assert input.num_dims == 3  # (batch_size, num_experts_per_tok, hidden_size)
@@ -2067,16 +2115,22 @@ class PersistentKernel:
         self.kn_graph.customized([input, weight, residual, output], tb_graph)
 
         # Under tensor parallelism the MoE output is row-parallel and followed by
-        # an allreduce. The residual must be added on exactly one rank, otherwise
-        # the allreduce sums it world_size times (double-counted residual). Mirror
-        # the rank-0-only guard used by linear_with_residual_layer; the SM100
-        # kernel skips the residual add when its pointer is null (params[0]==0).
-        params = []
+        # an allreduce, so how the residual combines with it depends on what the
+        # caller passed:
+        #   add_residual_once=True  - the residual holds the same value on every
+        #       rank (a skip connection). Exactly one rank may add it, or the
+        #       allreduce counts it world_size times (double-counted residual).
+        #   add_residual_once=False - the residual is a per-rank partial that the
+        #       allreduce is meant to sum, such as a row-parallel shared-expert
+        #       output. Every rank must add the partial it was given, or the
+        #       other ranks' contributions are dropped.
+        # The SM100 kernel skips the residual add when its pointer is null
+        # (params[0]==0).
         enable_residual = 1
-        if self.world_size > 1 and self.mpi_rank != 0:
+        if add_residual_once and self.world_size > 1 and self.mpi_rank != 0:
             enable_residual = 0
-        params.append(enable_residual)
-        self.kn_graph.register_task(tb_graph, "moe_mul_sum_add_sm100", params)
+        self.kn_graph.register_task(
+            tb_graph, "moe_mul_sum_add_sm100", [enable_residual])
 
     def splitk_linear_layer(
         self,
@@ -2384,6 +2438,7 @@ class PersistentKernel:
         output: tuple[DTensor, DTensor],
         grid_dim: tuple,
         block_dim: tuple,
+        vocab_size: int = None,
     ):
         # Currently assume that input/output
         assert input.num_dims == 2  # (batch_size, vocab_size)
@@ -2393,15 +2448,18 @@ class PersistentKernel:
         assert output_index.num_dims == 2  # (batch_size, num_tasks)
         num_tasks = grid_dim[0]
         self.argmax_partial_output_size = input.dim(1) // num_tasks
+        # vocab_size: real vocab size when input.dim(1) is padded (e.g. the
+        # lm_head padded to 153600); positions at/after it never win argmax.
+        params = [num_tasks] if vocab_size is None else [num_tasks, vocab_size]
         tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
         tb_graph.new_input(input, (1, 0, -1), -1, True)
         tb_graph.new_input(output_value, (1, 0, -1), -1, True)
         tb_graph.new_input(output_index, (1, 0, -1), -1, True)
         self.kn_graph.customized([input, output_value, output_index], tb_graph)
         if self.target_cc in (100, 103) or self.target_cc == 90:
-            self.kn_graph.register_task(tb_graph, "argmax_partial_sm100", [num_tasks])
+            self.kn_graph.register_task(tb_graph, "argmax_partial_sm100", params)
         else:
-            self.kn_graph.register_task(tb_graph, "argmax_partial", [num_tasks])
+            self.kn_graph.register_task(tb_graph, "argmax_partial", params)
 
     def argmax_reduce_layer(
         self,
@@ -3192,7 +3250,10 @@ class PersistentKernel:
         self.init_func = getattr(mod, "init_func")
         self.launch_func = getattr(mod, "launch_func")
         self.init_request_func = getattr(mod, "init_request_func")
+        self.wait_func = getattr(mod, "wait_func")
         self.finalize_func = getattr(mod, "finalize_func")
+        self.load_i32_acquire = getattr(mod, "load_i32_acquire")
+        self.store_i32_release = getattr(mod, "store_i32_release")
         print("Finished megakernel compilation...")
 
         expected_order = [
@@ -3320,7 +3381,10 @@ class PersistentKernel:
         self.init_func = getattr(mod, "init_func")
         self.launch_func = getattr(mod, "launch_func")
         self.init_request_func = getattr(mod, "init_request_func")
+        self.wait_func = getattr(mod, "wait_func")
         self.finalize_func = getattr(mod, "finalize_func")
+        self.load_i32_acquire = getattr(mod, "load_i32_acquire")
+        self.store_i32_release = getattr(mod, "store_i32_release")
         
         # Prepare meta tensors
         meta_tensors = list()
@@ -3422,6 +3486,10 @@ class PersistentKernel:
     def __del__(self):
         if not self.__finalized__:
             self.finalize()
+
+    def wait(self) -> None:
+        """Block until both persistent GPU streams have exited."""
+        self.wait_func()
 
     def finalize(self):
         assert not self.__finalized__

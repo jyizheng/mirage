@@ -659,13 +659,13 @@ class Qwen3Builder(GraphBuilder):
             self.lm_head_weight = torch.cat(
                 (
                     lm_head_src,
-                    # Pad rows stay 0 (pad logit = exactly 0). Upstream #755
-                    # pads with -1e4, but a constant weight ROW gives
-                    # logit = -1e4 * sum(h): unbounded POSITIVE whenever
-                    # sum(h) < 0, so pad tokens win the argmax and decode
-                    # degenerates to pad-token garbage (reproduced on 1.7B,
-                    # 30B-A3B and 32B, 2026-08-27). Keep 0 until a real fix
-                    # masks indices >= vocab_size in the argmax/sampling task.
+                    # Pad rows stay 0 (pad logit = exactly 0), matching
+                    # upstream post-#758. The real fix is upstream #758 plus
+                    # our sampling mirror: argmax/sampling tasks take the real
+                    # vocab_size and never consider indices >= it, so the pad
+                    # fill value no longer matters for candidacy. (#755's -1e4
+                    # rows were actively wrong: logit = -1e4 * sum(h) is
+                    # unbounded positive for sum(h) < 0.)
                     torch.full(
                         (self.padded_vocab_size - self.vocab_size, self.hidden_size), 0, device="cuda"
                     ),
@@ -764,6 +764,7 @@ class Qwen3Builder(GraphBuilder):
                     output=(self.argmax_part_value, self.argmax_part_index),
                     grid_dim=argmax_partial_grid_dim,
                     block_dim=(128, 1, 1),
+                    vocab_size=self.vocab_size,
                 )
             else:
                 self.mpk.sampling_partial_sm100_layer(
@@ -777,6 +778,7 @@ class Qwen3Builder(GraphBuilder):
                     repetition_penalty=self.repetition_penalty,
                     per_request_sampling=getattr(
                         self, "per_request_sampling", False),
+                    vocab_size=self.vocab_size,
                 )
             self.mpk.argmax_reduce_layer(
                 input=(self.argmax_part_value, self.argmax_part_index),

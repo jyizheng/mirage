@@ -448,9 +448,6 @@ if __name__ == "__main__":
             (
                 model.lm_head.weight,
                 torch.full(
-                    # 0, not upstream #755's -1e4: constant -1e4 rows give
-                    # logit = -1e4 * sum(h), unbounded positive for
-                    # sum(h) < 0 — pad tokens then win the argmax.
                     (153600 - model.config.vocab_size, hidden_size), 0, device="cuda"
                 ),
             ),
@@ -1039,6 +1036,7 @@ if __name__ == "__main__":
                 output=(argmax_part_value, argmax_part_index),
                 grid_dim=argmax_partial_grid_dim,
                 block_dim=(128, 1, 1),
+                vocab_size=model.config.vocab_size,
             )
             mpk.argmax_reduce_layer(
                 input=(argmax_part_value, argmax_part_index),
