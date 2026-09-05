@@ -1002,6 +1002,7 @@ if __name__ == "__main__":
                     block_dim=(256, 1, 1),
                     seed=args.sampling_seed,
                     temperature=sampling_temperature,
+                    vocab_size=model.config.vocab_size,
                 )
                 mpk.argmax_reduce_layer(
                     input=(argmax_part_value, argmax_part_index),
@@ -1029,6 +1030,7 @@ if __name__ == "__main__":
                     prob_buffer=(
                         prob_buffer if sampling_capture_fused else None
                     ),
+                    vocab_size=model.config.vocab_size,
                 )
         else:
             mpk.argmax_partial_layer(
@@ -1063,6 +1065,7 @@ if __name__ == "__main__":
                 buffer=prob_buffer,
                 page_size=args.page_size,
                 grid_dim=(total_num_requests, 1, 1),
+                vocab_size=model.config.vocab_size,
             )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(
@@ -1263,7 +1266,8 @@ if __name__ == "__main__":
                 buffer=ref_prob_buffer,
                 page_size=args.page_size,
                 grid_dim=(total_num_requests, 1, 1),
-                order_dep=prob_buffer)
+                order_dep=prob_buffer,
+                vocab_size=model.config.vocab_size)
 
         results = mpk.kn_graph.generate_task_graph(num_gpus=world_size, my_gpu_id=rank)
         with open(f"task_graph_{rank}.json", "w") as f:

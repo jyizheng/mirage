@@ -504,11 +504,19 @@ __device__ __forceinline__ void
 // composition, and reproducible when a trajectory prefix is replayed.
 // Row -> (request, position) mapping mirrors
 // multitoken_paged_attention_sm100_task_impl / prefill_prob_capture.
+// VOCAB_BOUND (mirror of upstream #758's argmax bound): the REAL, unpadded
+// vocab size. Positions at/after it are lm_head padding rows (logit exactly
+// 0 with the 0-filled pad weights) and must never become sampling candidates
+// -- pad-logit 0 + Gumbel noise can win whenever every real logit is
+// negative. The bound also keeps pad rows out of the top-k/top-p threshold
+// scan and the captured softmax normalizer. 0 (the default) keeps the
+// legacy behaviour of bounding by the padded width d.
 template <uint32_t BLOCK_THREADS,
           uint32_t VEC_SIZE,
           typename DType,
           typename IdType,
-          bool CAPTURE_PROBS = false>
+          bool CAPTURE_PROBS = false,
+          uint32_t VOCAB_BOUND = 0>
 __device__ __forceinline__ void
     sampling_from_logits_poskeyed_kernel(int const my_rid,
                                          int const num_rid_tasks,
@@ -531,6 +539,9 @@ __device__ __forceinline__ void
                                          long long const *all_tokens_ptr = nullptr,
                                          int const *step_ptr = nullptr) {
   uint32_t const tx = threadIdx.x;
+  // Candidacy/normalizer bound: real vocab when VOCAB_BOUND is set, else the
+  // full (padded) row width d. d stays the ROW STRIDE either way.
+  uint32_t const vb = VOCAB_BOUND == 0 ? d : VOCAB_BOUND;
 
   using SharedMem = typename BlockReduce<SamplingDataAndIndex<DType, IdType>,
                                          BLOCK_THREADS,
@@ -581,7 +592,8 @@ __device__ __forceinline__ void
           sampling_neg_inf<DType>(), 0};
 
       uint64_t const row_off = static_cast<uint64_t>(row) * d;
-      uint32_t const n_chunks = sampling_ceil_div(d, BLOCK_THREADS * VEC_SIZE);
+      uint32_t const n_chunks =
+          sampling_ceil_div(vb, BLOCK_THREADS * VEC_SIZE);
       OnlineSoftmaxStats capture_stats = {-1e30f, 0.0f};
 
       // ---- deterministic top-k / top-p threshold on the ORDERED KEY ----
@@ -603,13 +615,13 @@ __device__ __forceinline__ void
             uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
             sampling_vec_t<DType, VEC_SIZE> lv;
             lv.fill(sampling_neg_inf<DType>());
-            if (base < d) {
+            if (base < vb) {
               lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
                            tx * VEC_SIZE);
             }
 #pragma unroll
             for (uint32_t j = 0; j < VEC_SIZE; ++j) {
-              if (base + j < d) {
+              if (base + j < vb) {
                 lm += __expf(static_cast<float>(lv[j]) * inv_temperature);
               }
             }
@@ -635,13 +647,13 @@ __device__ __forceinline__ void
             uint32_t const base = (c * BLOCK_THREADS + tx) * VEC_SIZE;
             sampling_vec_t<DType, VEC_SIZE> lv;
             lv.fill(sampling_neg_inf<DType>());
-            if (base < d) {
+            if (base < vb) {
               lv.cast_load(logits + row_off + c * BLOCK_THREADS * VEC_SIZE +
                            tx * VEC_SIZE);
             }
 #pragma unroll
             for (uint32_t j = 0; j < VEC_SIZE; ++j) {
-              if (base + j >= d) { continue; }
+              if (base + j >= vb) { continue; }
               if (sampling_bf16_orderkey(lv[j]) >= mid) {
                 local_cnt += 1;
                 if (do_topp) {
@@ -666,7 +678,7 @@ __device__ __forceinline__ void
 
       for (uint32_t c = 0; c < n_chunks; ++c) {
         logits_vec.fill(sampling_neg_inf<DType>());
-        if ((c * BLOCK_THREADS + tx) * VEC_SIZE < d) {
+        if ((c * BLOCK_THREADS + tx) * VEC_SIZE < vb) {
           logits_vec.cast_load(logits + row_off +
                                c * BLOCK_THREADS * VEC_SIZE + tx * VEC_SIZE);
         }
@@ -675,7 +687,7 @@ __device__ __forceinline__ void
 #pragma unroll
           for (uint32_t j = 0; j < VEC_SIZE; ++j) {
             uint32_t const idx = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
-            if (idx < d) {
+            if (idx < vb) {
               capture_stats = online_softmax_add(
                   capture_stats, static_cast<float>(logits_vec[j]));
             }
@@ -694,7 +706,7 @@ __device__ __forceinline__ void
 #pragma unroll
         for (uint32_t j = 0; j < VEC_SIZE; ++j) {
           uint32_t const idx = (c * BLOCK_THREADS + tx) * VEC_SIZE + j;
-          bool keep = idx < d;
+          bool keep = idx < vb;
           if (keep && (do_topk || do_topp)) {
             keep = sampling_bf16_orderkey(logits_vec[j]) >= keep_key;
           }
@@ -740,7 +752,7 @@ __device__ __forceinline__ void
           }
           int const target_id = static_cast<int>(target);
           int const slot = step_ptr[req_row] + i;
-          if (target_id >= 0 && target_id < static_cast<int>(d) &&
+          if (target_id >= 0 && target_id < static_cast<int>(vb) &&
               slot >= 0 && slot < max_seq) {
             float const target_logit =
                 static_cast<float>(logits[row_off + target_id]);

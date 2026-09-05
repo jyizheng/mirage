@@ -808,6 +808,7 @@ class Qwen3Builder(GraphBuilder):
                     buffer=prob_buffer,
                     page_size=self.page_size,
                     grid_dim=(tokens_meta.shape[0], 1, 1),
+                    vocab_size=self.vocab_size,
                 )
             # TODO(Jianan Ji): spec_decode_config handling (see previous implementation)
             # if spec_decode_config:

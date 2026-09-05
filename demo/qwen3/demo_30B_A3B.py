@@ -765,6 +765,7 @@ if __name__ == "__main__":
                 seed=args.sampling_seed,
                 prompt_lengths=(prompt_lengths_for_prob if fused_capture else None),
                 prob_buffer=(prob_buffer if fused_capture else None),
+                vocab_size=model.config.vocab_size,
             )
         else:
             mpk.argmax_partial_layer(
@@ -793,6 +794,7 @@ if __name__ == "__main__":
                 buffer=prob_buffer,
                 page_size=args.page_size,
                 grid_dim=(total_num_requests, 1, 1),
+                vocab_size=model.config.vocab_size,
             )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(

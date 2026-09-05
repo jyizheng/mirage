@@ -2500,6 +2500,7 @@ class PersistentKernel:
         top_p: float = 1.0,
         prompt_lengths: DTensor = None,
         prob_buffer: DTensor = None,
+        vocab_size: int = None,
     ):
         """Sampling from logits using Gumbel-Max for stochastic decoding.
 
@@ -2507,6 +2508,12 @@ class PersistentKernel:
         Gumbel-Max draw (top-k via an exact k-th-value key threshold, top-p
         via a fixed-order nucleus mass threshold). Defaults (T=1, k=0, p=1)
         reproduce plain argmax-of-Gumbel bit-for-bit.
+
+        vocab_size: the REAL (unpadded) vocab size when logits.dim(1) is
+        padded (e.g. the lm_head padded to a grid-divisible width). Indices
+        at/after it are excluded from candidacy, the top-k/top-p thresholds
+        and the captured softmax normalizer (mirror of upstream #758's
+        argmax bound). None keeps the padded width (legacy candidacy).
         """
         assert logits.num_dims == 2      # (batch_size, vocab_size)
         assert output.num_dims == 2      # (batch_size, 1)
@@ -2537,13 +2544,17 @@ class PersistentKernel:
         self.kn_graph.customized(tensors, tb_graph)
 
         # Params: [seed] keeps the legacy (bitwise-identical) variant;
-        # [seed, temp*1000, top_k, top_p*1000] enables truncation.
+        # [seed, temp*1000, top_k, top_p*1000] enables truncation. The real
+        # vocab size is ALWAYS appended last (the padded width when the
+        # caller does not pass one).
         default = (temperature == 1.0 and top_k == 0 and top_p == 1.0)
         params = [seed] if default and not fused_capture else [
             seed, int(round(temperature * 1000)), int(top_k),
             int(round(top_p * 1000))]
         if fused_capture:
             params.append(1)
+        params.append(
+            int(vocab_size) if vocab_size is not None else logits.dim(1))
         self.kn_graph.register_task(tb_graph, "sampling_sm100", params)
 
     def sampling_partial_sm100_layer(
@@ -2558,8 +2569,15 @@ class PersistentKernel:
         presence_penalty: float = 0.0,
         repetition_penalty: float = 1.0,
         per_request_sampling: bool = False,
+        vocab_size: int = None,
     ):
         """Parallel first stage for position-keyed Gumbel-Max sampling.
+
+        vocab_size: the REAL (unpadded) vocab size when logits.dim(1) is
+        padded. Indices at/after it never become sampling candidates
+        (mirror of upstream #758's argmax bound — a 0-logit lm_head pad row
+        plus Gumbel noise can win whenever every real logit is negative).
+        None keeps the padded width (legacy candidacy).
 
         frequency/presence (OpenAI-style subtraction) and repetition
         (HF-style divide/multiply) penalties are applied to the raw fp32
@@ -2604,6 +2622,10 @@ class PersistentKernel:
             ]
         if per_request_sampling:
             params.append(1)
+        # The real vocab size is ALWAYS appended last (the padded width when
+        # the caller does not pass one).
+        params.append(
+            int(vocab_size) if vocab_size is not None else logits.dim(1))
         self.kn_graph.register_task(
             tb_graph, "sampling_partial_sm100", params
         )
@@ -2806,6 +2828,7 @@ class PersistentKernel:
         grid_dim: tuple = (1, 1, 1),
         block_dim: tuple = (256, 1, 1),
         order_dep: DTensor = None,  # optional: read-only scheduling edge
+        vocab_size: int = None,     # real (unpadded) vocab; bounds the softmax
     ):
         """Teacher-forcing per-position probability capture: for every
         prefill row, buffer[r, step_r + i] = softmax(logits[row])[next
@@ -2829,8 +2852,13 @@ class PersistentKernel:
         tb_graph.new_input(buffer, (-1, -1, -1), -1, True)
         inputs.append(buffer)
         self.kn_graph.customized(inputs, tb_graph)
+        params = [page_size]
+        if vocab_size is not None:
+            # Bound the softmax normalizer / target lookup to the real vocab
+            # so lm_head padding rows contribute no probability mass.
+            params.append(int(vocab_size))
         self.kn_graph.register_task(
-            tb_graph, "prefill_prob_capture_sm100", [page_size]
+            tb_graph, "prefill_prob_capture_sm100", params
         )
 
     def softmax_gather_layer(

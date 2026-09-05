@@ -591,6 +591,7 @@ if __name__ == "__main__":
             grid_dim=(args.max_num_batched_tokens, 1, 1),
             block_dim=(256, 1, 1),
             seed=random.randint(0, 2**31 - 1),
+            vocab_size=model.config.vocab_size,
         )
         if spec_decode_config:
             verify_out = mpk.verify_layer_dispatcher(

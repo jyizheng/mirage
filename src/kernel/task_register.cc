@@ -2358,7 +2358,10 @@ int TaskRegister::register_splitk_reduce_sm100_task(
 int TaskRegister::register_prefill_prob_capture_sm100_task(
     threadblock::Graph const &bgraph, std::vector<int> const &params) {
   // params[0]: page_size
-  assert(params.size() == 1);
+  // params[1] (optional): real (unpadded) vocab size; the softmax
+  // normalizer and target lookup are bounded by it so lm_head padding rows
+  // contribute no probability mass (mirror of upstream #758's argmax bound)
+  assert(params.size() == 1 || params.size() == 2);
   int page_size = params[0];
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
@@ -2386,16 +2389,20 @@ int TaskRegister::register_prefill_prob_capture_sm100_task(
   int num_requests = input_ops[1]->output_tensors[0].dim[0];
   int max_seq = output_ops[0]->output_tensors[0].dim[1];
 
+  int real_vocab = params.size() == 2 ? params[1] : vocab_size;
+  assert(real_vocab > 0 && real_vocab <= vocab_size);
+
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
   int grid_x = bgraph.grid_dim.x;
   code.e("kernel::prefill_prob_capture_task_impl<cute::bfloat16_t, $, $, $, "
-         "$, $>(",
+         "$, $, $>(",
          num_requests,
          vocab_size,
          max_seq,
          page_size,
-         grid_x);
+         grid_x,
+         real_vocab);
   code.e("    task_desc->task_metadata.request_id,");
   code.e("    task_desc->input_ptrs[0],");
   code.e("    static_cast<int const *>(task_desc->input_ptrs[1]),");
@@ -2590,11 +2597,19 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
                                                std::vector<int> const &params) {
   // params[0]: seed
   // params[1..3] (optional): temperature*1000, top_k, top_p*1000
-  // params[4] (optional): fuse selected-token probability capture
-  assert(params.size() == 1 || params.size() == 4 || params.size() == 5);
+  // params[4] (optional): fuse selected-token probability capture (== 1)
+  // params.back(): ALWAYS the real (unpadded) vocab size — candidacy,
+  //   top-k/top-p thresholds and the captured softmax normalizer are
+  //   bounded by it so lm_head padding rows never participate (mirror of
+  //   upstream #758's argmax bound). Legacy vocab-less forms (sizes 1/4/5)
+  //   are no longer accepted; every Python layer emits the vocab.
+  assert(params.size() == 2 || params.size() == 5 || params.size() == 6);
+  assert(params.size() != 6 || params[4] == 1);
+  int const real_vocab = params.back();
+  assert(real_vocab > 0);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
-  bool const capture_probs = params.size() == 5;
+  bool const capture_probs = params.size() == 6;
   int num_inputs = capture_probs ? 2 : 1;
   int num_outputs = capture_probs ? 2 : 1;
 
@@ -2612,10 +2627,11 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   int vocab_size = input_ops[0]->output_tensors[0].dim[1];
   int seed = params[0];
   // Defaults reproduce plain Gumbel-Max argmax (temp 1, no truncation),
-  // so graphs that pass only [seed] are bitwise-unchanged.
-  int temp_milli = params.size() >= 4 ? params[1] : 1000;
-  int top_k = params.size() >= 4 ? params[2] : 0;
-  int top_p_milli = params.size() >= 4 ? params[3] : 1000;
+  // so graphs that pass only [seed, vocab] are bitwise-unchanged apart
+  // from the vocab bound.
+  int temp_milli = params.size() >= 5 ? params[1] : 1000;
+  int top_k = params.size() >= 5 ? params[2] : 0;
+  int top_p_milli = params.size() >= 5 ? params[3] : 1000;
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
@@ -2627,8 +2643,9 @@ int TaskRegister::register_sampling_sm100_task(threadblock::Graph const &bgraph,
   // next step's embedding reads out of bounds).
   int grid_x = bgraph.grid_dim.x;
   code.e("kernel::sampling_from_logits_poskeyed_kernel<256, 4, bfloat16, "
-         "long long, $>(",
-         capture_probs ? "true" : "false");
+         "long long, $, $>(",
+         capture_probs ? "true" : "false",
+         real_vocab);
   code.e("    task_desc->task_metadata.request_id,");
   code.e("    $,", grid_x);
   code.e("    static_cast<bfloat16*>(task_desc->input_ptrs[0]),");
@@ -2661,17 +2678,24 @@ int TaskRegister::register_sampling_partial_sm100_task(
     threadblock::Graph const &bgraph, std::vector<int> const &params) {
   // params: num vocabulary shards, seed, temperature * 1000
   // params[3..5] (optional): frequency_penalty * 1000,
-  //   presence_penalty * 1000, repetition_penalty * 1000. The 3-param form
-  //   emits the legacy code string byte-for-byte (penalty defaults are
-  //   supplied by the kernel's default arguments), so graphs without
-  //   penalties stay bitwise-unchanged.
+  //   presence_penalty * 1000, repetition_penalty * 1000. The base form
+  //   emits the legacy code string byte-for-byte apart from the vocab
+  //   bound (penalty defaults are supplied by the kernel's default
+  //   arguments), so graphs without penalties stay bitwise-unchanged on
+  //   real-vocab tokens.
   // params[6] (optional, opt-in build flag): 1 = per-request runtime
   //   sampling params; additionally emits runtime_config.sampling_params so
   //   the kernel can override temp/seed/penalties from the per-row record
-  //   (flags==0 rows keep the compiled constants).  Builds without the flag
-  //   (3- or 6-param forms) emit byte-identical legacy code strings.
-  assert(params.size() == 3 || params.size() == 6 || params.size() == 7);
-  assert(params.size() != 7 || params[6] == 1);
+  //   (flags==0 rows keep the compiled constants).
+  // params.back(): ALWAYS the real (unpadded) vocab size, passed as the
+  //   kernel's vocab_size argument so lm_head padding rows never become
+  //   sampling candidates (mirror of upstream #758's argmax bound; the
+  //   kernel already bounded candidacy by this argument, but the old
+  //   registration passed the PADDED width chunk_size * num_parts, which
+  //   let a 0-logit pad row + Gumbel noise win on all-negative steps).
+  //   Legacy vocab-less forms (sizes 3/6/7) are no longer accepted.
+  assert(params.size() == 4 || params.size() == 7 || params.size() == 8);
+  assert(params.size() != 8 || params[6] == 1);
   std::vector<tb::TBInputOp *> input_ops;
   std::vector<tb::TBInputOp *> output_ops;
   assert(bgraph.operators.size() == 3);
@@ -2689,6 +2713,8 @@ int TaskRegister::register_sampling_partial_sm100_task(
   int const num_parts = params[0];
   int const seed = params[1];
   int const temp_milli = params[2];
+  int const real_vocab = params.back();
+  assert(real_vocab > 0 && real_vocab <= chunk_size * num_parts);
 
   mirage::transpiler::CodeKeeper code;
   code.inc_indent();
@@ -2701,7 +2727,7 @@ int TaskRegister::register_sampling_partial_sm100_task(
   code.e("    static_cast<bfloat16 const*>(task_desc->input_ptrs[0]),");
   code.e("    static_cast<bfloat16*>(task_desc->output_ptrs[0]),");
   code.e("    static_cast<long long*>(task_desc->output_ptrs[1]),");
-  code.e("    $u,", chunk_size * num_parts);
+  code.e("    $u,", real_vocab);
   code.e("    $u,", seed);
   code.e("    runtime_config.request_ids,");
   code.e("    runtime_config.qo_indptr_buffer,");
@@ -2711,14 +2737,14 @@ int TaskRegister::register_sampling_partial_sm100_task(
   code.e("    MPK_PAGE_SIZE,");
   code.e("    MPK_MAX_SEQ_LENGTH,");
   code.e("    runtime_config.qo_indptr_buffer[MPK_MAX_NUM_BATCHED_REQUESTS],");
-  if (params.size() >= 6) {
+  if (params.size() >= 7) {
     code.e("    1000.0f / $.0f,", temp_milli);
     // milli-int -> float; penalties act pre-temperature in the kernel.
     code.e("    ($.0f) * 1e-3f,", params[3]);
     code.e("    ($.0f) * 1e-3f,", params[4]);
     code.e("    ($.0f) * 1e-3f,", params[5]);
     code.e("    runtime_config.tokens,");
-    if (params.size() == 7) {
+    if (params.size() == 8) {
       // Per-request runtime sampling params (opt-in build flag): the kernel
       // reads the per-row 12-lane record and overrides the compiled
       // constants above when flags bit0 is set.

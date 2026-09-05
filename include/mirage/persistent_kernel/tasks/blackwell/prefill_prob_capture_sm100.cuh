@@ -36,12 +36,17 @@ namespace kernel {
 // and fixed tree, so they remain bitwise-identical for the same logits row.
 //
 // Grid: (1, 1, 1); one task walks all requests. Block: (256, 1, 1).
+// REAL_VOCAB (mirror of upstream #758's argmax bound): the unpadded vocab
+// size. VOCAB_SIZE stays the padded ROW STRIDE; the softmax normalizer and
+// the target lookup are bounded by REAL_VOCAB so the 0-logit lm_head padding
+// rows contribute no probability mass. Defaults to VOCAB_SIZE (legacy).
 template <typename T,
           int NUM_REQUESTS,
           int VOCAB_SIZE,
           int MAX_SEQ,
           int PAGE_SIZE,
-          int NUM_RID_TASKS = 1>
+          int NUM_RID_TASKS = 1,
+          int REAL_VOCAB = VOCAB_SIZE>
 __device__ __forceinline__ void prefill_prob_capture_task_impl(
     int const my_rid,
     void const *__restrict__ logits_ptr,
@@ -115,12 +120,12 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
       OnlineSoftmaxStats stats = {-1e30f, 0.0f};
       constexpr int VEC_SIZE = 4;
       constexpr int CHUNK_SIZE = 256 * VEC_SIZE;
-      for (int chunk = 0; chunk < (VOCAB_SIZE + CHUNK_SIZE - 1) / CHUNK_SIZE;
+      for (int chunk = 0; chunk < (REAL_VOCAB + CHUNK_SIZE - 1) / CHUNK_SIZE;
            ++chunk) {
 #pragma unroll
         for (int j = 0; j < VEC_SIZE; ++j) {
           int const vocab_idx = (chunk * 256 + tid) * VEC_SIZE + j;
-          if (vocab_idx < VOCAB_SIZE) {
+          if (vocab_idx < REAL_VOCAB) {
             stats = online_softmax_add(
                 stats, static_cast<float>(row[vocab_idx]));
           }
@@ -129,7 +134,7 @@ __device__ __forceinline__ void prefill_prob_capture_task_impl(
       stats = online_softmax_reduce_256(stats, smem_max, smem_sum);
 
       if (tid == 0) {
-        float logit_at_target = (target_id >= 0 && target_id < VOCAB_SIZE)
+        float logit_at_target = (target_id >= 0 && target_id < REAL_VOCAB)
                                     ? static_cast<float>(row[target_id])
                                     : -1e30f;
         float prob = __expf(logit_at_target - stats.max) / stats.sum;
