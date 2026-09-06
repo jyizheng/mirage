@@ -34,6 +34,22 @@ a hand-launched server).
 
 ## Revalidation log
 
+- **2026-09-05, upstream merge `2541c856` (upstream/mpk `17e9e36d`, brings
+  #758's argmax vocab bound) + our sampling vocab bound `ae1db567`, gates
+  rerun at `ae1db567`** via `merge_gate_run.sh` on ali-apse7 b200-0
+  (L20D/B300 sm_103, GPU 5): all 5 gates PASS (seeded x2 bitwise across
+  restart, greedy x2 bitwise, group16 16/16, 0 spike victims, 0 pad-token
+  ids). **Token trajectories bitwise identical to the committed
+  references** — the vocab bound changes candidacy only on steps where a
+  0-logit pad row would have won, which never occurred in these runs.
+  `greedy_1p7b.json` unchanged byte-for-byte (logprobs included).
+  `seeded_1p7b.json` REGENERATED: bounding the capture softmax normalizer
+  to the real vocab removes the 1664 pad rows' exp(0 - max) mass, shifting
+  3/448 logprobs by <= 1.4e-07 (tokens identical). e35 serving rescore
+  spot (1.7B, deterministic=True): 285/285 captured probabilities
+  bitwise-identical between rollout and rescore. MoE 30B gate skipped —
+  weights not cached on the freshly reprovisioned pod.
+
 - **2026-08-27, upstream merge `ca26f917` (upstream/mpk `176042f5`), gates
   rerun at `fac2fc02`** via `merge_gate_run.sh` + `moe30b_run.sh` on
   ali-apse7 b200-0: both JSONs regenerated **bitwise identical** — the
