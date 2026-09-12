@@ -416,7 +416,11 @@ __device__ __forceinline__ void
 
             int32_t token_idx =
                 n_tile * MMA_N + tid_in_wg / cp_async_group_size;
-            int32_t topk_idx = tRoutingIndex(token_idx);
+            // Guard the routing-index read: the MMA N-tile can extend past
+            // BATCH_SIZE (mirrors the sm100 moe_linear fix a961f2ef and the
+            // fp8 group GEMM).
+            int32_t topk_idx =
+                (token_idx < BATCH_SIZE) ? tRoutingIndex(token_idx) : 0;
             if (token_idx < BATCH_SIZE && topk_idx > 0) {
               if constexpr (W13_LINEAR) {
                 cute::copy(
@@ -434,6 +438,19 @@ __device__ __forceinline__ void
                          topk_idx - 1),
                     tBsB(cute::_, cute::_, cute::_, cute::_, smem_wr_buffer));
               }
+            } else {
+              // Zero-fill this lane's share of the B tile: unrouted rows used
+              // to skip the copy and leave stale bf16 from the previous
+              // (expert, tile) iteration in smem, which the MMA then consumed.
+              // The garbage columns are never stored (epilogue routing guard),
+              // so zeroing is value-neutral and makes the tile deterministic.
+              // At mbt=1 row 0 is routed to every listed expert so this branch
+              // was dead code; it goes live for the first time at mbt>1.
+              cute::clear(tBsB(cute::_, cute::_, cute::_, cute::_,
+                               smem_wr_buffer));
+              // Generic-proxy stores -> make visible to the async proxy before
+              // the b_full barrier arrive.
+              cutlass::arch::fence_view_async_shared();
             }
 
             cutlass::arch::cpasync_barrier_arrive_noinc(
@@ -555,10 +572,11 @@ __device__ __forceinline__ void
           for (int i = 0; i < (MMA_N >> 1); i++) {
             int m_idx = ((warp_idx & 3) << 4) + (idx_in_warp >> 2) +
                         (((i & 3) >> 1) << 3) + m_base;
-            int n_idx = ((i >> 2) << 3) + ((idx_in_warp & 3) << 1) + (i & 1);
+            int n_idx = n_tile * MMA_N +
+                        ((i >> 2) << 3) + ((idx_in_warp & 3) << 1) + (i & 1);
 
-            int topk_idx = tRoutingIndex(n_idx);
-
+            // (removed an unguarded, unused tRoutingIndex(n_idx) OOB read;
+            //  pred below reads it only after the n_idx < BATCH_SIZE guard.)
             bool pred = (n_idx < BATCH_SIZE && tRoutingIndex(n_idx) > 0 &&
                          m_idx < OUTPUT_SIZE);
             TypeC fragD = TypeAcc_to_TypeC(accum(i));
