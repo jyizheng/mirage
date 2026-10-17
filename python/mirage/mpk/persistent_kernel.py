@@ -369,9 +369,11 @@ def get_compile_command(
             "-DMIRAGE_GRACE_HOPPER",
             "-DNDEBUG",
         ] + (["-DMIRAGE_ENABLE_PROFILER"] if profiling else [])
-    elif target_cc == 100:
+    elif target_cc in (100, 103):
+        # 100 = B200, 103 = B300/GB300 (Blackwell Ultra). Arch-specific ("a")
+        # cubins only load on their exact arch, so emit the real one.
         specific_cmd = [
-            "-gencode=arch=compute_100a,code=sm_100a",
+            f"-gencode=arch=compute_{target_cc}a,code=sm_{target_cc}a",
             "-DMPK_ENABLE_TMA",
             "-DMIRAGE_GRACE_BLACKWELL",
         ]
@@ -1392,7 +1394,7 @@ class PersistentKernel:
                 break
         params = [num_q_heads, num_kv_heads, qk_norm, rotary_embed,
                   self.max_seq_length, block_size] + tail[:n]
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             # params[14]: max_tokens_per_request (rows the CTA buffers hold).
             params = [num_q_heads, num_kv_heads, qk_norm, rotary_embed,
                       self.max_seq_length, block_size] + tail
@@ -1421,12 +1423,12 @@ class PersistentKernel:
         self.kn_graph.customized(graph_inputs + [output], tb_graph)
         # SM100 only: the other kernels drop the extra params in a Release
         # build and fall back to plain causal attention with no sink.
-        assert (window_size == 0 and not has_sink) or self.target_cc == 100, (
+        assert (window_size == 0 and not has_sink) or self.target_cc in (100, 103), (
             f"window_size={window_size} / sinks are only implemented for "
             f"sm100, got target_cc={self.target_cc}")
         if self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_hopper", params)
-        elif self.target_cc == 100:
+        elif self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "paged_attention_sm100", params)
         else:
             self.kn_graph.register_task(tb_graph, "paged_attention", params)
@@ -1515,7 +1517,7 @@ class PersistentKernel:
             ],
             tb_graph,
         )
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_hopper", params)
@@ -1560,7 +1562,7 @@ class PersistentKernel:
             ],
             tb_graph,
         )
-        if self.target_cc == 100 or self.target_cc == 90:
+        if self.target_cc in (100, 103) or self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "paged_attention_split_kv_merge_sm100", params)
         else:
             raise ValueError(f"Unsupported target CC: {self.target_cc}")
@@ -2064,9 +2066,9 @@ class PersistentKernel:
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
         self.kn_graph.customized(graph_inputs + [output], tb_graph)
 
-        assert bias is None or self.target_cc == 100, (
+        assert bias is None or self.target_cc in (100, 103), (
             "moe_w13_linear_layer(bias=...) is only implemented for sm100")
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w13_linear_sm90")
@@ -2113,7 +2115,7 @@ class PersistentKernel:
         self.kn_graph.customized(
             [input_fp8, input_scale, weight_fp8, weight_scale,
              moe_routing_indices, moe_mask, output], tb_graph)
-        assert self.target_cc == 100, "FP8 group GEMM requires SM100 (Blackwell)"
+        assert self.target_cc in (100, 103), "FP8 group GEMM requires SM100 (Blackwell)"
         self.kn_graph.register_task(tb_graph, "moe_w13_fp8_sm100")
 
     def moe_w2_fp8_layer(
@@ -2155,7 +2157,7 @@ class PersistentKernel:
         self.kn_graph.customized(
             [input_fp8, input_scale, weight_fp8, weight_scale,
              moe_routing_indices, moe_mask, output], tb_graph)
-        assert self.target_cc == 100, "FP8 group GEMM requires SM100 (Blackwell)"
+        assert self.target_cc in (100, 103), "FP8 group GEMM requires SM100 (Blackwell)"
         self.kn_graph.register_task(tb_graph, "moe_w2_fp8_sm100")
 
     # === FP8 Dense Layers ===
@@ -2313,9 +2315,9 @@ class PersistentKernel:
         tb_graph.new_input(output, (-1, 2, -1), -1, True)
         self.kn_graph.customized(graph_inputs + [output], tb_graph)
 
-        assert bias is None or self.target_cc == 100, (
+        assert bias is None or self.target_cc in (100, 103), (
             "moe_w2_linear_layer(bias=...) is only implemented for sm100")
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm100", params)
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "moe_w2_linear_sm90")
@@ -2380,7 +2382,7 @@ class PersistentKernel:
         tb_graph.new_input(output, (1, -1, -1), -1, True)
         self.kn_graph.customized([input, weight, output], tb_graph)
 
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(tb_graph, "splitk_linear_sm100")
         elif self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "splitk_linear_swapAB_hopper")
@@ -2416,10 +2418,10 @@ class PersistentKernel:
         # A bias reuses the residual epilogue with a zero row stride, which
         # only sm100 implements; elsewhere the param is dropped in a Release
         # build and the bias lost.
-        assert bias is None or self.target_cc == 100, (
+        assert bias is None or self.target_cc in (100, 103), (
             f"linear_layer(bias=...) is only implemented for sm100, "
             f"got target_cc={self.target_cc}")
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             # The SM100 output TMA needs each task's column slice 16-byte
             # aligned; a misaligned one dies at launch as an illegal
             # instruction.
@@ -2624,7 +2626,7 @@ class PersistentKernel:
         tb_graph.new_input(output_value, (1, 0, -1), -1, True)
         tb_graph.new_input(output_index, (1, 0, -1), -1, True)
         self.kn_graph.customized([input, output_value, output_index], tb_graph)
-        if self.target_cc == 100 or self.target_cc == 90:
+        if self.target_cc in (100, 103) or self.target_cc == 90:
             self.kn_graph.register_task(tb_graph, "argmax_partial_sm100", params)
         else:
             self.kn_graph.register_task(tb_graph, "argmax_partial", params)
@@ -2647,7 +2649,7 @@ class PersistentKernel:
         tb_graph.new_input(input_index, (1, 0, -1), -1, True)
         tb_graph.new_input(output, (0, 1, -1), -1, True) #TODO: Make sure the output map is expected
         self.kn_graph.customized([input_value, input_index, output], tb_graph)
-        if self.target_cc == 100:
+        if self.target_cc in (100, 103):
             self.kn_graph.register_task(
                 tb_graph, "argmax_reduce_sm100", [self.argmax_partial_output_size]
             )

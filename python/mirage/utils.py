@@ -15,7 +15,7 @@ def get_shared_memory_capacity(target_cc):
     elif target_cc == 90:
         # H100 GPUs
         return 223 * 1024
-    elif target_cc == 100:
+    elif target_cc in (100, 103):
         # B200 GPUs
         return 227 * 1024
     else:
