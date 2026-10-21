@@ -474,6 +474,20 @@ void Graph::register_task(char const *task_type, std::vector<int> params) {
         customized->bgraph, params);
     task_config[op] =
         std::make_tuple(3, 1, TASK_INKLING_SCONV_SM100, variant_id);
+  } else if (name == "dsv4_hc_mixes") {
+    int variant_id = task_register->register_dsv4_hc_mixes_sm100_task(
+        customized->bgraph, params);
+    task_config[op] =
+        std::make_tuple(4, 1, TASK_DSV4_HC_MIXES_SM100, variant_id);
+  } else if (name == "dsv4_hc_pre") {
+    int variant_id = task_register->register_dsv4_hc_pre_sm100_task(
+        customized->bgraph, params);
+    task_config[op] = std::make_tuple(2, 1, TASK_DSV4_HC_PRE_SM100, variant_id);
+  } else if (name == "dsv4_hc_post") {
+    int variant_id = task_register->register_dsv4_hc_post_sm100_task(
+        customized->bgraph, params);
+    task_config[op] =
+        std::make_tuple(3, 1, TASK_DSV4_HC_POST_SM100, variant_id);
   } else if (name == "glm_moe_router") {
     int variant_id = task_register->register_glm_moe_router_sm100_task(
         customized->bgraph, params);

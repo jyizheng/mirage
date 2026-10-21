@@ -223,6 +223,15 @@ enum TaskType {
   // Clamped-alpha SwiGLU: (clamp(up) + 1) * clamp(gate) * sigmoid(gate*alpha)
   TASK_CLAMPED_SWIGLU = 451,
   TASK_GPT_OSS_TASK_END = 499, // end placeholder, not a real task
+  // DeepSeek-V4.1 tasks, SM100
+  TASK_DSV4_TASK_BEGIN = 500, // begin placeholder, not a real task
+  // Hyper-connection coefficients: RMS-scaled projection + Sinkhorn split.
+  TASK_DSV4_HC_MIXES_SM100 = 501,
+  // Collapse the hyper-connection copies into the sublayer input.
+  TASK_DSV4_HC_PRE_SM100 = 502,
+  // Expand the sublayer output over the copies and mix in the residual.
+  TASK_DSV4_HC_POST_SM100 = 503,
+  TASK_DSV4_TASK_END = 549, // end placeholder, not a real task
 };
 
 enum EventType {

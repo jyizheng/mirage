@@ -1814,6 +1814,9 @@ TaskGraphResult print_task_graph(
   task_type_to_name[TASK_DFLASH_KV_STORE_SM100] = "TASK_DFLASH_KV_STORE_SM100";
   task_type_to_name[TASK_GLM_MOE_ROUTER_SM100] = "TASK_GLM_MOE_ROUTER_SM100";
   task_type_to_name[TASK_CLAMPED_SWIGLU] = "TASK_CLAMPED_SWIGLU";
+  task_type_to_name[TASK_DSV4_HC_MIXES_SM100] = "TASK_DSV4_HC_MIXES_SM100";
+  task_type_to_name[TASK_DSV4_HC_PRE_SM100] = "TASK_DSV4_HC_PRE_SM100";
+  task_type_to_name[TASK_DSV4_HC_POST_SM100] = "TASK_DSV4_HC_POST_SM100";
   task_type_to_name[TASK_INKLING_SCONV_SM100] = "TASK_INKLING_SCONV_SM100";
   task_type_to_name[TASK_INKLING_MOE_ROUTER_SM100] =
       "TASK_INKLING_MOE_ROUTER_SM100";

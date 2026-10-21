@@ -5482,5 +5482,140 @@ int TaskRegister::register_mla_mtp_decode_tp8_reduce_sm100_task(
                                code.to_string());
 }
 
+// ---- DeepSeek-V4.1 ----
+
+namespace {
+// Splits a customized bgraph's TB_INPUT_OPs into its inputs and outputs.
+void split_io_ops(threadblock::Graph const &bgraph,
+                  int num_inputs,
+                  int num_outputs,
+                  std::vector<tb::TBInputOp *> &input_ops,
+                  std::vector<tb::TBInputOp *> &output_ops) {
+  assert(bgraph.operators.size() == (size_t)num_inputs + num_outputs);
+  for (auto const &op : bgraph.operators) {
+    assert(op->op_type == mirage::type::TB_INPUT_OP);
+    if (input_ops.size() < (size_t)num_inputs) {
+      input_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    } else {
+      output_ops.push_back(static_cast<tb::TBInputOp *>(op));
+    }
+  }
+}
+
+// A float passed through an int param, emitted bit-exact (std::to_string would
+// print 1e-20 as 0.000000).
+std::string float_param_literal(std::vector<int> const &params, size_t idx) {
+  assert(params.size() > idx);
+  return "__int_as_float(" + std::to_string(params[idx]) + ")";
+}
+} // namespace
+
+int TaskRegister::register_dsv4_hc_mixes_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params: [hc_mult, sinkhorn_iters, norm_eps bits, hc_eps bits].
+  // 4 inputs (x [tokens, hc, dim] bf16, fn [mix, hc * dim] fp32, scale [3]
+  // fp32, base [mix] fp32), 1 output (mix [tokens, mix] fp32). grid.x
+  // partitions the tokens.
+  assert(params.size() == 4);
+  int hc = params[0];
+  int sinkhorn_iters = params[1];
+  std::vector<tb::TBInputOp *> input_ops, output_ops;
+  split_io_ops(bgraph, 4, 1, input_ops, output_ops);
+  kn::DTensor const &x = input_ops[0]->dtensor;
+  assert(x.num_dims == 3 && x.dim[1] == hc);
+  int dim = x.dim[2];
+  int mix = (2 + hc) * hc;
+  assert(input_ops[1]->dtensor.num_dims == 2);
+  assert(input_ops[1]->dtensor.dim[0] == mix);
+  assert(input_ops[1]->dtensor.dim[1] == hc * dim);
+  assert(output_ops[0]->dtensor.dim[1] == mix);
+  int batch_size = output_ops[0]->output_tensors[0].dim[0];
+  assert(input_ops[0]->output_tensors[0].dim[0] == batch_size);
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::hc_mixes_sm100_task_impl<bfloat16, $, $, $, $, $>(",
+         batch_size,
+         hc,
+         dim,
+         /*X_STRIDE=*/hc * dim,
+         sinkhorn_iters);
+  code.e("    task_desc->input_ptrs[0],");
+  code.e("    task_desc->input_ptrs[1],");
+  code.e("    task_desc->input_ptrs[2],");
+  code.e("    task_desc->input_ptrs[3],");
+  code.e("    task_desc->output_ptrs[0],");
+  code.e("    $,", float_param_literal(params, 2));
+  code.e("    $);", float_param_literal(params, 3));
+  return register_task_variant(TASK_DSV4_HC_MIXES_SM100, code.to_string());
+}
+
+int TaskRegister::register_dsv4_hc_pre_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params: []. 2 inputs (x [tokens, hc, dim] bf16, mix [tokens, mix] fp32),
+  // 1 output (y [tokens, dim] bf16). grid.x partitions the tokens, grid.y the
+  // hidden dim.
+  assert(params.size() == 0);
+  std::vector<tb::TBInputOp *> input_ops, output_ops;
+  split_io_ops(bgraph, 2, 1, input_ops, output_ops);
+  kn::DTensor const &x = input_ops[0]->dtensor;
+  assert(x.num_dims == 3);
+  int hc = x.dim[1];
+  int dim = x.dim[2];
+  assert(input_ops[1]->dtensor.dim[1] == (2 + hc) * hc);
+  assert(output_ops[0]->dtensor.num_dims == 2);
+  assert(output_ops[0]->dtensor.dim[1] == dim);
+  int batch_size = output_ops[0]->output_tensors[0].dim[0];
+  int dim_chunk = output_ops[0]->output_tensors[0].dim[1];
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::hc_pre_sm100_task_impl<bfloat16, $, $, $, $, $, $>(",
+         batch_size,
+         hc,
+         dim_chunk,
+         /*X_STRIDE=*/hc * dim,
+         /*X_HC_STRIDE=*/dim,
+         /*Y_STRIDE=*/dim);
+  code.e("    task_desc->input_ptrs[0],");
+  code.e("    task_desc->input_ptrs[1],");
+  code.e("    task_desc->output_ptrs[0]);");
+  return register_task_variant(TASK_DSV4_HC_PRE_SM100, code.to_string());
+}
+
+int TaskRegister::register_dsv4_hc_post_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params: []. 3 inputs (x [tokens, dim] bf16, residual [tokens, hc, dim]
+  // bf16, mix [tokens, mix] fp32), 1 output (out [tokens, hc, dim] bf16).
+  // grid.x partitions the tokens, grid.y the hidden dim.
+  assert(params.size() == 0);
+  std::vector<tb::TBInputOp *> input_ops, output_ops;
+  split_io_ops(bgraph, 3, 1, input_ops, output_ops);
+  kn::DTensor const &r = input_ops[1]->dtensor;
+  assert(r.num_dims == 3);
+  int hc = r.dim[1];
+  int dim = r.dim[2];
+  assert(input_ops[0]->dtensor.num_dims == 2);
+  assert(input_ops[0]->dtensor.dim[1] == dim);
+  assert(input_ops[2]->dtensor.dim[1] == (2 + hc) * hc);
+  assert(output_ops[0]->dtensor.num_dims == 3);
+  assert(output_ops[0]->dtensor.dim[1] == hc);
+  assert(output_ops[0]->dtensor.dim[2] == dim);
+  int batch_size = output_ops[0]->output_tensors[0].dim[0];
+  int dim_chunk = output_ops[0]->output_tensors[0].dim[2];
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e("kernel::hc_post_sm100_task_impl<bfloat16, $, $, $, $, $, $>(",
+         batch_size,
+         hc,
+         dim_chunk,
+         /*X_STRIDE=*/dim,
+         /*R_STRIDE=*/hc * dim,
+         /*R_HC_STRIDE=*/dim);
+  code.e("    task_desc->input_ptrs[0],");
+  code.e("    task_desc->input_ptrs[1],");
+  code.e("    task_desc->input_ptrs[2],");
+  code.e("    task_desc->output_ptrs[0]);");
+  return register_task_variant(TASK_DSV4_HC_POST_SM100, code.to_string());
+}
+
 } // namespace runtime
 } // namespace mirage

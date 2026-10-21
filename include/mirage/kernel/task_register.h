@@ -212,6 +212,12 @@ public:
                                             std::vector<int> const &params);
   int register_glm_moe_router_sm100_task(threadblock::Graph const &bgraph,
                                          std::vector<int> const &params);
+  int register_dsv4_hc_mixes_sm100_task(threadblock::Graph const &bgraph,
+                                        std::vector<int> const &params);
+  int register_dsv4_hc_pre_sm100_task(threadblock::Graph const &bgraph,
+                                      std::vector<int> const &params);
+  int register_dsv4_hc_post_sm100_task(threadblock::Graph const &bgraph,
+                                       std::vector<int> const &params);
   // SM100 tasks end
   // Multi-GPU tasks
   int register_nvshmem_allgather_strided_put_task(

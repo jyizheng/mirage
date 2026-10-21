@@ -1098,6 +1098,81 @@ class PersistentKernel:
         )
         self.kn_graph.register_task(tb_graph, "inkling_attention", params)
 
+    @staticmethod
+    def _float_bits(v: float) -> int:
+        import struct
+        return struct.unpack("<i", struct.pack("<f", v))[0]
+
+    def dsv4_hc_mixes_layer(
+        self,
+        x: DTensor,      # [tokens, hc, dim] bf16, the hyper-connection stream
+        fn: DTensor,     # [mix, hc * dim] fp32
+        scale: DTensor,  # [3] fp32
+        base: DTensor,   # [mix] fp32
+        output: DTensor, # [tokens, mix] fp32: [pre | post | comb]
+        grid_dim: tuple,
+        block_dim: tuple,
+        sinkhorn_iters: int = 20,
+        norm_eps: float = 1e-6,
+        hc_eps: float = 1e-6,
+    ):
+        # DeepSeek-V4.1 Block.hc_mixes + hc_split_sinkhorn. grid.x splits tokens.
+        assert x.num_dims == 3 and output.num_dims == 2
+        tmap = (0, -1, -1) if grid_dim[0] > 1 else (-1, -1, -1)
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(x, tmap, -1, True)
+        tb_graph.new_input(fn, (-1, -1, -1), -1, True)
+        tb_graph.new_input(scale, (-1, -1, -1), -1, True)
+        tb_graph.new_input(base, (-1, -1, -1), -1, True)
+        tb_graph.new_input(output, tmap, -1, True)
+        self.kn_graph.customized([x, fn, scale, base, output], tb_graph)
+        self.kn_graph.register_task(
+            tb_graph, "dsv4_hc_mixes",
+            [x.dim(1), sinkhorn_iters, self._float_bits(norm_eps),
+             self._float_bits(hc_eps)])
+
+    def dsv4_hc_pre_layer(
+        self,
+        x: DTensor,      # [tokens, hc, dim] bf16
+        mix: DTensor,    # [tokens, mix] fp32 (pre at offset 0)
+        output: DTensor, # [tokens, dim] bf16
+        grid_dim: tuple,
+        block_dim: tuple,
+    ):
+        # DeepSeek-V4.1 Block.hc_pre. grid.x splits tokens, grid.y the hidden dim.
+        assert x.num_dims == 3 and output.num_dims == 2
+        assert x.dim(2) % grid_dim[1] == 0
+        t = 0 if grid_dim[0] > 1 else -1
+        d = grid_dim[1] > 1
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(x, (t, 2 if d else -1, -1), -1, True)
+        tb_graph.new_input(mix, (t, -1, -1), -1, True)
+        tb_graph.new_input(output, (t, 1 if d else -1, -1), -1, True)
+        self.kn_graph.customized([x, mix, output], tb_graph)
+        self.kn_graph.register_task(tb_graph, "dsv4_hc_pre")
+
+    def dsv4_hc_post_layer(
+        self,
+        x: DTensor,        # [tokens, dim] bf16, the sublayer output
+        residual: DTensor, # [tokens, hc, dim] bf16, the sublayer's input stream
+        mix: DTensor,      # [tokens, mix] fp32
+        output: DTensor,   # [tokens, hc, dim] bf16
+        grid_dim: tuple,
+        block_dim: tuple,
+    ):
+        # DeepSeek-V4.1 Block.hc_post. grid.x splits tokens, grid.y the hidden dim.
+        assert residual.num_dims == 3 and output.num_dims == 3
+        assert x.dim(1) % grid_dim[1] == 0
+        t = 0 if grid_dim[0] > 1 else -1
+        d = grid_dim[1] > 1
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        tb_graph.new_input(x, (t, 1 if d else -1, -1), -1, True)
+        tb_graph.new_input(residual, (t, 2 if d else -1, -1), -1, True)
+        tb_graph.new_input(mix, (t, -1, -1), -1, True)
+        tb_graph.new_input(output, (t, 2 if d else -1, -1), -1, True)
+        self.kn_graph.customized([x, residual, mix, output], tb_graph)
+        self.kn_graph.register_task(tb_graph, "dsv4_hc_post")
+
     def inkling_sconv_layer(
         self,
         x: DTensor,          # [seq_len, hidden] bf16
