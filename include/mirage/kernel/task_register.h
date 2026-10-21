@@ -218,6 +218,8 @@ public:
                                       std::vector<int> const &params);
   int register_dsv4_hc_post_sm100_task(threadblock::Graph const &bgraph,
                                        std::vector<int> const &params);
+  int register_dsv4_kernel_sm100_task(threadblock::Graph const &bgraph,
+                                      std::vector<int> const &params);
   // SM100 tasks end
   // Multi-GPU tasks
   int register_nvshmem_allgather_strided_put_task(

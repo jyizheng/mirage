@@ -1103,6 +1103,39 @@ class PersistentKernel:
         import struct
         return struct.unpack("<i", struct.pack("<f", v))[0]
 
+    DSV4_KERNELS = {
+        "gemv": 0, "rmsnorm": 1, "rope_quant": 2, "compress_pool": 3,
+        "attention": 4, "router": 5, "swiglu": 6, "moe_combine": 7,
+        "engram_hash": 8, "engram_lookup": 9, "engram_gate": 10, "argmax": 11,
+    }
+
+    def dsv4_kernel_layer(
+        self,
+        kernel: str,
+        inputs: list,    # [(DTensor, imap)], imap: tensor dim per grid dim
+        outputs: list,   # [(DTensor, imap)]
+        grid_dim: tuple,
+        block_dim: tuple,
+        template_args: list,
+        scalars: list = (),  # ints, or floats (passed bit-exact)
+    ):
+        # DeepSeek-V4.1 kernels of tasks/blackwell/dsv4_sm100.cuh. The kernel
+        # gets every input pointer, every output pointer, then the scalars, in
+        # order; template_args follow the kernel's template parameters after
+        # its element type.
+        tb_graph = TBGraph(CyTBGraph(grid_dim, block_dim, 1, 64))
+        for t, imap in list(inputs) + list(outputs):
+            tb_graph.new_input(t, imap, -1, True)
+        self.kn_graph.customized([t for t, _ in list(inputs) + list(outputs)], tb_graph)
+        params = [self.DSV4_KERNELS[kernel], len(inputs), len(outputs),
+                  len(template_args), *[int(a) for a in template_args], len(scalars)]
+        for v in scalars:
+            if isinstance(v, float):
+                params += [1, self._float_bits(v)]
+            else:
+                params += [0, int(v)]
+        self.kn_graph.register_task(tb_graph, "dsv4_kernel", params)
+
     def dsv4_hc_mixes_layer(
         self,
         x: DTensor,      # [tokens, hc, dim] bf16, the hyper-connection stream
@@ -3447,6 +3480,7 @@ class PersistentKernel:
         spec.loader.exec_module(mod)
         self.init_func = getattr(mod, "init_func")
         self.launch_func = getattr(mod, "launch_func")
+        self.init_request_func = getattr(mod, "init_request_func")
         self.wait_func = getattr(mod, "wait_func")
         self.finalize_func = getattr(mod, "finalize_func")
         self.load_i32_acquire = getattr(mod, "load_i32_acquire")

@@ -5617,5 +5617,67 @@ int TaskRegister::register_dsv4_hc_post_sm100_task(
   return register_task_variant(TASK_DSV4_HC_POST_SM100, code.to_string());
 }
 
+int TaskRegister::register_dsv4_kernel_sm100_task(
+    threadblock::Graph const &bgraph, std::vector<int> const &params) {
+  // params: [kernel, num_inputs, num_outputs, num_template_args,
+  //          template_args..., num_scalars, (kind, value)...]
+  // kind 0 = int, 1 = float bits. The kernel is called with every input
+  // pointer, then every output pointer, then the scalars; the Python layer
+  // (PersistentKernel.dsv4_kernel_layer) owns the meaning of each argument.
+  static char const *const kernels[] = {
+      "dsv4_gemv_task_impl<bfloat16, ",          // 0
+      "dsv4_rmsnorm_task_impl<bfloat16, ",       // 1
+      "dsv4_rope_quant_task_impl<bfloat16, ",    // 2
+      "dsv4_compress_pool_task_impl<bfloat16, ", // 3
+      "dsv4_attention_task_impl<bfloat16, ",     // 4
+      "dsv4_router_task_impl<",                  // 5
+      "dsv4_swiglu_task_impl<bfloat16, ",        // 6
+      "dsv4_moe_combine_task_impl<bfloat16, ",   // 7
+      "dsv4_engram_hash_task_impl<",             // 8
+      "dsv4_engram_lookup_task_impl<bfloat16, ", // 9
+      "dsv4_engram_gate_task_impl<bfloat16, ",   // 10
+      "dsv4_argmax_task_impl<",                  // 11
+  };
+  constexpr int num_kernels = sizeof(kernels) / sizeof(kernels[0]);
+  assert(params.size() >= 4);
+  int kernel = params[0];
+  int num_inputs = params[1];
+  int num_outputs = params[2];
+  assert(kernel >= 0 && kernel < num_kernels);
+  std::vector<tb::TBInputOp *> input_ops, output_ops;
+  split_io_ops(bgraph, num_inputs, num_outputs, input_ops, output_ops);
+  size_t pos = 3;
+  int num_template = params[pos++];
+  assert(params.size() >= pos + num_template + 1);
+  std::string call = std::string("kernel::") + kernels[kernel];
+  for (int i = 0; i < num_template; ++i) {
+    call += (i ? ", " : "") + std::to_string(params[pos++]);
+  }
+  call += ">(";
+  std::vector<std::string> args;
+  for (int i = 0; i < num_inputs; ++i) {
+    args.push_back("task_desc->input_ptrs[" + std::to_string(i) + "]");
+  }
+  for (int i = 0; i < num_outputs; ++i) {
+    args.push_back("task_desc->output_ptrs[" + std::to_string(i) + "]");
+  }
+  int num_scalars = params[pos++];
+  assert(params.size() == pos + 2 * num_scalars);
+  for (int i = 0; i < num_scalars; ++i) {
+    int kind = params[pos++];
+    int value = params[pos++];
+    args.push_back(kind == 1 ? "__int_as_float(" + std::to_string(value) + ")"
+                             : std::to_string(value));
+  }
+  for (size_t i = 0; i < args.size(); ++i) {
+    call += (i ? ", " : "") + args[i];
+  }
+  call += ");";
+  mirage::transpiler::CodeKeeper code;
+  code.inc_indent();
+  code.e(call);
+  return register_task_variant(TASK_DSV4_KERNEL_SM100, code.to_string());
+}
+
 } // namespace runtime
 } // namespace mirage

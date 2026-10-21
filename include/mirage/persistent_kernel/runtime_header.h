@@ -231,6 +231,9 @@ enum TaskType {
   TASK_DSV4_HC_PRE_SM100 = 502,
   // Expand the sublayer output over the copies and mix in the residual.
   TASK_DSV4_HC_POST_SM100 = 503,
+  // The remaining DeepSeek-V4.1 kernels in tasks/blackwell/dsv4_sm100.cuh;
+  // each variant is one of them, chosen by the layer's params.
+  TASK_DSV4_KERNEL_SM100 = 504,
   TASK_DSV4_TASK_END = 549, // end placeholder, not a real task
 };
 
