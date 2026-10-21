@@ -44,10 +44,10 @@ __device__ __forceinline__ void
                              float hc_eps) {
   constexpr int MIX = (2 + HC) * HC;
   constexpr int K = HC * DIM;
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   // One partial per output coefficient plus the sum of squares.
   constexpr int NACC = MIX + 1;
-  static_assert(K % (2 * NUM_THREADS) == 0, "HC * DIM must split over threads");
+  static_assert(K % 2 == 0, "HC * DIM must be even");
 
   T const *__restrict__ d_x = static_cast<T const *>(input_ptr);
   float const *__restrict__ d_fn = static_cast<float const *>(fn_ptr);
@@ -57,7 +57,7 @@ __device__ __forceinline__ void
 
   extern __shared__ char smem[];
   float(*s_part)[NACC] = reinterpret_cast<float(*)[NACC]>(smem);
-  float *s_mix = reinterpret_cast<float *>(smem) + NUM_WARPS * NACC;
+  float *s_mix = reinterpret_cast<float *>(smem) + 32 * NACC; // <= 32 warps
 
   int const lane = threadIdx.x % 32;
   int const warp = threadIdx.x / 32;
@@ -71,7 +71,7 @@ __device__ __forceinline__ void
     }
     // Two consecutive elements per thread so the bf16 load is 4 bytes and the
     // fp32 weight load is 8 bytes; consecutive threads stay contiguous.
-    for (int k = 2 * threadIdx.x; k < K; k += 2 * NUM_THREADS) {
+    for (int k = 2 * threadIdx.x; k < K; k += 2 * blockDim.x) {
       float x0 = float(x[k]);
       float x1 = float(x[k + 1]);
       acc[MIX] += x0 * x0 + x1 * x1;
@@ -198,7 +198,7 @@ __device__ __forceinline__ void hc_pre_sm100_task_impl(void const *input_ptr,
     for (int j = 0; j < HC; ++j) {
       pre[j] = d_mix[b * MIX + j];
     }
-    for (int d = threadIdx.x; d < DIM_CHUNK; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < DIM_CHUNK; d += blockDim.x) {
       float y = 0.0f;
 #pragma unroll
       for (int j = 0; j < HC; ++j) {
@@ -239,7 +239,7 @@ __device__ __forceinline__ void hc_post_sm100_task_impl(void const *input_ptr,
         comb[j][i] = d_mix[b * MIX + 2 * HC + j * HC + i];
       }
     }
-    for (int d = threadIdx.x; d < DIM_CHUNK; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < DIM_CHUNK; d += blockDim.x) {
       float x = float(d_x[b * X_STRIDE + d]);
       float r[HC];
 #pragma unroll

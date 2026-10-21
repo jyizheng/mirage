@@ -5637,6 +5637,7 @@ int TaskRegister::register_dsv4_kernel_sm100_task(
       "dsv4_engram_lookup_task_impl<bfloat16, ", // 9
       "dsv4_engram_gate_task_impl<bfloat16, ",   // 10
       "dsv4_argmax_task_impl<",                  // 11
+      "dsv4_embed_task_impl<bfloat16, ",         // 12
   };
   constexpr int num_kernels = sizeof(kernels) / sizeof(kernels[0]);
   assert(params.size() >= 4);

@@ -44,10 +44,12 @@ __device__ __forceinline__ float warp_max(float v) {
   return v;
 }
 
-// Block-wide sum over NUM_THREADS threads; `red` holds NUM_THREADS / 32
-// floats. Every thread gets the result.
+// Block-wide sum; `red` holds one float per warp. Every thread gets the
+// result. These kernels size loops by blockDim.x: a task runs on every worker
+// thread (256 on Hopper/Blackwell), not the NUM_THREADS = 128 of
+// worker_config.h.
 __device__ __forceinline__ float block_sum(float v, float *red) {
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   v = warp_sum(v);
   __syncthreads();
   if (threadIdx.x % 32 == 0) {
@@ -63,7 +65,7 @@ __device__ __forceinline__ float block_sum(float v, float *red) {
 }
 
 __device__ __forceinline__ float block_max(float v, float *red) {
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   v = warp_max(v);
   __syncthreads();
   if (threadIdx.x % 32 == 0) {
@@ -94,11 +96,13 @@ template <int QUANT>
 __device__ __forceinline__ float fake_quant(float v, float amax) {
   if constexpr (QUANT == QUANT_FP8) {
     float s = pow2_ceil(fmaxf(amax, 1e-4f) * (1.0f / 448.0f));
-    float q = fminf(fmaxf(v / s, -448.0f), 448.0f);
+    // IEEE division: MPK builds with -use_fast_math, whose approximate divide
+    // flips the rounding of values that sit on a quantization boundary.
+    float q = fminf(fmaxf(__fdiv_rn(v, s), -448.0f), 448.0f);
     return float(__nv_fp8_e4m3(q)) * s;
   } else if constexpr (QUANT == QUANT_FP4_E4M3) {
-    float s = float(__nv_fp8_e4m3(fmaxf(amax, 6.0f * 0.001953125f) / 6.0f));
-    float q = fminf(fmaxf(v / s, -6.0f), 6.0f);
+    float s = float(__nv_fp8_e4m3(__fdiv_rn(fmaxf(amax, 6.0f * 0.001953125f), 6.0f)));
+    float q = fminf(fmaxf(__fdiv_rn(v, s), -6.0f), 6.0f);
     return float(__nv_fp4_e2m1(q)) * s;
   } else {
     return v;
@@ -128,7 +132,7 @@ __device__ __forceinline__ void dsv4_gemv_task_impl(void const *x_ptr,
                                                     void const *w_ptr,
                                                     void const *idx_ptr,
                                                     void *out_ptr) {
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   constexpr int VEC = 8; // bf16 per 16-byte load
   static_assert(K % (32 * VEC) == 0, "K must be a multiple of 256");
   T const *__restrict__ d_x = static_cast<T const *>(x_ptr);
@@ -141,7 +145,7 @@ __device__ __forceinline__ void dsv4_gemv_task_impl(void const *x_ptr,
 
   for (int g = 0; g < G_PER_TASK; ++g) {
     __syncthreads();
-    for (int k = threadIdx.x; k < K; k += NUM_THREADS) {
+    for (int k = threadIdx.x; k < K; k += blockDim.x) {
       s_x[k] = float(d_x[g * X_GROUP_STRIDE + k]);
     }
     __syncthreads();
@@ -186,13 +190,13 @@ __device__ __forceinline__ void dsv4_rmsnorm_task_impl(void const *x_ptr,
   float *red = reinterpret_cast<float *>(smem);
   for (int r = 0; r < ROWS; ++r) {
     float ss = 0.0f;
-    for (int d = threadIdx.x; d < D; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < D; d += blockDim.x) {
       float v = float(d_x[r * X_STRIDE + d]);
       ss += v * v;
     }
     ss = dsv4::block_sum(ss, red);
     float rs = rsqrtf(ss / float(D) + eps);
-    for (int d = threadIdx.x; d < D; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < D; d += blockDim.x) {
       float v = float(d_x[r * X_STRIDE + d]) * rs;
       d_y[r * Y_STRIDE + d] = T(float(d_w[d]) * v);
     }
@@ -238,7 +242,7 @@ __device__ __forceinline__ void dsv4_rope_quant_task_impl(void const *x_ptr,
   T *__restrict__ d_out = static_cast<T *>(out_ptr) + (long long)slot * H * OUT_STRIDE;
   int const lane = threadIdx.x % 32;
   int const warp = threadIdx.x / 32;
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   constexpr int CHUNKS = D / 32; // 32 elements per warp iteration
   for (int c = warp; c < H * CHUNKS; c += NUM_WARPS) {
     int const h = c / CHUNKS;
@@ -291,7 +295,7 @@ __device__ __forceinline__ void dsv4_compress_pool_task_impl(
   int const step = *static_cast<int const *>(step_ptr);
   int const slot = step % RATIO;
   bool const close = (step + 1) % RATIO == 0;
-  for (int d = threadIdx.x; d < D; d += NUM_THREADS) {
+  for (int d = threadIdx.x; d < D; d += blockDim.x) {
     kv_state[slot * D + d] = d_kv[d];
     score_state[slot * D + d] = d_score[d];
     if (close) {
@@ -341,7 +345,7 @@ __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
                                                          void const *step_ptr,
                                                          void *out_ptr,
                                                          float scale) {
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   constexpr int MAX_KEYS = WINDOW + MAX_COMPRESSED;
   constexpr int DPL = D / 32; // dims per lane in the score dot product
   static_assert(D % 64 == 0, "");
@@ -397,20 +401,20 @@ __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
   for (int h = 0; h < HEADS; ++h) {
     float *sc = s_score + h * MAX_KEYS;
     float m = -1e30f;
-    for (int j = threadIdx.x; j < n_keys; j += NUM_THREADS) {
+    for (int j = threadIdx.x; j < n_keys; j += blockDim.x) {
       m = fmaxf(m, sc[j]);
     }
     m = dsv4::block_max(m, s_red);
     float sum = 0.0f;
     __syncthreads();
-    for (int j = threadIdx.x; j < n_keys; j += NUM_THREADS) {
+    for (int j = threadIdx.x; j < n_keys; j += blockDim.x) {
       float e = expf(sc[j] - m);
       sum += e;
       sc[j] = float(T(e)); // P in bf16 for the PV product
     }
     sum = dsv4::block_sum(sum, s_red) + expf(d_sink[h] - m);
     __syncthreads();
-    for (int d = threadIdx.x; d < D; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < D; d += blockDim.x) {
       float acc = 0.0f;
       for (int j = 0; j < n_keys; ++j) {
         T const *row = j < n_win ? d_win + (long long)j * D
@@ -438,7 +442,7 @@ __device__ __forceinline__ void dsv4_router_task_impl(void const *logits_ptr,
   extern __shared__ char smem[];
   float *s_score = reinterpret_cast<float *>(smem); // [E]
   float *s_sel = s_score + E;                       // [E] score + bias
-  for (int e = threadIdx.x; e < E; e += NUM_THREADS) {
+  for (int e = threadIdx.x; e < E; e += blockDim.x) {
     float l = d_logits[e];
     // torch softplus: x above threshold 20 stays linear.
     float sp = l > 20.0f ? l : log1pf(expf(l));
@@ -490,27 +494,26 @@ __device__ __forceinline__ void dsv4_router_task_impl(void const *logits_ptr,
 } // dsv4_router_task_impl
 
 // ---------------------------------------------------------------------------
-// Clamped SwiGLU (Expert.forward): h = [gate | up] bf16 [G, 2I];
+// Clamped SwiGLU (Expert.forward): gate = w1 x, up = w3 x, bf16 [G, I];
 // out = bf16(w_g * silu(min(gate, L)) * clamp(up, -L, L)), w_g = 1 without
 // weights (the shared expert).
 // ---------------------------------------------------------------------------
 template <typename T, int G, int I, int HAS_WEIGHTS>
-__device__ __forceinline__ void dsv4_swiglu_task_impl(void const *h_ptr,
+__device__ __forceinline__ void dsv4_swiglu_task_impl(void const *gate_ptr,
+                                                      void const *up_ptr,
                                                       void const *weights_ptr,
                                                       void *out_ptr,
                                                       float limit) {
-  T const *__restrict__ d_h = static_cast<T const *>(h_ptr);
+  T const *__restrict__ d_gate = static_cast<T const *>(gate_ptr);
+  T const *__restrict__ d_up = static_cast<T const *>(up_ptr);
   float const *__restrict__ d_w = static_cast<float const *>(weights_ptr);
   T *__restrict__ d_out = static_cast<T *>(out_ptr);
-  for (int i = threadIdx.x; i < G * I; i += NUM_THREADS) {
-    int const g = i / I, c = i % I;
-    float gate = float(d_h[g * 2 * I + c]);
-    float up = float(d_h[g * 2 * I + I + c]);
-    up = fminf(fmaxf(up, -limit), limit);
-    gate = fminf(gate, limit);
+  for (int i = threadIdx.x; i < G * I; i += blockDim.x) {
+    float gate = fminf(float(d_gate[i]), limit);
+    float up = fminf(fmaxf(float(d_up[i]), -limit), limit);
     float v = gate / (1.0f + expf(-gate)) * up;
     if (HAS_WEIGHTS) {
-      v = d_w[g] * v;
+      v = d_w[i / I] * v;
     }
     d_out[i] = T(v);
   }
@@ -546,7 +549,7 @@ __device__ __forceinline__ void dsv4_moe_combine_task_impl(void const *experts_p
       }
     }
   }
-  for (int d = threadIdx.x; d < DIM_CHUNK; d += NUM_THREADS) {
+  for (int d = threadIdx.x; d < DIM_CHUNK; d += blockDim.x) {
     float acc = 0.0f;
 #pragma unroll
     for (int t = 0; t < TOPK; ++t) {
@@ -607,7 +610,7 @@ __device__ __forceinline__ void dsv4_engram_lookup_task_impl(
   __nv_fp8_e4m3 const *__restrict__ table = static_cast<__nv_fp8_e4m3 const *>(table_ptr);
   uint8_t const *__restrict__ scale = static_cast<uint8_t const *>(scale_ptr);
   T *__restrict__ d_out = static_cast<T *>(out_ptr);
-  for (int i = threadIdx.x; i < NCOLS * HEAD_DIM; i += NUM_THREADS) {
+  for (int i = threadIdx.x; i < NCOLS * HEAD_DIM; i += blockDim.x) {
     int const c = i / HEAD_DIM, d = i % HEAD_DIM;
     long long row = ids[c];
     float v = float(table[row * HEAD_DIM + d]);
@@ -636,7 +639,7 @@ __device__ __forceinline__ void dsv4_engram_gate_task_impl(void const *h_ptr,
   float *red = reinterpret_cast<float *>(smem);
   for (int j = 0; j < HC; ++j) {
     float hh = 0.0f, kk = 0.0f, hk = 0.0f;
-    for (int d = threadIdx.x; d < DIM; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < DIM; d += blockDim.x) {
       float h = float(d_h[j * DIM + d]);
       float k = float(d_kv[j * DIM + d]);
       hh += h * h;
@@ -650,7 +653,7 @@ __device__ __forceinline__ void dsv4_engram_gate_task_impl(void const *h_ptr,
     float dot = hk * rstd * inv_sqrt_dim;
     float sq = sqrtf(fmaxf(fabsf(dot), 1e-6f));
     float gate = 1.0f / (1.0f + expf(-copysignf(sq, dot)));
-    for (int d = threadIdx.x; d < DIM; d += NUM_THREADS) {
+    for (int d = threadIdx.x; d < DIM; d += blockDim.x) {
       float h = float(d_h[j * DIM + d]);
       float v = float(d_kv[HC * DIM + d]);
       d_out[j * DIM + d] = T(h + gate * v);
@@ -658,19 +661,35 @@ __device__ __forceinline__ void dsv4_engram_gate_task_impl(void const *h_ptr,
   }
 } // dsv4_engram_gate_task_impl
 
+// Token embedding: out = table[tokens[step]], DIM_CHUNK columns (the table
+// pointer is offset to this task's columns, rows ROW_STRIDE apart).
+template <typename T, int DIM_CHUNK, int ROW_STRIDE>
+__device__ __forceinline__ void dsv4_embed_task_impl(void const *tokens_ptr,
+                                                     void const *step_ptr,
+                                                     void const *table_ptr,
+                                                     void *out_ptr) {
+  long long const tok = static_cast<long long const *>(
+      tokens_ptr)[*static_cast<int const *>(step_ptr)];
+  T const *__restrict__ row = static_cast<T const *>(table_ptr) + tok * ROW_STRIDE;
+  T *__restrict__ d_out = static_cast<T *>(out_ptr);
+  for (int d = threadIdx.x; d < DIM_CHUNK; d += blockDim.x) {
+    d_out[d] = row[d];
+  }
+} // dsv4_embed_task_impl
+
 // Argmax over fp32 logits [V] (lowest index on ties, as torch.argmax), written
 // as int64 to out[0].
 template <int V>
 __device__ __forceinline__ void dsv4_argmax_task_impl(void const *logits_ptr,
                                                       void *out_ptr) {
-  constexpr int NUM_WARPS = NUM_THREADS / 32;
+  int const NUM_WARPS = blockDim.x / 32;
   float const *__restrict__ d_l = static_cast<float const *>(logits_ptr);
   extern __shared__ char smem[];
   float *s_v = reinterpret_cast<float *>(smem);
   int *s_i = reinterpret_cast<int *>(s_v + NUM_WARPS);
   float best = -INFINITY;
   int best_i = V;
-  for (int i = threadIdx.x; i < V; i += NUM_THREADS) {
+  for (int i = threadIdx.x; i < V; i += blockDim.x) {
     float v = d_l[i];
     if (v > best) {
       best = v;

@@ -1107,6 +1107,7 @@ class PersistentKernel:
         "gemv": 0, "rmsnorm": 1, "rope_quant": 2, "compress_pool": 3,
         "attention": 4, "router": 5, "swiglu": 6, "moe_combine": 7,
         "engram_hash": 8, "engram_lookup": 9, "engram_gate": 10, "argmax": 11,
+        "embed": 12,
     }
 
     def dsv4_kernel_layer(
