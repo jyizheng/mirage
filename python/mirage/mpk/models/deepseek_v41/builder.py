@@ -508,6 +508,10 @@ class DeepSeekV41Builder(GraphBuilder):
     Uses row 0 of MPK's meta tensors, so the kernel must serve one request per batch and one
     token per step: max_num_batched_requests == max_num_batched_tokens == 1."""
 
+    # The graph ends in argmax: greedy only. Per-request max_new_tokens / stop ids still apply,
+    # they are checked by the scheduler, not the sampler.
+    per_request_sampling = False
+
     def __init__(self, mpk: PersistentKernel, weights=None):
         super().__init__(mpk, weights)
         self.tokenizer = None

@@ -48,9 +48,31 @@ def main():
         outs.append(toks)
         print(f"request {rid}: {len(toks)} tokens in {dt:.2f}s (final_step {final_step}); "
               f"first 16 {toks[:16]}; text {runner.tokenizer.decode(toks[:16])!r}", flush=True)
+    # Per-request budget, enforced by the kernel (mirage-project/mirage#784): requests end after
+    # max_new_tokens with reason "length", so the next one is admitted right away.
+    from mirage.engine.sampling import SamplingParams
+    budget = 8
+    cfg = SamplingParams(max_new_tokens=budget).pack(len(prompt), a.max_seq_len, runner.vocab_size,
+                                                     runner.eos_ids)
+    times = []
+    for rid in range(100, 103):
+        t0 = time.time()
+        rt.submit(rid, prompt, generation_config=cfg)
+        row, final_step = rt.wait_for_request(rid, 300.0, 1e-4)
+        times.append(time.time() - t0)
+        toks = rt.read_tokens_at_row(row, final_step)[len(prompt):].tolist()
+        reason = rt.finish_reason(row)
+        rt.release_request(rid)
+        print(f"request {rid}: max_new_tokens={budget} -> {len(toks)} tokens, reason={reason}, "
+              f"{times[-1] * 1e3:.0f} ms, ids {toks}", flush=True)
+        ok_budget = len(toks) == budget and reason == "length" and toks == outs[0][:budget]
+        if not ok_budget:
+            print("budget check FAILED")
     rt.request_shutdown()
     kernel.join(timeout=60)
-    ok = all(o == outs[0] for o in outs)
+    # One token per step, prompt included: a budgeted request costs prompt + budget steps, and
+    # must not wait for an earlier request's row to run on to max_seq_length.
+    ok = all(o == outs[0] for o in outs) and ok_budget and max(times) < (len(prompt) + budget) * 4e-3
     if a.expect:
         want = [int(x) for x in a.expect.split(",")]
         ok &= outs[0][:len(want)] == want

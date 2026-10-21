@@ -83,7 +83,10 @@ class ModelRunner:
         rank: Optional[int] = None,
     ) -> None:
         self.config = config
-        if get_builder(config.model) is not Qwen3Builder:
+        builder = get_builder(config.model)
+        # A greedy-only graph (per_request_sampling = False) needs no serving
+        # sampler: the scheduler applies max_new_tokens and stop ids itself.
+        if builder is not Qwen3Builder and getattr(builder, "per_request_sampling", True):
             raise ValueError("Serving sampling currently supports only Qwen3 models")
 
         # ── Distributed init ──────────────────────────────────────────────
@@ -124,6 +127,11 @@ class ModelRunner:
         self.runtime = OnlinePinnedRuntime(self.mpk)
         self.tokenizer = self.mpk.tokenizer
         self.vocab_size = self.mpk.model_builder.vocab_size
+        # False for a graph that ends in a fixed argmax instead of the serving
+        # sampler: the kernel still applies each request's max_new_tokens and
+        # stop ids, but ignores its sampling parameters.
+        self.per_request_sampling = bool(
+            getattr(self.mpk.model_builder, "per_request_sampling", True))
         generation_config = getattr(getattr(self.mpk.model_builder, "model", None), "generation_config", None)
         eos = getattr(generation_config, "eos_token_id", None)
         if eos is None:
