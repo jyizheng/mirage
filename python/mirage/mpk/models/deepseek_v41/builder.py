@@ -4,7 +4,10 @@ Follows DeepSeek's inference/model.py op for op, built from the kernels in
 tasks/blackwell/dsv4_sm100.cuh and mhc_sm100.cuh. Scope of this first version:
 
   * one request, one token per step; the prompt is fed token by token.
-  * bf16 checkpoints (e.g. the 4-layer slice), single GPU.
+  * bf16 checkpoints (the 4-layer slice) or the released fp8 / fp4 one (DeepSeek-V4.1-Flash):
+    fp8 Linears and fp4 experts run as quantized GEMVs ("qgemv"). Compute is on one GPU; weights
+    that do not fit (routed experts, engram tables) live on peer GPUs and are read over NVLink.
+  * text only: no vision tower, no MTP / DSpark speculative layers.
   * the indexer is built when the compressed length can exceed index_topk; its
     first level (candidate blocks) keeps every block up to
     candidate_topk_blocks * candidate_block_size positions and is not built.
@@ -115,16 +118,127 @@ def _divisor_at_most(n: int, cap: int) -> int:
     return 1
 
 
+class LazyCheckpoint:
+    """A safetensors checkpoint as a read-only name -> CPU tensor mapping, reading each tensor
+    only when asked for, so a checkpoint larger than host memory can be placed tensor by tensor."""
+
+    def __init__(self, path: str):
+        import json
+        from glob import glob
+
+        from safetensors import safe_open
+
+        self._open = lambda f: safe_open(os.path.join(path, f), framework="pt", device="cpu")
+        index = os.path.join(path, "model.safetensors.index.json")
+        if os.path.exists(index):
+            self._where = json.load(open(index))["weight_map"]
+        else:
+            self._where = {}
+            for f in glob(os.path.join(path, "*.safetensors")):
+                with self._open(os.path.basename(f)) as h:
+                    self._where.update(dict.fromkeys(h.keys(), os.path.basename(f)))
+        self._files = {}
+
+    def __getitem__(self, key):
+        f = self._where[key]
+        if f not in self._files:
+            self._files[f] = self._open(f).__enter__()
+        return self._files[f].get_tensor(key)
+
+    def __contains__(self, key):
+        return key in self._where
+
+    def __delitem__(self, key):
+        pass  # nothing is held
+
+    DTYPES = {"F8_E4M3": torch.float8_e4m3fn, "F8_E8M0": torch.uint8, "I8": torch.uint8, "U8": torch.uint8,
+              "BF16": torch.bfloat16, "F32": torch.float32}
+
+    def load_to(self, key, device, chunk_bytes=1 << 30):
+        """key straight onto `device`, a row block at a time (tables larger than host memory).
+        Scale (e8m0) and packed-fp4 (int8) tensors come back as uint8."""
+        f = self._where[key]
+        if f not in self._files:
+            self._files[f] = self._open(f).__enter__()
+        sl = self._files[f].get_slice(key)
+        shape, dtype = sl.get_shape(), self.DTYPES[sl.get_dtype()]
+        out = torch.empty(shape, dtype=dtype, device=device)
+        rows = max(1, chunk_bytes // max(1, out[0].nbytes))
+        for a in range(0, shape[0], rows):
+            to_device(sl[a:a + rows].view(dtype), device, out[a:a + rows])
+        return out
+
+
+_staging = []
+
+
+def to_device(t: torch.Tensor, device, out: torch.Tensor = None) -> torch.Tensor:
+    """t on `device` (into `out` when given). Host tensors go through one reused pinned buffer:
+    copying safetensors' pageable host tensors straight to the GPU grows host memory by what was
+    copied (seen on GB300), which a 500 GB checkpoint cannot afford."""
+    if t.device.type != "cpu":
+        return t.to(device) if out is None else out.copy_(t)
+    if out is None:
+        out = torch.empty(t.shape, dtype=t.dtype, device=device)
+    src = t.contiguous().view(-1).view(torch.uint8)
+    dst = out.view(-1).view(torch.uint8)
+    chunk = 256 << 20
+    if not _staging:
+        _staging.append(torch.empty(chunk, dtype=torch.uint8, pin_memory=True))
+    pin = _staging[0]
+    for a in range(0, src.numel(), chunk):
+        n = min(chunk, src.numel() - a)
+        pin[:n].copy_(src[a:a + n])
+        dst[a:a + n].copy_(pin[:n])
+    return out
+
+
+def load_to(sd, key, device):
+    """sd[key] on `device`, as uint8 when it is an fp8 scale or packed fp4."""
+    if hasattr(sd, "load_to"):
+        return sd.load_to(key, device)
+    t = sd[key]
+    if t.dtype in (torch.int8, torch.float8_e8m0fnu):
+        t = t.view(torch.uint8)
+    return to_device(t, device)
+
+
+def enable_peer_access(devices):
+    """Let the first device read every other device's memory (cudaDeviceEnablePeerAccess)."""
+    import ctypes
+    import glob as _glob
+
+    libs = sorted(_glob.glob(os.path.join(os.path.dirname(torch.__file__), "..", "nvidia", "cu*", "lib",
+                                          "libcudart.so*")) +
+                  _glob.glob(os.path.join(os.path.dirname(torch.__file__), "..", "nvidia", "cuda_runtime",
+                                          "lib", "libcudart.so*")))
+    rt = ctypes.CDLL(libs[0] if libs else "libcudart.so")
+    home = torch.device(devices[0]).index or 0
+    prev = torch.cuda.current_device()
+    torch.cuda.set_device(home)
+    torch.zeros(1, device=home)  # the primary context exists
+    for d in devices[1:]:
+        peer = torch.device(d).index
+        assert torch.cuda.can_device_access_peer(home, peer), (home, peer)
+        err = rt.cudaDeviceEnablePeerAccess(peer, 0)
+        assert err in (0, 704), f"cudaDeviceEnablePeerAccess({peer}) failed: {err}"  # 704: already on
+    torch.cuda.set_device(prev)
+
+
 # ---------------------------------------------------------------- builder
 class DeepSeekV41DecodeBuilder:
     BLOCK = (256, 1, 1)
 
     def __init__(self, mpk: PersistentKernel, cfg: dict, max_seq_len: int, device="cuda",
                  tokens: torch.Tensor = None, step: torch.Tensor = None,
-                 next_token: torch.Tensor = None):
+                 next_token: torch.Tensor = None, spill_devices=(), reserve_gib: float = 32.0):
         """tokens / step / next_token default to tensors owned by the builder (for a caller that
         drives the steps itself); pass MPK's meta tensors (tokens[0], step[:1],
-        output_tokens[:1]) to run under MPK's own scheduler."""
+        output_tokens[:1]) to run under MPK's own scheduler.
+
+        spill_devices: peer GPUs for the routed experts and engram tables that do not fit on
+        `device` while keeping reserve_gib free there (engram tables go to a peer first: a step
+        reads a few rows of them)."""
         self.mpk = mpk
         self.cfg = cfg
         self.device = device
@@ -151,11 +265,18 @@ class DeepSeekV41DecodeBuilder:
         # length fits in candidate_topk_blocks * candidate_block_size; it is not built.
         n_cand = cfg.get("candidate_topk_blocks", 0) * cfg.get("candidate_block_size", 0)
         for i, r in enumerate(self.ratios):
-            if r:
-                assert i in self.index_sources or max_seq_len // r <= self.index_topk
+            if r and i < cfg["num_hidden_layers"]:
                 assert not n_cand or max_seq_len // r <= n_cand, (
                     "candidate-block selection is not implemented: max_seq_len too long")
-        assert cfg.get("num_nextn_predict_layers", 0) == 0
+        # num_nextn_predict_layers (MTP / DSpark) is ignored: plain decode
+        self.devices = [str(torch.device(device))] + [str(torch.device(d)) for d in spill_devices]
+        if len(self.devices) > 1:
+            # expandable segments are VMM mappings: peers need cuMemSetAccess, not peer access
+            assert "expandable_segments:True" not in os.environ.get("PYTORCH_CUDA_ALLOC_CONF", ""), (
+                "spill_devices needs PYTORCH_CUDA_ALLOC_CONF without expandable_segments")
+            enable_peer_access(self.devices)
+        self.reserve = int(reserve_gib * 2**30)
+        self.placed = {}  # device -> bytes placed there by _place
         self.keep = []  # torch tensors the graph points at
         self.bufs = {}  # name -> torch tensor, for inspection by tests
         self._torch = {}  # id(DTensor) -> the torch tensor it was attached from
@@ -177,8 +298,19 @@ class DeepSeekV41DecodeBuilder:
         self.next_token = runtime(next_token, "next_token", (1,), torch.int64)
 
     # ------------------------------------------------------------ tensor helpers
-    def _t(self, tensor: torch.Tensor, name: str, buf: bool = True):
-        tensor = tensor.to(self.device).contiguous()
+    def _place(self, nbytes: int, peer_first: bool = False) -> str:
+        """The device a large weight goes to: the compute GPU while it keeps `reserve` free, else
+        the first peer with room."""
+        order = self.devices[1:] + self.devices[:1] if peer_first else self.devices
+        for d in order:
+            keep = self.reserve if d == self.devices[0] else 2**30
+            if torch.cuda.mem_get_info(d)[0] - nbytes > keep:
+                self.placed[d] = self.placed.get(d, 0) + nbytes
+                return d
+        raise RuntimeError(f"no device has {nbytes / 2**30:.1f} GiB free: {self.devices}")
+
+    def _t(self, tensor: torch.Tensor, name: str, buf: bool = True, device=None):
+        tensor = to_device(tensor, device or self.device).contiguous()
         self.keep.append(tensor)
         if buf:
             self.bufs[name] = tensor
@@ -241,6 +373,56 @@ class DeepSeekV41DecodeBuilder:
         self._k("gemv", ins, [(out, omap)], grid,
                 [k, n // nt, 1, 0, k, wgs, 0, int(idx is not None), int(out_fp32)])
 
+    def linear(self, x, sd, key, out, shape=None, out_fp32=False, max_tasks=128):
+        """The reference's Linear: bf16 weights through gemv; fp8 ones (with key.scale) through
+        qgemv. shape views the [N, K] weight as [R, C, K] for an [R, C] output."""
+        w = sd[key + ".weight"]
+        if w.dtype != torch.float8_e4m3fn:
+            self.gemv(x, self._w(sd, key + ".weight", shape=shape), out, out_fp32=out_fp32,
+                      max_tasks=max_tasks)
+            return
+        s = sd[key + ".scale"]
+        n, k = w.shape
+        if shape is not None:
+            w = w.reshape(shape)
+            s = s.reshape(*shape[:-2], shape[-2] // 32, k // 32)
+        name = key.replace(".", "_")
+        self.qgemv(x, self._t(w.view(torch.uint8), name, buf=False),
+                   self._t(s.view(torch.uint8), name + "_scale", buf=False), out, k, quant=1,
+                   out_fp32=out_fp32, max_tasks=max_tasks)
+
+    def qgemv(self, x, w, s, out, k, quant, out_fp32=False, idx=None, groups=1, x_per_group=False,
+              max_tasks=128):
+        """gemv on quantized weights (uint8 views): quant 1 = fp8 [.., N, K] with scales
+        [.., N/32, K/32]; 2 = fp4 [.., N, K/2] with scales [.., N, K/32]. Same layouts as gemv."""
+        wt, st = self.tt(w), self.tt(s)
+        n = st.shape[-2] * 32 if quant == 1 else wt.shape[-2]
+        if groups == 1 and idx is None:
+            n = self.tt(out).numel()
+            rows = self.tt(out).shape[0]
+            if rows > 1:
+                nt = _divisor_at_most(rows, max_tasks)
+                imap, omap = (-1, 0, -1), (-1, 0, -1)
+            else:
+                cands = [d for d in range(min(n, max_tasks), 0, -1)
+                         if n % d == 0 and (quant != 1 or (n // d) % 32 == 0)]
+                nt = cands[0]
+                imap, omap = (-1, 0, -1), (-1, 1, -1)
+            ins = [(x, self.N), (w, imap), (s, imap), (self._dummy_idx, self.N)]
+            grid = (1, nt, 1)
+            wgs = sgs = 0
+        else:
+            nt = _divisor_at_most(n, max(1, max_tasks // groups))
+            xmap = (0, -1, -1) if x_per_group else self.N
+            assert idx is not None
+            ins = [(x, xmap), (w, (-1, 1, -1)), (s, (-1, 1, -1)), (idx, (0, -1, -1))]
+            wgs, sgs = wt[0].numel(), st[0].numel()
+            omap = (0, 1, -1)
+            grid = (groups, nt, 1)
+        self._k("qgemv", ins, [(out, omap)], grid,
+                [k, n // nt, 1, 0, wt.shape[-1], wgs, st.shape[-1], sgs, 0, int(idx is not None),
+                 int(out_fp32), quant])
+
     def rmsnorm(self, x, w, out):
         d = self.tt(w).shape[0]
         self._k("rmsnorm", [(x, self.N), (w, self.N)], [(out, self.N)], (1, 1, 1),
@@ -297,10 +479,16 @@ class DeepSeekV41DecodeBuilder:
 
         self.comp_cache = {}
         self.index_k_cache = {}
+        self.last_sel = (None, None)
+        verbose = bool(os.environ.get("DSV4_LOAD_VERBOSE"))
         for i in range(L):
             if i in cfg["engram_layer_ids"]:
                 x = self._build_engram(i, sd, x, engram_tables[i])
             x, pre_mix = self._build_block(i, sd, x, pre_mix)
+            if verbose:
+                rss = int(open("/proc/self/statm").read().split()[1]) * os.sysconf("SC_PAGE_SIZE")
+                print(f"layer {i}: host rss {rss / 2**30:.0f} GiB, placed "
+                      + ", ".join(f"{d} {n / 2**30:.0f}" for d, n in self.placed.items()), flush=True)
 
         # head
         xh = self._new("final_pre", (1, dim))
@@ -325,12 +513,15 @@ class DeepSeekV41DecodeBuilder:
                  (self._t(offsets, f"l{i}_engram_offsets", False), self.N), (self.step, self.N)],
                 [(ids, self.N)], (1, 1, 1), [ngram, heads], [int(pad_id)])
         emb = self._new(f"l{i}_engram_emb", (ncols, hd))
-        table = self._w(sd, p + "embed.weight")
-        scale = self._t(sd[p + "embed.scale"].view(torch.uint8), f"l{i}_engram_scale", buf=False)
+        rows = cfg["engram_num_embeddings"][cfg["engram_layer_ids"].index(i)]
+        dev = self._place(rows * hd * (1 + 1 / 32), peer_first=True)
+        table = self._t(load_to(sd, p + "embed.weight", dev), p.replace(".", "_") + "embed_weight",
+                        buf=False, device=dev)
+        scale = self._t(load_to(sd, p + "embed.scale", dev), f"l{i}_engram_scale", buf=False, device=dev)
         self._k("engram_lookup", [(ids, self.N), (table, self.N), (scale, self.N)], [(emb, self.N)],
                 (1, 1, 1), [ncols, hd])
         kv = self._new(f"l{i}_engram_kv", (1, dim * (hc + 1)))
-        self.gemv(emb, self._w(sd, p + "wkv.weight"), kv)
+        self.linear(emb, sd, p + "wkv", kv)
         w = (sd[p + "q_weight"].float() * sd[p + "k_weight"].float())
         out = self._new(f"l{i}_engram_out", (1, hc, dim))
         self._k("engram_gate", [(x, self.N), (kv, self.N), (self._t(w, f"l{i}_engram_w", False), self.N)],
@@ -379,17 +570,17 @@ class DeepSeekV41DecodeBuilder:
         freqs = self.freqs[ratio]
 
         qa = self._new(f"l{i}_qa", (1, cfg["q_lora_rank"]))
-        self.gemv(xn, self._w(sd, p + "wq_a.weight"), qa)
+        self.linear(xn, sd, p + "wq_a", qa)
         qn = self._new(f"l{i}_qa_norm", (1, cfg["q_lora_rank"]))
         self.rmsnorm(qa, self._w(sd, p + "q_norm.weight"), qn)
         q = self._new(f"l{i}_q", (H, D))
-        self.gemv(qn, self._w(sd, p + "wq_b.weight", shape=(H, D, cfg["q_lora_rank"])), q, max_tasks=64)
+        self.linear(qn, sd, p + "wq_b", q, shape=(H, D, cfg["q_lora_rank"]), max_tasks=64)
         q_r = self._new(f"l{i}_q_rope", (H, D))
         self.rope_quant(q, freqs, q_r, heads=H)
 
         # sliding window: kv_norm(wkv x), RoPE, fp8 fake quant, into ring slot step % window
         kv = self._new(f"l{i}_kv", (1, D))
-        self.gemv(xn, self._w(sd, p + "wkv.weight"), kv)
+        self.linear(xn, sd, p + "wkv", kv)
         kvn = self._new(f"l{i}_kv_norm", (1, D))
         self.rmsnorm(kv, self._w(sd, p + "kv_norm.weight"), kvn)
         win = self._new(f"l{i}_window_cache", (self.window, D))
@@ -437,7 +628,12 @@ class DeepSeekV41DecodeBuilder:
         selected, sel = 0, self._dummy_idx
         if comp is not None and self._use_indexer(i):
             sel = self._build_indexer(i, sd, xn, qn, freqs, ratio, n_comp)
+            self.last_sel = (ratio, sel)
             selected = self.index_topk
+        elif comp is not None and n_comp > self.index_topk:
+            # layers between index sources attend where the last source's indexer picked
+            assert self.last_sel[0] == ratio, (i, self.last_sel[0], ratio)
+            sel, selected = self.last_sel[1], self.index_topk
 
         o = self._new(f"l{i}_attn_o", (H, D))
         heads_per_task = 4
@@ -452,10 +648,15 @@ class DeepSeekV41DecodeBuilder:
         o_r = self._new(f"l{i}_attn_o_rope", (g, H * D // g))
         self.rope_quant(o, freqs, o_r, heads=H, inverse=True, quant=1, qblock=32, max_tasks=g)
         oa = self._new(f"l{i}_attn_oa", (g, self.o_rank))
-        self.gemv(o_r, self._w(sd, p + "wo_a.weight", shape=(g, self.o_rank, H * D // g)), oa,
+        wo_a = sd[p + "wo_a.weight"]
+        if wo_a.dtype == torch.float8_e4m3fn:  # convert.py: dequantized to bf16, an einsum not a Linear
+            sc = sd[p + "wo_a.scale"].float()
+            wo_a = (wo_a.float().unflatten(0, (-1, 32)).unflatten(-1, (-1, 32)) * sc[:, None, :, None]
+                    ).flatten(2, 3).flatten(0, 1).bfloat16()
+        self.gemv(o_r, self._t(wo_a.reshape(g, self.o_rank, H * D // g), f"l{i}_wo_a", buf=False), oa,
                   groups=g, x_per_group=True)
         out = self._new(f"l{i}_attn_out", (1, dim))
-        self.gemv(oa, self._w(sd, p + "wo_b.weight"), out)
+        self.linear(oa, sd, p + "wo_b", out)
         return out
 
     def _use_indexer(self, i):
@@ -469,7 +670,7 @@ class DeepSeekV41DecodeBuilder:
         ip = f"layers.{i}.attn.indexer."
         nh, hd = cfg["index_n_heads"], cfg["index_head_dim"]
         iq = self._new(f"l{i}_index_q", (nh, hd))
-        self.gemv(qn, self._w(sd, ip + "wq_b.weight", shape=(nh, hd, cfg["q_lora_rank"])), iq, max_tasks=32)
+        self.linear(qn, sd, ip + "wq_b", iq, shape=(nh, hd, cfg["q_lora_rank"]), max_tasks=32)
         iq_r = self._new(f"l{i}_index_q_rope", (nh, hd))
         self.rope_quant(iq, freqs, iq_r, heads=nh, d=hd, quant=3, qblock=32)
         iw = self._new(f"l{i}_index_w", (1, nh))
@@ -495,34 +696,49 @@ class DeepSeekV41DecodeBuilder:
                 [(weights, self.N), (idx, self.N)], (1, 1, 1), [E, K],
                 [float(self.cfg["routed_scaling_factor"])])
 
-        def stacked(w):
-            keys = [f"{p}experts.{e}.{w}.weight" for e in range(E)]
-            t = torch.stack([sd[k] for k in keys])
-            for k in keys:
+        def stacked(w, suffix="weight"):
+            """All experts' w (or its scales) as one [E, ...] tensor, on whichever GPU has room."""
+            keys = [f"{p}experts.{e}.{w}.{suffix}" for e in range(E)]
+            first = sd[keys[0]]
+            if first.dtype in (torch.int8, torch.float8_e8m0fnu):
+                first = first.view(torch.uint8)
+            dev = self._place(first.nbytes * E)
+            t = torch.empty((E, *first.shape), dtype=first.dtype, device=dev)
+            for e, k in enumerate(keys):
+                src = sd[k]
+                to_device(src.view(first.dtype) if src.dtype != first.dtype else src, dev, t[e])
                 del sd[k]
-            return self._t(t, f"l{i}_experts_{w}", buf=False)
+            return self._t(t, f"l{i}_experts_{w}_{suffix}", buf=False, device=dev)
+
+        def experts(x, w, out, x_per_group=False):
+            if sd[f"{p}experts.0.{w}.weight"].dtype == torch.int8:  # fp4, two per byte
+                wt, st = stacked(w), stacked(w, "scale")
+                self.qgemv(x, wt, st, out, 2 * self.tt(wt).shape[-1], quant=2, idx=idx, groups=K,
+                           x_per_group=x_per_group)
+            else:
+                self.gemv(x, stacked(w), out, idx=idx, groups=K, x_per_group=x_per_group)
 
         limit = float(self.cfg["swiglu_limit"])
         gate = self._new(f"l{i}_moe_gate", (K, I))
         up = self._new(f"l{i}_moe_up", (K, I))
-        self.gemv(xfn, stacked("w1"), gate, idx=idx, groups=K)
-        self.gemv(xfn, stacked("w3"), up, idx=idx, groups=K)
+        experts(xfn, "w1", gate)
+        experts(xfn, "w3", up)
         act = self._new(f"l{i}_moe_act", (K, I))
         self._k("swiglu", [(gate, self.N), (up, self.N), (weights, self.N)], [(act, self.N)], (1, 1, 1),
                 [K, I, 1], [limit])
         eo = self._new(f"l{i}_moe_expert_out", (K, dim))
-        self.gemv(act, stacked("w2"), eo, idx=idx, groups=K, x_per_group=True)
+        experts(act, "w2", eo, x_per_group=True)
 
         sp = p + "shared_experts."
         sg = self._new(f"l{i}_shared_gate", (1, I))
         su = self._new(f"l{i}_shared_up", (1, I))
-        self.gemv(xfn, self._w(sd, sp + "w1.weight"), sg)
-        self.gemv(xfn, self._w(sd, sp + "w3.weight"), su)
+        self.linear(xfn, sd, sp + "w1", sg)
+        self.linear(xfn, sd, sp + "w3", su)
         sa = self._new(f"l{i}_shared_act", (1, I))
         self._k("swiglu", [(sg, self.N), (su, self.N), (self._dummy_f32, self.N)], [(sa, self.N)],
                 (1, 1, 1), [1, I, 0], [limit])
         so = self._new(f"l{i}_shared_out", (1, dim))
-        self.gemv(sa, self._w(sd, sp + "w2.weight"), so)
+        self.linear(sa, sd, sp + "w2", so)
 
         out = self._new(f"l{i}_ffn_out", (1, dim))
         nt = 8
@@ -551,7 +767,8 @@ def load_tokenizer(model_dir: str):
     return AutoTokenizer.from_pretrained(tok_dir)
 
 
-@register_model_builder("deepseek_v41", "DeepseekV41ForCausalLM", "CharyZeng/DeepSeek-V4.1-4layer")
+@register_model_builder("deepseek_v41", "DeepseekV41ForCausalLM", "CharyZeng/DeepSeek-V4.1-4layer",
+                        "deepseek-ai/DeepSeek-V4.1-Flash")
 class DeepSeekV41Builder(GraphBuilder):
     """DeepSeekV41DecodeBuilder behind MPK's model registry (MPK.build / mirage.engine.ModelRunner).
 
@@ -569,9 +786,6 @@ class DeepSeekV41Builder(GraphBuilder):
 
     def build_from_model(self, model_name: str, model_path: str | None = None):
         import json
-        from glob import glob
-
-        from safetensors.torch import load_file
 
         mpk = self.mpk
         assert mpk.world_size == 1, "DeepSeek-V4.1 on MPK: single GPU only"
@@ -586,13 +800,18 @@ class DeepSeekV41Builder(GraphBuilder):
         self.tokenizer = load_tokenizer(path)
         eos = cfg.get("eos_token_id", self.tokenizer.eos_token_id)
         self.eos_token_id = int(eos[0] if isinstance(eos, list) else eos)
-        sd = {}
-        for shard in sorted(glob(os.path.join(path, "*.safetensors"))):
-            sd.update(load_file(shard, device="cuda"))
+        sd = LazyCheckpoint(path)
         meta = mpk.meta_tensors
+        # Every other visible GPU may hold weights that do not fit (DSV4_SPILL_GPUS="" turns it off).
+        home = torch.cuda.current_device()
+        env = os.environ.get("DSV4_SPILL_GPUS")
+        spill = ([int(d) for d in env.split(",") if d] if env is not None else
+                 [d for d in range(torch.cuda.device_count())
+                  if d != home and torch.cuda.can_device_access_peer(home, d)])
         self.decode_builder = DeepSeekV41DecodeBuilder(
-            mpk, cfg, max_seq_len=mpk.max_seq_length, tokens=meta["tokens"][0],
-            step=meta["step"][:1], next_token=meta["output_tokens"].view(-1)[:1])
+            mpk, cfg, max_seq_len=mpk.max_seq_length, device=f"cuda:{home}", tokens=meta["tokens"][0],
+            step=meta["step"][:1], next_token=meta["output_tokens"].view(-1)[:1],
+            spill_devices=[f"cuda:{d}" for d in spill])
         self.decode_builder.build(sd, engram_hash_tables(cfg, self.tokenizer))
         self.vocab_size = cfg["vocab_size"]
         del sd

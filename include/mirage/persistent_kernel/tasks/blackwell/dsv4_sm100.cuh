@@ -187,6 +187,124 @@ __device__ __forceinline__ void dsv4_gemv_task_impl(void const *x_ptr,
 } // dsv4_gemv_task_impl
 
 // ---------------------------------------------------------------------------
+// Quantized GEMV, the reference's linear() on fp8 / fp4 weights: the input row
+// is fp8-quantized per 32 (act_quant, ue8m0 scales), then
+//   WQ_FP8: W fp8 e4m3 [N, K], one ue8m0 scale per 32x32 block, S [N/32, K/32]
+//   WQ_FP4: W e2m1 packed two per byte along K (low nibble first) [N, K/2],
+//           one ue8m0 scale per 32 along K, S [N, K/32]
+// Each 32-wide K block is summed, then scaled, as fp8_gemm / fp4_gemm do.
+// Strides are in bytes of W / S. Otherwise as dsv4_gemv_task_impl; with
+// WQ_FP8 a task's N_CHUNK must be a multiple of 32.
+// ---------------------------------------------------------------------------
+namespace dsv4 {
+enum WeightQuant { WQ_FP8 = 1, WQ_FP4 = 2 };
+
+__device__ __forceinline__ float e8m0(uint8_t b) {
+  return __uint_as_float(uint32_t(b) << 23);
+}
+
+__device__ __forceinline__ float e2m1(uint32_t b) {
+  uint32_t const e = (b >> 1) & 3u, m = b & 1u;
+  float const mag = e == 0 ? (m ? 0.5f : 0.0f)
+                           : __uint_as_float(((e + 126u) << 23) | (m << 22));
+  return (b & 8u) ? -mag : mag;
+}
+} // namespace dsv4
+
+template <typename T,
+          int K,
+          int N_CHUNK,
+          int G_PER_TASK,
+          int X_GROUP_STRIDE,
+          int W_ROW_STRIDE,
+          long long W_GROUP_STRIDE,
+          int S_ROW_STRIDE,
+          long long S_GROUP_STRIDE,
+          int OUT_GROUP_STRIDE,
+          int HAS_IDX,
+          int OUT_FP32,
+          int WQ>
+__device__ __forceinline__ void dsv4_qgemv_task_impl(void const *x_ptr,
+                                                     void const *w_ptr,
+                                                     void const *s_ptr,
+                                                     void const *idx_ptr,
+                                                     void *out_ptr) {
+  static_assert(K % 32 == 0, "K must be a multiple of 32");
+  static_assert(WQ != dsv4::WQ_FP8 || N_CHUNK % 32 == 0,
+                "fp8 weights: rows per task must cover whole 32-row blocks");
+  int const NUM_WARPS = blockDim.x / 32;
+  constexpr int NB = K / 32;
+  T const *__restrict__ d_x = static_cast<T const *>(x_ptr);
+  uint8_t const *__restrict__ d_w = static_cast<uint8_t const *>(w_ptr);
+  uint8_t const *__restrict__ d_s = static_cast<uint8_t const *>(s_ptr);
+  int const *__restrict__ d_idx = static_cast<int const *>(idx_ptr);
+  extern __shared__ char smem[];
+  // x padded by one float per 32-block: lanes walking different blocks hit
+  // different banks
+  float *s_x = reinterpret_cast<float *>(smem);
+  int const lane = threadIdx.x % 32;
+  int const warp = threadIdx.x / 32;
+
+  for (int g = 0; g < G_PER_TASK; ++g) {
+    __syncthreads();
+    for (int b = warp; b < NB; b += NUM_WARPS) {
+      float v = float(d_x[g * X_GROUP_STRIDE + b * 32 + lane]);
+      float amax = dsv4::warp_max(fabsf(v));
+      s_x[b * 33 + lane] = dsv4::fake_quant<dsv4::QUANT_FP8>(v, amax);
+    }
+    __syncthreads();
+    long long const e = HAS_IDX ? (long long)d_idx[g] : (long long)g;
+    uint8_t const *w_group = d_w + e * W_GROUP_STRIDE;
+    uint8_t const *s_group = d_s + e * S_GROUP_STRIDE;
+    for (int n = warp; n < N_CHUNK; n += NUM_WARPS) {
+      uint8_t const *w_row = w_group + (long long)n * W_ROW_STRIDE;
+      float acc = 0.0f;
+      if constexpr (WQ == dsv4::WQ_FP4) {
+        uint8_t const *s_row = s_group + (long long)n * S_ROW_STRIDE;
+        for (int b = lane; b < NB; b += 32) {
+          uint4 packed = *reinterpret_cast<uint4 const *>(w_row + b * 16);
+          uint32_t const words[4] = {packed.x, packed.y, packed.z, packed.w};
+          float const *xb = s_x + b * 33;
+          float part = 0.0f;
+#pragma unroll
+          for (int q = 0; q < 4; ++q) {
+#pragma unroll
+            for (int j = 0; j < 8; ++j) {
+              part += dsv4::e2m1((words[q] >> (4 * j)) & 15u) * xb[q * 8 + j];
+            }
+          }
+          acc += part * dsv4::e8m0(s_row[b]);
+        }
+      } else {
+        uint8_t const *s_row = s_group + (long long)(n / 32) * S_ROW_STRIDE;
+        for (int b = lane; b < NB; b += 32) {
+          float const *xb = s_x + b * 33;
+          float part = 0.0f;
+#pragma unroll
+          for (int h = 0; h < 2; ++h) {
+            uint4 packed = *reinterpret_cast<uint4 const *>(w_row + b * 32 + h * 16);
+            __nv_fp8_e4m3 const *w8 = reinterpret_cast<__nv_fp8_e4m3 const *>(&packed);
+#pragma unroll
+            for (int j = 0; j < 16; ++j) {
+              part += float(w8[j]) * xb[h * 16 + j];
+            }
+          }
+          acc += part * dsv4::e8m0(s_row[b]);
+        }
+      }
+      acc = dsv4::warp_sum(acc);
+      if (lane == 0) {
+        if constexpr (OUT_FP32) {
+          static_cast<float *>(out_ptr)[g * OUT_GROUP_STRIDE + n] = acc;
+        } else {
+          static_cast<T *>(out_ptr)[g * OUT_GROUP_STRIDE + n] = T(acc);
+        }
+      }
+    }
+  }
+} // dsv4_qgemv_task_impl
+
+// ---------------------------------------------------------------------------
 // RMSNorm over D: y = bf16(w * x * rsqrt(mean(x^2) + eps)), ROWS rows.
 // ---------------------------------------------------------------------------
 template <typename T, int ROWS, int D, int X_STRIDE, int Y_STRIDE>
