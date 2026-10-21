@@ -118,7 +118,12 @@ def _divisor_at_most(n: int, cap: int) -> int:
 class DeepSeekV41DecodeBuilder:
     BLOCK = (256, 1, 1)
 
-    def __init__(self, mpk: PersistentKernel, cfg: dict, max_seq_len: int, device="cuda"):
+    def __init__(self, mpk: PersistentKernel, cfg: dict, max_seq_len: int, device="cuda",
+                 tokens: torch.Tensor = None, step: torch.Tensor = None,
+                 next_token: torch.Tensor = None):
+        """tokens / step / next_token default to tensors owned by the builder (for a caller that
+        drives the steps itself); pass MPK's meta tensors (tokens[0], step[:1],
+        output_tokens[:1]) to run under MPK's own scheduler."""
         self.mpk = mpk
         self.cfg = cfg
         self.device = device
@@ -149,9 +154,20 @@ class DeepSeekV41DecodeBuilder:
         self._torch = {}  # id(DTensor) -> the torch tensor it was attached from
         self._dts = []
 
-        self.tokens = self._t(torch.zeros(max_seq_len, dtype=torch.int64), "tokens")
-        self.step = self._t(torch.zeros(1, dtype=torch.int32), "step")
-        self.next_token = self._t(torch.zeros(1, dtype=torch.int64), "next_token")
+        def runtime(t, name, shape, dtype):
+            if t is None:
+                return self._t(torch.zeros(shape, dtype=dtype), name)
+            assert t.dtype == dtype and t.is_contiguous() and t.numel() == math.prod(shape), (name, t.shape)
+            self.keep.append(t)
+            self.bufs[name] = t
+            dt = self.mpk.attach_input(torch_tensor=t, name=name)
+            self._dts.append(dt)
+            self._torch[id(dt)] = t
+            return dt
+
+        self.tokens = runtime(tokens, "tokens", (max_seq_len,), torch.int64)
+        self.step = runtime(step, "step", (1,), torch.int32)
+        self.next_token = runtime(next_token, "next_token", (1,), torch.int64)
 
     # ------------------------------------------------------------ tensor helpers
     def _t(self, tensor: torch.Tensor, name: str, buf: bool = True):
