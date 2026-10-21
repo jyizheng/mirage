@@ -25,5 +25,14 @@ def register_model_builder(*names: Union[str, Iterable[str]]):
 def get_builder(name: str):
     builder = _MODEL_BUILDERS.get(name)
     if builder is None:
+        # A local checkpoint directory: look the builder up by its architecture.
+        import json
+        import os
+        cfg_path = os.path.join(name, "config.json")
+        if os.path.isfile(cfg_path):
+            cfg = json.load(open(cfg_path))
+            for arch in cfg.get("architectures") or []:
+                builder = builder or _MODEL_BUILDERS.get(arch)
+    if builder is None:
         raise ValueError(f"Unknown builder: {name}. Registered: {list(_MODEL_BUILDERS.keys())}")
     return builder

@@ -16,11 +16,12 @@ Runtime state the caller drives (all on the GPU):
 """
 
 import math
+import os
 
 import numpy as np
 import torch
 
-from mirage.mpk.persistent_kernel import PersistentKernel
+from ...persistent_kernel import PersistentKernel
 
 
 # ---------------------------------------------------------------- reference helpers
@@ -478,3 +479,70 @@ class DeepSeekV41DecodeBuilder:
         self._k("moe_combine", [(eo, (-1, 1, -1)), (idx, self.N), (so, (-1, 1, -1))],
                 [(out, (-1, 1, -1))], (1, nt, 1), [K, dim // nt, dim])
         return out
+
+
+# ---------------------------------------------------------------- MPK model registry entry
+from ...model_registry import register_model_builder  # noqa: E402
+from ..graph_builder import GraphBuilder  # noqa: E402
+
+
+def load_tokenizer(model_dir: str):
+    """The tokenizer alone: transformers cannot parse V4.1's config.json, so load it from a
+    directory holding only the tokenizer files (as DeepSeek's convert.py does)."""
+    import shutil
+    import tempfile
+
+    from transformers import AutoTokenizer
+
+    tok_dir = tempfile.mkdtemp(prefix="dsv41_tokenizer_")
+    for f in ("tokenizer.json", "tokenizer_config.json", "chat_template.jinja", "special_tokens_map.json"):
+        if os.path.exists(os.path.join(model_dir, f)):
+            shutil.copy(os.path.join(model_dir, f), tok_dir)
+    return AutoTokenizer.from_pretrained(tok_dir)
+
+
+@register_model_builder("deepseek_v41", "DeepseekV41ForCausalLM", "CharyZeng/DeepSeek-V4.1-4layer")
+class DeepSeekV41Builder(GraphBuilder):
+    """DeepSeekV41DecodeBuilder behind MPK's model registry (MPK.build / mirage.engine.ModelRunner).
+
+    Uses row 0 of MPK's meta tensors, so the kernel must serve one request per batch and one
+    token per step: max_num_batched_requests == max_num_batched_tokens == 1."""
+
+    def __init__(self, mpk: PersistentKernel, weights=None):
+        super().__init__(mpk, weights)
+        self.tokenizer = None
+        self.eos_token_id = -1
+
+    def build_from_model(self, model_name: str, model_path: str | None = None):
+        import json
+        from glob import glob
+
+        from safetensors.torch import load_file
+
+        mpk = self.mpk
+        assert mpk.world_size == 1, "DeepSeek-V4.1 on MPK: single GPU only"
+        assert mpk.max_num_batched_requests == 1 and mpk.max_num_batched_tokens == 1, (
+            "DeepSeek-V4.1 on MPK decodes one request, one token per step")
+        path = model_path or model_name
+        if not os.path.isdir(path):
+            from huggingface_hub import snapshot_download
+            path = snapshot_download(path)
+        cfg = json.load(open(os.path.join(path, "config.json")))
+        cfg = cfg.get("text_config", cfg)
+        self.tokenizer = load_tokenizer(path)
+        eos = cfg.get("eos_token_id", self.tokenizer.eos_token_id)
+        self.eos_token_id = int(eos[0] if isinstance(eos, list) else eos)
+        sd = {}
+        for shard in sorted(glob(os.path.join(path, "*.safetensors"))):
+            sd.update(load_file(shard, device="cuda"))
+        meta = mpk.meta_tensors
+        self.decode_builder = DeepSeekV41DecodeBuilder(
+            mpk, cfg, max_seq_len=mpk.max_seq_length, tokens=meta["tokens"][0],
+            step=meta["step"][:1], next_token=meta["output_tokens"].view(-1)[:1])
+        self.decode_builder.build(sd, engram_hash_tables(cfg, self.tokenizer))
+        self.vocab_size = cfg["vocab_size"]
+        del sd
+        torch.cuda.empty_cache()
+
+    def decode(self, ids: torch.Tensor):
+        return self.tokenizer.decode(ids)
