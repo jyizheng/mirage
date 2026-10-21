@@ -34,7 +34,7 @@ def main():
     tokens_ref, prompt_len, steps = gold["tokens"], gold["prompt_len"], gold["steps"]
     if max_steps:
         steps = steps[:max_steps]
-    max_seq = 512
+    max_seq = int(os.environ.get("DSV41_MAX_SEQ", "512"))
 
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(os.path.join(golden, "tokenizer"))
@@ -79,11 +79,12 @@ def main():
     # 1) teacher-forced over every step (prompt and the reference's greedy continuation), so each
     #    step's outputs are comparable with the reference's.
     tok[:len(tokens_ref)] = torch.tensor(tokens_ref, device="cuda")
-    worst, agree = {}, 0
+    worst, agree, mpk_argmax = {}, 0, []
     t0 = time.time()
     for pos, ref in enumerate(steps):
         nxt = launch(pos)
         agree += nxt == ref["argmax"]
+        mpk_argmax.append(nxt)
         errs = {g: rel(b.bufs[m], ref[g]) for g, m in pairs}
         errs["logits"] = rel(b.bufs["logits"], ref["logits"])
         for k, v in errs.items():
@@ -94,6 +95,12 @@ def main():
             print(f"step {pos}: argmax mpk={nxt} ref={ref['argmax']} | {top}", flush=True)
     n = len(steps)
     print(f"teacher-forced: {n} steps in {time.time() - t0:.0f}s; argmax agreement {agree}/{n}")
+    topk = cfg["index_topk"]
+    if n > topk:
+        late = sum(mpk_argmax[p] == steps[p]["argmax"] for p in range(topk, n))
+        print(f"  steps >= {topk} (indexer selecting in the ratio-1 layers): {late}/{n - topk}")
+    if os.environ.get("DSV41_DUMP"):
+        json.dump(mpk_argmax, open(os.environ["DSV41_DUMP"], "w"))
     print("worst relative error per output (value, step):")
     for k, (v, p) in worst.items():
         print(f"  {k:18s} {v:.3e} @ {p}")

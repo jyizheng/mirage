@@ -5,9 +5,9 @@ tasks/blackwell/dsv4_sm100.cuh and mhc_sm100.cuh. Scope of this first version:
 
   * one request, one token per step; the prompt is fed token by token.
   * bf16 checkpoints (e.g. the 4-layer slice), single GPU.
-  * max_seq_len <= index_topk * min(compress_ratio): while every compressed
-    position fits in the indexer's top-k, the indexer selects all of them, so
-    attention reads the whole compressed cache and the indexer is not built.
+  * the indexer is built when the compressed length can exceed index_topk; its
+    first level (candidate blocks) keeps every block up to
+    candidate_topk_blocks * candidate_block_size positions and is not built.
 
 Runtime state the caller drives (all on the GPU):
   self.tokens      int64 [max_seq_len]  token ids, prompt then generated
@@ -145,10 +145,16 @@ class DeepSeekV41DecodeBuilder:
         self.o_groups = cfg["o_groups"]
         self.o_rank = cfg["o_lora_rank"]
         self.vocab = cfg["vocab_size"]
-        for r in self.ratios:
+        self.index_sources = set(cfg["index_source_layer_ids"])
+        self.index_topk = cfg["index_topk"]
+        # The indexer's first level (candidate blocks) keeps every block while the compressed
+        # length fits in candidate_topk_blocks * candidate_block_size; it is not built.
+        n_cand = cfg.get("candidate_topk_blocks", 0) * cfg.get("candidate_block_size", 0)
+        for i, r in enumerate(self.ratios):
             if r:
-                assert max_seq_len // r <= cfg["index_topk"], (
-                    "M0 builds no indexer: every compressed position must fit in index_topk")
+                assert i in self.index_sources or max_seq_len // r <= self.index_topk
+                assert not n_cand or max_seq_len // r <= n_cand, (
+                    "candidate-block selection is not implemented: max_seq_len too long")
         assert cfg.get("num_nextn_predict_layers", 0) == 0
         self.keep = []  # torch tensors the graph points at
         self.bufs = {}  # name -> torch tensor, for inspection by tests
@@ -241,8 +247,8 @@ class DeepSeekV41DecodeBuilder:
                 [1, d, d, d], [float(self.eps)])
 
     def rope_quant(self, x, freqs, out, heads, inverse=False, quant=0, qblock=32, pos_shift=0,
-                   slot_div=1, slot_mod=1, max_tasks=8):
-        d = self.head_dim
+                   slot_div=1, slot_mod=1, max_tasks=8, d=None):
+        d = d or self.head_dim
         nt = _divisor_at_most(heads, max_tasks) if slot_mod == 1 else 1
         pmap = (0, -1, -1) if nt > 1 else self.N
         self._k("rope_quant", [(x, pmap), (freqs, self.N), (self.step_dt, self.N)], [(out, pmap)],
@@ -290,6 +296,7 @@ class DeepSeekV41DecodeBuilder:
         pre_mix = self._t(pre_mix, "identity_pre_mix", buf=False)
 
         self.comp_cache = {}
+        self.index_k_cache = {}
         for i in range(L):
             if i in cfg["engram_layer_ids"]:
                 x = self._build_engram(i, sd, x, engram_tables[i])
@@ -408,6 +415,18 @@ class DeepSeekV41DecodeBuilder:
                         [(kv_state, self.N), (sc_state, self.N), (pooled, self.N)], (1, 1, 1), [D, ratio])
             cn = self._new(f"l{i}_comp_norm", (1, D))
             self.rmsnorm(pooled, self._w(sd, cp + "norm.weight"), cn)
+            if self._use_indexer(i):
+                # index keys come from the RoPE-free latent, one per closed group
+                ip = p + "indexer."
+                ihd = cfg["index_head_dim"]
+                ik = self._new(f"l{i}_index_k", (1, ihd))
+                self.gemv(cn, self._w(sd, ip + "wk.weight"), ik)
+                ikn = self._new(f"l{i}_index_k_norm", (1, ihd))
+                self.rmsnorm(ik, self._w(sd, ip + "k_norm.weight"), ikn)
+                kc = self._new(f"l{i}_index_k_cache", (n_comp, ihd))
+                self.rope_quant(ikn, freqs, kc, heads=1, d=ihd, quant=3, qblock=32,
+                                pos_shift=1 - ratio, slot_div=ratio, slot_mod=n_comp)
+                self.index_k_cache[ratio] = kc
             # a latent stands for the first token of its group: RoPE at step + 1 - ratio
             self.rope_quant(cn, freqs, cache, heads=1, quant=2, qblock=16, pos_shift=1 - ratio,
                             slot_div=ratio, slot_mod=n_comp)
@@ -415,14 +434,19 @@ class DeepSeekV41DecodeBuilder:
         comp = self.comp_cache.get(ratio) if ratio else None
         n_comp = self.tt(comp).shape[0] if comp is not None else 0
 
+        selected, sel = 0, self._dummy_idx
+        if comp is not None and self._use_indexer(i):
+            sel = self._build_indexer(i, sd, xn, qn, freqs, ratio, n_comp)
+            selected = self.index_topk
+
         o = self._new(f"l{i}_attn_o", (H, D))
         heads_per_task = 4
         nt = H // heads_per_task
         self._k("attention",
                 [(q_r, (0, -1, -1)), (win, self.N), (comp if comp is not None else self._dummy_kv, self.N),
-                 (self._w(sd, p + "attn_sink"), (0, -1, -1)), (self.step, self.N)],
+                 (sel, self.N), (self._w(sd, p + "attn_sink"), (0, -1, -1)), (self.step, self.N)],
                 [(o, (0, -1, -1))], (nt, 1, 1),
-                [heads_per_task, D, self.window, ratio, n_comp, D, D], [float(D ** -0.5)])
+                [heads_per_task, D, self.window, ratio, n_comp, selected, D, D], [float(D ** -0.5)])
         # remove the query rotation, fp8 fake quant, then the grouped low-rank output projection
         g = self.o_groups
         o_r = self._new(f"l{i}_attn_o_rope", (g, H * D // g))
@@ -433,6 +457,32 @@ class DeepSeekV41DecodeBuilder:
         out = self._new(f"l{i}_attn_out", (1, dim))
         self.gemv(oa, self._w(sd, p + "wo_b.weight"), out)
         return out
+
+    def _use_indexer(self, i):
+        r = self.ratios[i]
+        return bool(r) and i in self.index_sources and self.max_seq_len // r > self.index_topk
+
+    def _build_indexer(self, i, sd, xn, qn, freqs, ratio, n_comp):
+        """Indexer.forward without candidate blocks: fp4 queries against the index keys, rectified
+        scores mixed by weights_proj, the index_topk best compressed positions."""
+        cfg = self.cfg
+        ip = f"layers.{i}.attn.indexer."
+        nh, hd = cfg["index_n_heads"], cfg["index_head_dim"]
+        iq = self._new(f"l{i}_index_q", (nh, hd))
+        self.gemv(qn, self._w(sd, ip + "wq_b.weight", shape=(nh, hd, cfg["q_lora_rank"])), iq, max_tasks=32)
+        iq_r = self._new(f"l{i}_index_q_rope", (nh, hd))
+        self.rope_quant(iq, freqs, iq_r, heads=nh, d=hd, quant=3, qblock=32)
+        iw = self._new(f"l{i}_index_w", (1, nh))
+        self.gemv(xn, self._w(sd, ip + "weights_proj.weight"), iw)
+        kc = self.index_k_cache[ratio]
+        scores = self._new(f"l{i}_index_scores", (n_comp,), torch.float32)
+        nt = _divisor_at_most(n_comp, 64)
+        self._k("index_score", [(iq_r, self.N), (kc, (0, -1, -1)), (iw, self.N)], [(scores, (0, -1, -1))],
+                (nt, 1, 1), [nh, hd, n_comp // nt], [float(hd ** -0.5 * nh ** -0.5)])
+        sel = self._new(f"l{i}_index_topk", (self.index_topk,), torch.int32)
+        self._k("index_topk", [(scores, self.N), (self.step, self.N)], [(sel, self.N)], (1, 1, 1),
+                [n_comp, self.index_topk, ratio])
+        return sel
 
     def _build_moe(self, i, sd, xfn):
         dim, E, K, I = self.dim, self.n_experts, self.topk, self.inter

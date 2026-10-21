@@ -90,7 +90,14 @@ __device__ __forceinline__ float pow2_ceil(float x) {
 // Fake quantization of one value whose 32-lane (or 16-lane) group shares
 // `amax`. QUANT_FP8: e4m3 with a power-of-two scale (act_quant, ue8m0).
 // QUANT_FP4_E4M3: e2m1 with an e4m3 scale (fp4_act_quant, compressed KV).
-enum QuantKind { QUANT_NONE = 0, QUANT_FP8 = 1, QUANT_FP4_E4M3 = 2 };
+// QUANT_FP4_UE8M0: e2m1 with a power-of-two scale (fp4_act_quant default,
+// the indexer's queries and keys).
+enum QuantKind {
+  QUANT_NONE = 0,
+  QUANT_FP8 = 1,
+  QUANT_FP4_E4M3 = 2,
+  QUANT_FP4_UE8M0 = 3
+};
 
 template <int QUANT>
 __device__ __forceinline__ float fake_quant(float v, float amax) {
@@ -100,6 +107,10 @@ __device__ __forceinline__ float fake_quant(float v, float amax) {
     // flips the rounding of values that sit on a quantization boundary.
     float q = fminf(fmaxf(__fdiv_rn(v, s), -448.0f), 448.0f);
     return float(__nv_fp8_e4m3(q)) * s;
+  } else if constexpr (QUANT == QUANT_FP4_UE8M0) {
+    float s = pow2_ceil(fmaxf(amax, 6.0f * 1.17549435e-38f) * (1.0f / 6.0f));
+    float q = fminf(fmaxf(__fdiv_rn(v, s), -6.0f), 6.0f);
+    return float(__nv_fp4_e2m1(q)) * s;
   } else if constexpr (QUANT == QUANT_FP4_E4M3) {
     float s = float(__nv_fp8_e4m3(__fdiv_rn(fmaxf(amax, 6.0f * 0.001953125f), 6.0f)));
     float q = fminf(fmaxf(__fdiv_rn(v, s), -6.0f), 6.0f);
@@ -325,7 +336,8 @@ __device__ __forceinline__ void dsv4_compress_pool_task_impl(
 // (sparse_attn with every reachable position selected, which is what the
 // indexer's top-k returns while the compressed length is <= index_topk).
 //   window slot s is valid iff s <= step (the ring is still filling);
-//   compressed row j is valid iff j < (step + 1) / RATIO  (RATIO 0: none).
+//   compressed row j is valid iff j < (step + 1) / RATIO  (RATIO 0: none);
+//   with SELECTED > 0 only the indexer's picks in idx are read.
 // K = V = the cached row. P is rounded to bf16 before the PV product, as the
 // reference kernel does.
 // q, out: [HEADS, D] (this task's heads); sink: fp32 [HEADS].
@@ -336,17 +348,19 @@ template <typename T,
           int WINDOW,
           int RATIO,
           int MAX_COMPRESSED,
+          int SELECTED,
           int Q_STRIDE,
           int OUT_STRIDE>
 __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
                                                          void const *win_ptr,
                                                          void const *comp_ptr,
+                                                         void const *idx_ptr,
                                                          void const *sink_ptr,
                                                          void const *step_ptr,
                                                          void *out_ptr,
                                                          float scale) {
   int const NUM_WARPS = blockDim.x / 32;
-  constexpr int MAX_KEYS = WINDOW + MAX_COMPRESSED;
+  constexpr int MAX_KEYS = WINDOW + (SELECTED > 0 ? SELECTED : MAX_COMPRESSED);
   constexpr int DPL = D / 32; // dims per lane in the score dot product
   static_assert(D % 64 == 0, "");
   T const *__restrict__ d_q = static_cast<T const *>(q_ptr);
@@ -357,7 +371,18 @@ __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
   int const step = *static_cast<int const *>(step_ptr);
   int const n_win = step + 1 < WINDOW ? step + 1 : WINDOW;
   int n_comp = RATIO > 0 ? (step + 1) / (RATIO > 0 ? RATIO : 1) : 0;
-  n_comp = n_comp < MAX_COMPRESSED ? n_comp : MAX_COMPRESSED;
+  // With SELECTED > 0 the compressed keys are the indexer's picks: the first
+  // min(n_comp, SELECTED) entries of idx, row numbers into comp.
+  int const cap = SELECTED > 0 ? SELECTED : MAX_COMPRESSED;
+  n_comp = n_comp < cap ? n_comp : cap;
+  int const *__restrict__ d_idx = static_cast<int const *>(idx_ptr);
+  auto key_row = [&](int j) -> T const * {
+    if (j < n_win) {
+      return d_win + (long long)j * D;
+    }
+    int r = SELECTED > 0 ? d_idx[j - n_win] : j - n_win;
+    return d_comp + (long long)r * D;
+  };
   int const n_keys = n_win + n_comp;
 
   extern __shared__ char smem[];
@@ -376,8 +401,7 @@ __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
     }
   }
   for (int j = warp; j < n_keys; j += NUM_WARPS) {
-    T const *row = j < n_win ? d_win + (long long)j * D
-                             : d_comp + (long long)(j - n_win) * D;
+    T const *row = key_row(j);
     float kf[DPL];
 #pragma unroll
     for (int i = 0; i < DPL; ++i) {
@@ -417,14 +441,182 @@ __device__ __forceinline__ void dsv4_attention_task_impl(void const *q_ptr,
     for (int d = threadIdx.x; d < D; d += blockDim.x) {
       float acc = 0.0f;
       for (int j = 0; j < n_keys; ++j) {
-        T const *row = j < n_win ? d_win + (long long)j * D
-                                 : d_comp + (long long)(j - n_win) * D;
-        acc += sc[j] * float(row[d]);
+        acc += sc[j] * float(key_row(j)[d]);
       }
       d_out[h * OUT_STRIDE + d] = T(acc / sum);
     }
   }
 } // dsv4_attention_task_impl
+
+// ---------------------------------------------------------------------------
+// Indexer scores (Indexer.forward): for each of this task's KEYS index keys,
+// score[t] = sum_h relu(q_h . k_t) * w_h, with w_h = weights_proj(x)_h *
+// w_scale. Rounded to bf16 where the reference's bf16 einsum / product / sum
+// round. Keys past the compressed length are scored too; the top-k ignores
+// them. q: [HEADS, D] bf16; k: [KEYS, D] bf16 (this task's rows); w: [HEADS]
+// bf16; out: fp32 [KEYS].
+// ---------------------------------------------------------------------------
+template <typename T, int HEADS, int D, int KEYS>
+__device__ __forceinline__ void dsv4_index_score_task_impl(void const *q_ptr,
+                                                           void const *k_ptr,
+                                                           void const *w_ptr,
+                                                           void *out_ptr,
+                                                           float w_scale) {
+  static_assert(D % 32 == 0, "");
+  constexpr int DPL = D / 32;
+  T const *__restrict__ d_q = static_cast<T const *>(q_ptr);
+  T const *__restrict__ d_k = static_cast<T const *>(k_ptr);
+  T const *__restrict__ d_w = static_cast<T const *>(w_ptr);
+  float *__restrict__ d_out = static_cast<float *>(out_ptr);
+  extern __shared__ char smem[];
+  float *s_q = reinterpret_cast<float *>(smem); // [HEADS][D]
+  float *s_w = s_q + HEADS * D;                 // [HEADS]
+  for (int i = threadIdx.x; i < HEADS * D; i += blockDim.x) {
+    s_q[i] = float(d_q[i]);
+  }
+  for (int h = threadIdx.x; h < HEADS; h += blockDim.x) {
+    s_w[h] = float(T(float(d_w[h]) * w_scale));
+  }
+  __syncthreads();
+  int const lane = threadIdx.x % 32;
+  int const warp = threadIdx.x / 32;
+  int const nwarps = blockDim.x / 32;
+  for (int t = warp; t < KEYS; t += nwarps) {
+    float kf[DPL];
+#pragma unroll
+    for (int i = 0; i < DPL; ++i) {
+      kf[i] = float(d_k[(long long)t * D + lane + 32 * i]);
+    }
+    float score = 0.0f;
+    for (int h = 0; h < HEADS; ++h) {
+      float dot = 0.0f;
+#pragma unroll
+      for (int i = 0; i < DPL; ++i) {
+        dot += s_q[h * D + lane + 32 * i] * kf[i];
+      }
+      dot = float(T(dsv4::warp_sum(dot)));
+      score += float(T(fmaxf(dot, 0.0f) * s_w[h]));
+    }
+    if (lane == 0) {
+      d_out[t] = float(T(score));
+    }
+  }
+} // dsv4_index_score_task_impl
+
+// ---------------------------------------------------------------------------
+// Indexer top-k: the TOPK best of the n = min((step + 1) / RATIO, N) valid
+// scores, as row numbers in ascending position order (ties at the cut go to
+// the lower positions), padded with -1. With n <= TOPK every position is
+// taken. Deterministic: the threshold is found by bisecting the order-
+// preserving bit pattern, and the picks are compacted in index order.
+// ---------------------------------------------------------------------------
+template <int N, int TOPK, int RATIO>
+__device__ __forceinline__ void dsv4_index_topk_task_impl(void const *score_ptr,
+                                                          void const *step_ptr,
+                                                          void *idx_ptr) {
+  float const *__restrict__ d_score = static_cast<float const *>(score_ptr);
+  int *__restrict__ d_idx = static_cast<int *>(idx_ptr);
+  int const step = *static_cast<int const *>(step_ptr);
+  int n = (step + 1) / RATIO;
+  n = n < N ? n : N;
+  extern __shared__ char smem[];
+  int *s_cnt = reinterpret_cast<int *>(smem); // [32] per-warp counts + total
+  int const lane = threadIdx.x % 32;
+  int const warp = threadIdx.x / 32;
+  int const nwarps = blockDim.x / 32;
+  auto key = [&](int t) -> uint32_t {
+    uint32_t b = __float_as_uint(d_score[t]);
+    return (b & 0x80000000u) ? ~b : (b | 0x80000000u);
+  };
+  auto count_ge = [&](uint32_t thr) -> int {
+    int c = 0;
+    for (int t = threadIdx.x; t < n; t += blockDim.x) {
+      c += key(t) >= thr;
+    }
+    c = __reduce_add_sync(0xffffffff, c);
+    __syncthreads();
+    if (lane == 0) {
+      s_cnt[warp] = c;
+    }
+    __syncthreads();
+    int total = 0;
+    for (int w = 0; w < nwarps; ++w) {
+      total += s_cnt[w];
+    }
+    return total;
+  };
+  // Ordered compaction of the positions satisfying pred, from out offset
+  // `base`, at most `limit` of them. Returns the new offset.
+  auto compact = [&](auto pred, int base, int limit) -> int {
+    for (int t0 = 0; t0 < n && base < limit; t0 += blockDim.x) {
+      int t = t0 + threadIdx.x;
+      bool f = t < n && pred(t);
+      unsigned m = __ballot_sync(0xffffffff, f);
+      __syncthreads();
+      if (lane == 0) {
+        s_cnt[warp] = __popc(m);
+      }
+      __syncthreads();
+      int off = base;
+      for (int w = 0; w < warp; ++w) {
+        off += s_cnt[w];
+      }
+      off += __popc(m & ((1u << lane) - 1u));
+      if (f && off < limit) {
+        d_idx[off] = t;
+      }
+      int total = 0;
+      for (int w = 0; w < nwarps; ++w) {
+        total += s_cnt[w];
+      }
+      base += total;
+    }
+    return base < limit ? base : limit;
+  };
+  int filled;
+  if (n <= TOPK) {
+    for (int t = threadIdx.x; t < n; t += blockDim.x) {
+      d_idx[t] = t;
+    }
+    filled = n;
+  } else {
+    uint32_t thr = 0;
+    for (int bit = 31; bit >= 0; --bit) {
+      uint32_t cand = thr | (1u << bit);
+      if (count_ge(cand) >= TOPK) {
+        thr = cand;
+      }
+    }
+    // Everything above the threshold, then ties at it, each in index order;
+    // the two passes are merged back into ascending order below.
+    int above = compact([&](int t) { return key(t) > thr; }, 0, TOPK);
+    compact([&](int t) { return key(t) == thr; }, above, TOPK);
+    filled = TOPK;
+    __syncthreads();
+    // Merge the two sorted runs [0, above) and [above, TOPK) (one thread:
+    // TOPK is small and this keeps the order deterministic).
+    if (threadIdx.x == 0 && above > 0 && above < TOPK) {
+      int tmp[TOPK];
+      int i = 0, j = above, o = 0;
+      while (i < above && j < TOPK) {
+        tmp[o++] = d_idx[i] < d_idx[j] ? d_idx[i++] : d_idx[j++];
+      }
+      while (i < above) {
+        tmp[o++] = d_idx[i++];
+      }
+      while (j < TOPK) {
+        tmp[o++] = d_idx[j++];
+      }
+      for (int k = 0; k < TOPK; ++k) {
+        d_idx[k] = tmp[k];
+      }
+    }
+  }
+  __syncthreads();
+  for (int t = filled + threadIdx.x; t < TOPK; t += blockDim.x) {
+    d_idx[t] = -1;
+  }
+} // dsv4_index_topk_task_impl
 
 // ---------------------------------------------------------------------------
 // MoE gate (Gate.forward, sqrtsoftplus): scores = sqrt(softplus(logits));
